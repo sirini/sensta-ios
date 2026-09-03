@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Xcode 사용자별 상태와 빌드 결과
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager 캐시
+.build/
+.swiftpm/xcode/package.xcworkspace/xcuserdata/
+
+# 서명·Apple·Firebase 자격 증명
+*.p8
+*.p12
+*.mobileprovision
+GoogleService-Info.plist
+
+# 로컬 환경 파일
+.env
+.env.*
+!.env.example
