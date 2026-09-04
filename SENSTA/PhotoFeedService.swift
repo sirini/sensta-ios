@@ -4,7 +4,7 @@ protocol PhotoFeedServing: Sendable {
   func fetchPage(_ page: Int) async throws -> PhotoFeedPage
 }
 
-enum PhotoFeedServiceError: Error, Equatable, LocalizedError, Sendable {
+enum NuboAPIError: Error, Equatable, LocalizedError, Sendable {
   case invalidRequest
   case invalidResponse
   case httpStatus(Int)
@@ -32,12 +32,12 @@ enum PhotoFeedServiceError: Error, Equatable, LocalizedError, Sendable {
 enum PhotoFeedEndpoint {
   static func makeRequest(apiBaseURL: URL, page: Int) throws -> URLRequest {
     guard page > 0 else {
-      throw PhotoFeedServiceError.invalidRequest
+      throw NuboAPIError.invalidRequest
     }
 
     let endpointURL = apiBaseURL.appending(path: "board/list")
     guard var components = URLComponents(url: endpointURL, resolvingAgainstBaseURL: false) else {
-      throw PhotoFeedServiceError.invalidRequest
+      throw NuboAPIError.invalidRequest
     }
     components.queryItems = [
       URLQueryItem(name: "id", value: "photo"),
@@ -46,7 +46,7 @@ enum PhotoFeedEndpoint {
       URLQueryItem(name: "keyword", value: ""),
     ]
     guard let url = components.url else {
-      throw PhotoFeedServiceError.invalidRequest
+      throw NuboAPIError.invalidRequest
     }
 
     var request = URLRequest(url: url)
@@ -57,8 +57,8 @@ enum PhotoFeedEndpoint {
   }
 }
 
-struct PhotoFeedService: PhotoFeedServing {
-  private let apiBaseURL: URL
+struct NuboAPIClient: Sendable {
+  let apiBaseURL: URL
   private let session: URLSession
 
   init(apiBaseURL: URL, session: URLSession = .shared) {
@@ -66,8 +66,7 @@ struct PhotoFeedService: PhotoFeedServing {
     self.session = session
   }
 
-  func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
-    let request = try PhotoFeedEndpoint.makeRequest(apiBaseURL: apiBaseURL, page: page)
+  func data(for request: URLRequest) async throws -> Data {
     let data: Data
     let response: URLResponse
 
@@ -78,35 +77,49 @@ struct PhotoFeedService: PhotoFeedServing {
     } catch let error as URLError {
       switch error.code {
       case .notConnectedToInternet, .networkConnectionLost:
-        throw PhotoFeedServiceError.networkUnavailable
+        throw NuboAPIError.networkUnavailable
       case .timedOut:
-        throw PhotoFeedServiceError.timedOut
+        throw NuboAPIError.timedOut
       default:
-        throw PhotoFeedServiceError.networkFailure
+        throw NuboAPIError.networkFailure
       }
     } catch {
-      throw PhotoFeedServiceError.networkFailure
+      throw NuboAPIError.networkFailure
     }
 
     guard let httpResponse = response as? HTTPURLResponse else {
-      throw PhotoFeedServiceError.invalidResponse
+      throw NuboAPIError.invalidResponse
     }
     guard (200..<300).contains(httpResponse.statusCode) else {
-      throw PhotoFeedServiceError.httpStatus(httpResponse.statusCode)
+      throw NuboAPIError.httpStatus(httpResponse.statusCode)
     }
+    return data
+  }
+}
+
+struct PhotoFeedService: PhotoFeedServing {
+  private let client: NuboAPIClient
+
+  init(apiBaseURL: URL, session: URLSession = .shared) {
+    client = NuboAPIClient(apiBaseURL: apiBaseURL, session: session)
+  }
+
+  func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
+    let request = try PhotoFeedEndpoint.makeRequest(apiBaseURL: client.apiBaseURL, page: page)
+    let data = try await client.data(for: request)
 
     let envelope: BoardListResponseDTO
     do {
       envelope = try JSONDecoder().decode(BoardListResponseDTO.self, from: data)
     } catch {
-      throw PhotoFeedServiceError.malformedResponse
+      throw NuboAPIError.malformedResponse
     }
-    return try envelope.makeFeedPage(apiBaseURL: apiBaseURL)
+    return try envelope.makeFeedPage(apiBaseURL: client.apiBaseURL)
   }
 }
 
 struct UnavailablePhotoFeedService: PhotoFeedServing {
   func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
-    throw PhotoFeedServiceError.configuration
+    throw NuboAPIError.configuration
   }
 }

@@ -33,10 +33,10 @@ struct BoardListResponseDTO: Decodable, Sendable {
 
   func makeFeedPage(apiBaseURL: URL) throws -> PhotoFeedPage {
     guard success, code == 0 else {
-      throw PhotoFeedServiceError.server(code: code, message: error)
+      throw NuboAPIError.server(code: code, message: error)
     }
     guard let result else {
-      throw PhotoFeedServiceError.malformedResponse
+      throw NuboAPIError.malformedResponse
     }
 
     let blockedWriterIDs = Set(result.blackList)
@@ -86,20 +86,25 @@ struct BoardPostDTO: Decodable, Sendable {
       content: content,
       submitted: Date(timeIntervalSince1970: Double(submitted) / 1_000),
       viewCount: hit,
-      coverURL: Self.mediaURL(for: Self.previewImagePath(for: cover), apiBaseURL: apiBaseURL),
+      coverURL: MediaURLResolver.url(
+        for: MediaURLResolver.previewImagePath(for: cover),
+        apiBaseURL: apiBaseURL
+      ),
       commentCount: comment,
       likeCount: like,
       isLiked: liked,
       writer: PhotoPostWriter(
         id: writer.uid,
         name: writer.name,
-        profileURL: Self.mediaURL(for: writer.profile, apiBaseURL: apiBaseURL),
+        profileURL: MediaURLResolver.url(for: writer.profile, apiBaseURL: apiBaseURL),
         badgeKeys: writer.badges?.map(\.key) ?? []
       )
     )
   }
+}
 
-  private static func previewImagePath(for path: String) -> String {
+enum MediaURLResolver {
+  static func previewImagePath(for path: String) -> String {
     let pattern = #"(/upload/thumbnails/(?:[^/]+/)*)t([^/?]+)(?=$|[?#])"#
     return path.replacingOccurrences(
       of: pattern,
@@ -108,7 +113,7 @@ struct BoardPostDTO: Decodable, Sendable {
     )
   }
 
-  private static func mediaURL(for path: String, apiBaseURL: URL) -> URL? {
+  static func url(for path: String, apiBaseURL: URL) -> URL? {
     guard !path.isEmpty,
       let url = URL(string: path, relativeTo: apiBaseURL)?.absoluteURL,
       url.scheme == "https"

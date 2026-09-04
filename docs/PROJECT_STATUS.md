@@ -4,8 +4,8 @@
 
 - SENSTA Android의 제품 동작과 GOAPI API contract v1을 기준으로 iPhone용 네이티브 SwiftUI 앱을
   개발한다.
-- Apple·App Store 등록과 최소 Xcode 프로젝트 기반 위에 공개 피드를 확정하고 게시글 상세 기능을
-  준비한다.
+- Apple·App Store 등록과 최소 Xcode 프로젝트 기반 위에 공개 피드와 게시글 상세를 확정하고 목록 추가
+  로딩을 준비한다.
 
 ## 현재 단계
 
@@ -19,6 +19,9 @@
   카드로 표시한다.
 - 원격 이미지의 고유 크기와 긴 통계 값이 카드 너비를 넓히지 않도록 이미지 Geometry와 카드 최대 너비를
   분리했다. 피드 카드는 화면 양쪽 12pt 안에 고정하며 UI test로 프레임 좌표를 검증한다.
+- 피드 카드를 누르면 익명 `GET /board/view?id=photo&postUid=...&needUpdateHit=0&latestLimit=5` 요청으로
+  게시글 상세를 연다. 여러 사진을 가로로 넘기고 각 사진의 EXIF·AI 설명, 본문·태그·첨부 파일 정보·통계와
+  시스템 공유를 표시한다. 상세 사진도 화면 양쪽 16pt 안에 고정하는 UI 회귀 테스트를 갖췄다.
 - macOS 27 beta 환경에서 `/Applications/Xcode-beta.app`의 Xcode 27.0(`27A5252f`), Swift 6.4,
   iOS 27.0 SDK와 시뮬레이터를 확인했다.
 - 실제 iPhone은 준비되어 있다.
@@ -40,10 +43,10 @@
   `https://sensta.me/goapi/`를 Info.plist에 주입한다. Associated Domains, Push Notifications와 Sign in
   with Apple entitlement도 App ID 설정과 맞췄다.
 - Xcode 27의 iPhone 17 Pro 시뮬레이터에서 Debug test build, Release build와 정적 분석을 통과했다. API
-  설정·피드 계약·상태 unit test 9개와 launch·피드 폭 UI test 2개가 통과했으며 운영 데이터로 라이트·
-  다크 모드와 큰 글자 레이아웃을 확인했다.
+  설정·피드/상세 계약·상태 unit test 14개와 launch·피드 폭·상세 이동/폭 UI test 3개가 통과했으며 운영
+  데이터 피드로 라이트·다크 모드와 큰 글자 레이아웃을 확인했다.
 - iPhone 17 실기기용 Debug 빌드를 Apple Development 인증서와 Team `WKPCU58CWL`로 서명했고,
-  첫 공개 피드가 포함된 `me.sensta.ios.debug` 설치·실행 및 실행 중 프로세스를 확인했다.
+  공개 피드와 게시글 상세가 포함된 `me.sensta.ios.debug` 설치·실행을 확인했다.
 
 ## 결정
 
@@ -69,8 +72,7 @@
 
 ## 다음 작업
 
-1. `GET /board/view` 응답 fixture와 decoding test를 먼저 만들고 피드 카드에서 게시글 상세로 이동하는
-   두 번째 공개 수직 기능을 구현한다. 이후 목록 페이지 추가 로딩을 연결한다.
+1. 공개 피드의 다음 페이지 추가 로딩과 중복 요청·끝 페이지 처리를 계약 및 상태 테스트부터 구현한다.
 2. Firebase iOS 앱과 APNs 인증 키는 알림 기능 작업이 시작될 때 등록한다.
 3. GOAPI의 공용 mobile Google 인증·refresh 경로와 Google ID token 검증 강화를 서버 작업 단위로
    구현하고 보안 회귀 테스트를 추가한다. 이후 Apple 로그인, push, 앱 출처와 업로드 계약을 각각 독립

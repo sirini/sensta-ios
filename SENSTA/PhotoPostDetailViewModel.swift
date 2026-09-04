@@ -1,50 +1,43 @@
-import Foundation
 import Observation
 
 @MainActor
 @Observable
-final class PhotoFeedViewModel {
+final class PhotoPostDetailViewModel {
   enum State: Equatable {
     case idle
     case loading
-    case loaded([PhotoPost])
-    case empty
+    case loaded(PhotoPostDetail)
     case failed(String)
   }
 
-  private let service: any PhotoFeedServing
+  private let postID: Int
+  private let service: any PhotoPostDetailServing
   private var requestInFlight = false
   private(set) var state: State = .idle
 
-  init(service: any PhotoFeedServing) {
+  init(postID: Int, service: any PhotoPostDetailServing) {
+    self.postID = postID
     self.service = service
   }
 
   func loadIfNeeded() async {
     guard state == .idle else { return }
-    await load(showsLoadingState: true)
-  }
-
-  func refresh() async {
-    await load(showsLoadingState: false)
+    await load()
   }
 
   func retry() async {
-    await load(showsLoadingState: true)
+    await load()
   }
 
-  private func load(showsLoadingState: Bool) async {
+  private func load() async {
     guard !requestInFlight else { return }
     let previousState = state
     requestInFlight = true
-    if showsLoadingState {
-      state = .loading
-    }
+    state = .loading
     defer { requestInFlight = false }
 
     do {
-      let page = try await service.fetchPage(1)
-      state = page.posts.isEmpty ? .empty : .loaded(page.posts)
+      state = .loaded(try await service.fetchPost(id: postID))
     } catch is CancellationError {
       state = previousState
     } catch {

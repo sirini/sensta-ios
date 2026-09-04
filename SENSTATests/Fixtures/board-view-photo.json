@@ -1,0 +1,77 @@
+{
+  "success": true,
+  "error": "",
+  "code": 0,
+  "result": {
+    "config": { "uid": 2, "id": "photo", "name": "사진", "rowCount": 32 },
+    "post": {
+      "uid": 101,
+      "title": "가을빛 테스트 사진",
+      "content": "<p>빛이 부드럽던 오후의 기록입니다.</p>",
+      "submitted": 1788500000000,
+      "modified": 1788500001000,
+      "hit": 17,
+      "status": 0,
+      "category": { "uid": 5, "name": "lounge" },
+      "cover": "/upload/thumbnails/2026/09/04/tsample.webp",
+      "comment": 2,
+      "like": 4,
+      "liked": false,
+      "writer": {
+        "uid": 42,
+        "name": "사진가",
+        "profile": "/upload/profile/sample.webp",
+        "signature": "사진을 좋아합니다.",
+        "badges": [{
+          "key": "sensta-app",
+          "name": "SENSTA 앱 포토그래퍼",
+          "description": "SENSTA 앱으로 사진을 공유한 사용자입니다.",
+          "iconKey": "aperture",
+          "earnedAt": 1788400000000
+        }]
+      }
+    },
+    "images": [
+      {
+        "file": { "uid": 501 },
+        "thumbnail": {
+          "large": "/upload/thumbnails/2026/09/04/lsample.webp",
+          "small": "/upload/thumbnails/2026/09/04/ssample.webp"
+        },
+        "exif": {
+          "make": "Apple", "model": "iPhone", "aperture": 180, "iso": 80,
+          "focalLength": 67, "exposure": 125, "width": 3024, "height": 4032,
+          "date": 1788499000000
+        },
+        "description": "노을빛을 받은 나무와 산책로가 보입니다."
+      },
+      {
+        "file": { "uid": 502 },
+        "thumbnail": {
+          "large": "/upload/thumbnails/2026/09/04/lsecond.webp",
+          "small": "/upload/thumbnails/2026/09/04/ssecond.webp"
+        },
+        "exif": {
+          "make": "", "model": "", "aperture": 0, "iso": 0, "focalLength": 0,
+          "exposure": 0, "width": 3024, "height": 4032, "date": 0
+        },
+        "description": ""
+      }
+    ],
+    "files": [{ "uid": 701, "name": "원본사진.heic", "size": 3123456 }],
+    "tags": [{ "uid": 11, "name": "가을" }, { "uid": 12, "name": "산책" }],
+    "prevPostUid": 0,
+    "nextPostUid": 102,
+    "writerPosts": [{
+      "board": { "id": "photo", "type": 1, "name": "사진" },
+      "postUid": 99, "like": 3, "submitted": 1788400000000, "comment": 1,
+      "title": "이전 사진"
+    }],
+    "writerComments": [{
+      "board": { "id": "photo", "type": 1, "name": "사진" },
+      "postUid": 98, "like": 1, "submitted": 1788300000000,
+      "content": "좋은 사진입니다."
+    }],
+    "isAdmin": false
+  }
+}

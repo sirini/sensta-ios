@@ -2,9 +2,11 @@ import SwiftUI
 
 struct ContentView: View {
   @State private var model: PhotoFeedViewModel
+  private let detailService: any PhotoPostDetailServing
 
-  init(service: any PhotoFeedServing) {
+  init(service: any PhotoFeedServing, detailService: any PhotoPostDetailServing) {
     _model = State(initialValue: PhotoFeedViewModel(service: service))
+    self.detailService = detailService
   }
 
   var body: some View {
@@ -31,7 +33,7 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
           }
         case .loaded(let posts):
-          PhotoFeedList(posts: posts) {
+          PhotoFeedList(posts: posts, detailService: detailService) {
             await model.refresh()
           }
         }
@@ -53,14 +55,21 @@ struct ContentView: View {
 
 private struct PhotoFeedList: View {
   let posts: [PhotoPost]
+  let detailService: any PhotoPostDetailServing
   let onRefresh: @MainActor @Sendable () async -> Void
 
   var body: some View {
     ScrollView {
       LazyVStack(spacing: 20) {
         ForEach(posts) { post in
-          PhotoFeedCard(post: post)
-            .frame(maxWidth: .infinity)
+          NavigationLink {
+            PhotoPostDetailView(postID: post.id, service: detailService)
+          } label: {
+            PhotoFeedCard(post: post)
+          }
+          .buttonStyle(.plain)
+          .frame(maxWidth: .infinity)
+          .accessibilityIdentifier("photo-feed-card")
         }
       }
       .frame(maxWidth: .infinity)
@@ -113,7 +122,6 @@ private struct PhotoFeedCard: View {
     }
     .frame(maxWidth: .infinity)
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("photo-feed-card")
   }
 
   private var writerHeader: some View {
@@ -227,7 +235,40 @@ private struct PhotoFeedCard: View {
 }
 
 #Preview {
-  ContentView(service: PreviewPhotoFeedService())
+  ContentView(
+    service: PreviewPhotoFeedService(),
+    detailService: PreviewPhotoPostDetailService()
+  )
+}
+
+private struct PreviewPhotoPostDetailService: PhotoPostDetailServing {
+  func fetchPost(id: Int) async throws -> PhotoPostDetail {
+    PhotoPostDetail(
+      post: PhotoPost(
+        id: id,
+        title: "사진으로 이어지는 커뮤니티",
+        content: "SENSTA에서 사진과 이야기를 함께 만나보세요.",
+        submitted: .now,
+        viewCount: 24,
+        coverURL: nil,
+        commentCount: 3,
+        likeCount: 12,
+        isLiked: false,
+        writer: PhotoPostWriter(
+          id: 1,
+          name: "SENSTA",
+          profileURL: nil,
+          badgeKeys: ["sensta-app"]
+        )
+      ),
+      images: [],
+      tags: [PhotoPostTag(id: 1, name: "사진")],
+      attachments: [],
+      previousPostID: nil,
+      nextPostID: nil,
+      shareURL: nil
+    )
+  }
 }
 
 private struct PreviewPhotoFeedService: PhotoFeedServing {

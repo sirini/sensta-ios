@@ -57,7 +57,7 @@ struct PhotoFeedContractTests {
     )
     let response = try JSONDecoder().decode(BoardListResponseDTO.self, from: data)
 
-    #expect(throws: PhotoFeedServiceError.server(code: 3, message: "invalid board")) {
+    #expect(throws: NuboAPIError.server(code: 3, message: "invalid board")) {
       try response.makeFeedPage(
         apiBaseURL: #require(URL(string: "https://sensta.me/goapi/"))
       )

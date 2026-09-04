@@ -85,7 +85,7 @@ private actor RetryPhotoFeedService: PhotoFeedServing {
   func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
     attemptCount += 1
     if attemptCount == 1 {
-      throw PhotoFeedServiceError.networkUnavailable
+      throw NuboAPIError.networkUnavailable
     }
     return self.page
   }
