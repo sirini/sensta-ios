@@ -1,0 +1,79 @@
+{
+  "success": true,
+  "error": "",
+  "code": 0,
+  "result": {
+    "totalPostCount": 2,
+    "config": {
+      "uid": 2,
+      "id": "photo",
+      "groupUid": 1,
+      "admin": { "group": 1, "board": 1 },
+      "type": 1,
+      "name": "사진",
+      "info": "사진 게시판",
+      "rowCount": 32,
+      "width": 1200,
+      "useCategory": true,
+      "category": [{ "uid": 5, "name": "lounge" }],
+      "level": { "view": 0, "write": 1, "comment": 1, "download": 0, "list": 0 },
+      "point": { "view": 0, "write": 0, "comment": 0, "download": 0 },
+      "skinKey": "nubo-advance-gallery"
+    },
+    "notices": [],
+    "posts": [
+      {
+        "uid": 101,
+        "title": "테스트 사진",
+        "content": "fixture 본문",
+        "submitted": 1788500000000,
+        "modified": 1788500001000,
+        "hit": 7,
+        "status": 0,
+        "category": { "uid": 5, "name": "lounge" },
+        "cover": "/upload/thumbnails/2026/09/04/tsample.webp",
+        "comment": 2,
+        "like": 4,
+        "liked": false,
+        "writer": {
+          "uid": 42,
+          "name": "사진가",
+          "profile": "/upload/profile/sample.webp",
+          "signature": "사진을 좋아합니다.",
+          "badges": [
+            {
+              "key": "sensta-app",
+              "name": "SENSTA 앱 포토그래퍼",
+              "description": "SENSTA 앱으로 사진을 공유한 사용자입니다.",
+              "iconKey": "aperture",
+              "earnedAt": 1788400000000
+            }
+          ]
+        }
+      },
+      {
+        "uid": 102,
+        "title": "차단된 작성자의 사진",
+        "content": "피드에서 제외되어야 합니다.",
+        "submitted": 1788400000000,
+        "modified": 1788400000000,
+        "hit": 1,
+        "status": 0,
+        "category": { "uid": 5, "name": "lounge" },
+        "cover": "/upload/thumbnails/2026/09/03/tblocked.webp",
+        "comment": 0,
+        "like": 0,
+        "liked": false,
+        "writer": {
+          "uid": 99,
+          "name": "차단 사용자",
+          "profile": "",
+          "signature": "",
+          "badges": []
+        }
+      }
+    ],
+    "blackList": [99],
+    "isAdmin": false
+  }
+}

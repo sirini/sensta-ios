@@ -2,7 +2,7 @@
 .DS_Store
 
 # Xcode 사용자별 상태와 빌드 결과
-DerivedData/
+DerivedData*/
 build/
 *.xcuserstate
 xcuserdata/

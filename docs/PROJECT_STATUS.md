@@ -4,12 +4,19 @@
 
 - SENSTA Android의 제품 동작과 GOAPI API contract v1을 기준으로 iPhone용 네이티브 SwiftUI 앱을
   개발한다.
-- Apple·App Store 등록과 최소 Xcode 프로젝트 기반을 확정하고 첫 공개 피드 수직 기능을 준비한다.
+- Apple·App Store 등록과 최소 Xcode 프로젝트 기반 위에 공개 피드를 확정하고 게시글 상세 기능을
+  준비한다.
 
 ## 현재 단계
 
-- iOS 17 이상·iPhone 전용 SwiftUI 앱과 unit/UI test target, shared scheme을 생성했다. 앱 기능 구현은
-  아직 시작하지 않았다.
+- iOS 17 이상·iPhone 전용 SwiftUI 앱과 unit/UI test target, shared scheme을 만들고 첫 공개 사진 피드를
+  구현했다.
+- `GET /board/list?id=photo&page=1&option=0&keyword=` 운영 응답을 Android DTO와 대조했다. fixture 기반
+  Swift DTO decoding, 오류 envelope, 공개 요청과 차단 목록 필터 회귀 테스트를 갖췄으며, 로딩·빈 상태·
+  오류·재시도·당겨서 새로고침을 제공한다.
+- 목록 `cover` 상대 경로는 Android와 같이 `t*.webp`에서 `f*.webp` 미리보기로 바꾸고 `sensta.me`의
+  HTTPS 절대 URL로 해석한다. 작성자, 앱 포토그래퍼 업적, 제목, 좋아요·댓글·조회수와 날짜를 네이티브
+  카드로 표시한다.
 - macOS 27 beta 환경에서 `/Applications/Xcode-beta.app`의 Xcode 27.0(`27A5252f`), Swift 6.4,
   iOS 27.0 SDK와 시뮬레이터를 확인했다.
 - 실제 iPhone은 준비되어 있다.
@@ -30,10 +37,11 @@
 - Debug는 `me.sensta.ios.debug`, Release는 `me.sensta.ios`를 사용하고 두 구성 모두 운영
   `https://sensta.me/goapi/`를 Info.plist에 주입한다. Associated Domains, Push Notifications와 Sign in
   with Apple entitlement도 App ID 설정과 맞췄다.
-- Xcode 27의 iPhone 17 Pro 시뮬레이터에서 Debug·Release 빌드, API 설정 unit test 3개와 초기 화면 UI
-  test 1개를 통과했다.
+- Xcode 27의 iPhone 17 Pro 시뮬레이터에서 Debug test build, Release build와 정적 분석을 통과했다. API
+  설정·피드 계약·상태 unit test 9개와 launch UI test 1개가 통과했으며 운영 데이터로 라이트·다크 모드와
+  큰 글자 레이아웃을 확인했다.
 - iPhone 17 실기기용 Debug 빌드를 Apple Development 인증서와 Team `WKPCU58CWL`로 서명했고,
-  `me.sensta.ios.debug` 설치·실행 및 실행 중 프로세스를 확인했다.
+  첫 공개 피드가 포함된 `me.sensta.ios.debug` 설치·실행 및 실행 중 프로세스를 확인했다.
 
 ## 결정
 
@@ -47,7 +55,9 @@
 - 최소 지원 버전은 iOS 17이며 초기 배포 대상은 iPhone이다. iPad는 별도 QA 뒤 확대한다.
 - access/refresh token은 Keychain에 저장하고 민감하지 않은 설정만 UserDefaults에 둔다.
 - 정확한 GPS 위치는 공개 업로드에 포함하지 않는다.
-- 앱 기능 작업은 다음 개발 세션부터 작은 수직 기능 단위로 구현·검증·커밋한다.
+- 공개 피드는 로그인 없이 직접 GOAPI를 호출한다. 요청에는 `Authorization`을 붙이지 않으며 서버가 주는
+  차단 목록 필터는 Android와 동일하게 적용한다.
+- 앱 기능은 fixture와 요청 계약 테스트를 먼저 만든 뒤 작은 수직 기능 단위로 구현·검증한다.
 
 ## 선행 조건
 
@@ -57,8 +67,8 @@
 
 ## 다음 작업
 
-1. 공개 게시글 목록 응답 fixture와 Swift DTO decoding test를 먼저 만들고, 빈 상태·오류·재시도를 포함한
-   첫 사진 피드 수직 기능을 구현한다.
+1. `GET /board/view` 응답 fixture와 decoding test를 먼저 만들고 피드 카드에서 게시글 상세로 이동하는
+   두 번째 공개 수직 기능을 구현한다. 이후 목록 페이지 추가 로딩을 연결한다.
 2. Firebase iOS 앱과 APNs 인증 키는 알림 기능 작업이 시작될 때 등록한다.
 3. GOAPI의 공용 mobile Google 인증·refresh 경로와 Google ID token 검증 강화를 서버 작업 단위로
    구현하고 보안 회귀 테스트를 추가한다. 이후 Apple 로그인, push, 앱 출처와 업로드 계약을 각각 독립

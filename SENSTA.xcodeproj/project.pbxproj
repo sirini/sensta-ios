@@ -13,6 +13,12 @@
 		A10000000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* Assets.xcassets */; };
 		A10000000000000000000005 /* AppConfigurationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* AppConfigurationTests.swift */; };
 		A10000000000000000000006 /* SENSTAUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* SENSTAUITests.swift */; };
+		A10000000000000000000007 /* PhotoFeedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* PhotoFeedModels.swift */; };
+		A10000000000000000000008 /* PhotoFeedService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* PhotoFeedService.swift */; };
+		A10000000000000000000009 /* PhotoFeedViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* PhotoFeedViewModel.swift */; };
+		A1000000000000000000000A /* PhotoFeedContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* PhotoFeedContractTests.swift */; };
+		A1000000000000000000000B /* PhotoFeedViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* PhotoFeedViewModelTests.swift */; };
+		A1000000000000000000000C /* board-list-photo.json in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000014 /* board-list-photo.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -47,6 +53,12 @@
 		A2000000000000000000000C /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A2000000000000000000000D /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		A2000000000000000000000E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A2000000000000000000000F /* PhotoFeedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFeedModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* PhotoFeedService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFeedService.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* PhotoFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFeedViewModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* PhotoFeedContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFeedContractTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* PhotoFeedViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoFeedViewModelTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000014 /* board-list-photo.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "board-list-photo.json"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +103,9 @@
 				A20000000000000000000004 /* SENSTAApp.swift */,
 				A20000000000000000000005 /* ContentView.swift */,
 				A20000000000000000000006 /* AppConfiguration.swift */,
+				A2000000000000000000000F /* PhotoFeedModels.swift */,
+				A20000000000000000000010 /* PhotoFeedService.swift */,
+				A20000000000000000000011 /* PhotoFeedViewModel.swift */,
 				A20000000000000000000007 /* Assets.xcassets */,
 				A2000000000000000000000E /* Info.plist */,
 				A20000000000000000000008 /* SENSTA.entitlements */,
@@ -102,8 +117,19 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000009 /* AppConfigurationTests.swift */,
+				A20000000000000000000012 /* PhotoFeedContractTests.swift */,
+				A20000000000000000000013 /* PhotoFeedViewModelTests.swift */,
+				A50000000000000000000007 /* Fixtures */,
 			);
 			path = SENSTATests;
+			sourceTree = "<group>";
+		};
+		A50000000000000000000007 /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000014 /* board-list-photo.json */,
+			);
+			path = Fixtures;
 			sourceTree = "<group>";
 		};
 		A50000000000000000000004 /* SENSTAUITests */ = {
@@ -258,6 +284,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000000000000000000000C /* board-list-photo.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,6 +304,9 @@
 			files = (
 				A10000000000000000000003 /* AppConfiguration.swift in Sources */,
 				A10000000000000000000002 /* ContentView.swift in Sources */,
+				A10000000000000000000007 /* PhotoFeedModels.swift in Sources */,
+				A10000000000000000000008 /* PhotoFeedService.swift in Sources */,
+				A10000000000000000000009 /* PhotoFeedViewModel.swift in Sources */,
 				A10000000000000000000001 /* SENSTAApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -286,6 +316,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000005 /* AppConfigurationTests.swift in Sources */,
+				A1000000000000000000000A /* PhotoFeedContractTests.swift in Sources */,
+				A1000000000000000000000B /* PhotoFeedViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
