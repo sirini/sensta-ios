@@ -4,18 +4,20 @@
 
 - [x] Apple Developer Program 재가입 신청
 - [x] 결제 카드 등록
-- [ ] Apple 심사 승인 메일 수신
+- [x] Apple Developer Program 재가입 승인
 - [ ] 실제 카드 결제 완료 확인
 - [ ] Developer 계정의 활성 상태, Team ID와 만료일 확인
 - [ ] Xcode에 Apple Account와 활성 Team 연결
 - [x] 개발용 iPhone 준비
 - [x] Xcode 27 beta와 iOS 27 simulator 설치
+- [x] Xcode 라이선스 동의와 초기 구성 완료
 - [ ] iPhone을 Xcode에 연결하고 개발자 모드·서명·실행 확인
 
 개인정보나 인증서 비밀키는 문서와 Git에 기록하지 않는다.
 
 ## 앱 식별자와 범위
 
+- [ ] 재활성화된 계정의 기존 SENSTA App ID·App Store Connect 레코드 확인
 - [ ] 운영 bundle ID 확정: 제안 `me.sensta.ios`
 - [ ] 개발 bundle ID 확정: 제안 `me.sensta.ios.debug`
 - [ ] App Store Connect에서 `SENSTA` 이름과 앱 레코드 생성
@@ -25,7 +27,7 @@
 
 ## GOAPI와 NUBO
 
-- [ ] iOS용 Google token audience와 mobile refresh 계약
+- [ ] 공용 Google server client audience와 mobile 인증·refresh 계약
 - [ ] Sign in with Apple 서버 검증과 외부 계정 연결 정책
 - [ ] `ios` push platform 등록과 APNs/FCM payload
 - [ ] `sensta-ios` 게시글 출처와 `sensta-app` 업적 정책

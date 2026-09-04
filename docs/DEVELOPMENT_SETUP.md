@@ -13,6 +13,8 @@
 | iOS SDK | iOS 27.0 |
 | Simulator runtime | iOS 27.0 (`24A5423a`) |
 | 실제 기기 | iPhone 준비됨 |
+| Xcode 초기 설정 | 라이선스 동의와 추가 구성 완료 |
+| Apple Developer Program | 재가입 승인, Team·코드서명 확인 예정 |
 
 `xcode-select`는 Xcode 26.6을 가리킬 수 있으므로 단순히 `xcodebuild`나 `/usr/bin/git`을 실행하면
 호환성 또는 라이선스 오류가 발생할 수 있다. 저장소 작업에서는 Xcode 27 beta의 Developer 디렉터리를
@@ -56,7 +58,7 @@ Beta 도구 자체의 결함과 앱 결함을 구분하기 위해 release 준비
 - Interface: SwiftUI
 - Language: Swift
 - 테스트: unit test와 UI test target 포함
-- Team: Apple Developer Program 승인 후 선택
+- Team: 승인된 Apple Developer Program Team을 계정에서 확인한 뒤 선택
 - 운영 bundle ID 제안: `me.sensta.ios`
 - 개발 bundle ID 제안: `me.sensta.ios.debug`
 - 최소 지원 버전 제안: iOS 17 이상, 첫 구현 전에 최종 확정

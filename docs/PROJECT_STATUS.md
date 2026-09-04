@@ -12,8 +12,10 @@
 - macOS 27 beta 환경에서 `/Applications/Xcode-beta.app`의 Xcode 27.0(`27A5252f`), Swift 6.4,
   iOS 27.0 SDK와 시뮬레이터를 확인했다.
 - 실제 iPhone은 준비되어 있다.
-- Apple Developer Program은 약 10년 전 만료된 멤버십의 재가입 신청과 카드 등록을 마쳤고,
-  2026-09-04 현재 Apple 심사 결과와 결제 완료 메일을 기다리고 있다.
+- 약 10년 전 만료됐던 Apple Developer Program 재가입이 2026-09-04 승인됐다. Xcode 라이선스 동의와
+  초기 구성도 마쳤고 저장소 환경 점검은 다시 통과했다.
+- Team ID·멤버십 만료일과 Xcode의 활성 Team 연결은 아직 확인하지 않았다. 로컬 Keychain에도 유효한
+  Apple Development 코드서명 identity가 아직 없어 실제 iPhone 서명 실행은 다음 단계다.
 
 ## 결정
 
@@ -30,7 +32,7 @@
 
 ## 선행 조건
 
-- Apple Developer Program 승인, 결제 완료, Team ID와 멤버십 만료일 확인
+- Apple Developer Program 승인은 완료했다. 결제 내역, Team ID와 멤버십 만료일은 계정에서 확인한다.
 - 운영·개발 bundle ID 확정과 Xcode Signing Team 연결
 - iOS 인증·푸시·앱 출처·HEIC 및 UGC 심사 대응을 위한 GOAPI 사전 작업
 - Firebase iOS 앱, Google OAuth iOS client, APNs 인증 키 준비
@@ -38,7 +40,13 @@
 
 ## 다음 작업
 
-1. Apple 멤버십 승인 상태와 Xcode Signing Team을 확인한다.
-2. 최소 지원 iOS 버전, bundle ID와 초기 기능 범위를 확정한다.
-3. GOAPI 사전 작업을 보안 회귀 테스트와 함께 구현한다.
-4. Xcode 프로젝트를 만들고 공통 응답·인증·공개 피드 계약 테스트부터 시작한다.
+1. Apple 계정의 Team ID·멤버십 만료일·결제 완료와 최신 계약 동의 여부를 확인하고 Xcode에 활성 Team을
+   연결한다. 비밀값은 문서나 Git에 기록하지 않는다.
+2. 재활성화된 계정에 과거 SENSTA App ID나 App Store Connect 레코드가 남아 있는지 먼저 확인한다. 그
+   결과를 바탕으로 운영·개발 bundle ID, 최소 지원 iOS 버전과 초기 iPhone 범위를 확정한다. 새 App Store
+   Connect 레코드는 이 값이 고정된 뒤 만든다.
+3. unit/UI test target을 포함한 최소 SwiftUI 프로젝트를 만들고 자동 서명으로 실제 iPhone에서 실행해
+   Apple Development 인증서·기기 등록·provisioning 경로를 검증한다.
+4. GOAPI의 공용 mobile Google 인증·refresh 경로와 Google ID token 검증 강화를 첫 서버 작업 단위로
+   구현하고 보안 회귀 테스트를 추가한다. 이후 Apple 로그인, push, 앱 출처와 업로드 계약을 각각 독립
+   작업으로 진행한다.

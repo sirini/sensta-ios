@@ -4,7 +4,8 @@
 
 ## 제안 식별자
 
-최종 bundle ID는 Apple Developer Program 승인 뒤 확정한다.
+Apple Developer Program 승인은 완료됐다. 최종 bundle ID는 App ID와 App Store Connect 레코드를 만들기
+전에 확정한다.
 
 | 용도 | bundle ID 제안 | Firebase 앱 |
 | --- | --- | --- |
@@ -40,9 +41,12 @@ Apple Developer 계정이 활성화되면 다음을 준비한다.
 
 ## Google 로그인
 
-- Google Cloud/Firebase에서 iOS OAuth client를 만들고 bundle ID를 연결한다.
+- Google Cloud/Firebase에서 iOS OAuth client를 만들고 bundle ID를 연결한다. 이 ID는 iOS 앱 자체를
+  식별한다.
 - URL scheme과 `GoogleService-Info.plist` 구성을 Xcode에 반영한다.
-- iOS ID token의 audience를 GOAPI 환경변수와 정확히 일치시킨다.
+- GOAPI 인증용 ID token을 받기 위해 기존 Android와 같은 Google Cloud 프로젝트의 Web 유형 server client
+  ID를 `GIDServerClientID`로 설정한다. GOAPI가 검증할 audience는 iOS client ID가 아니라 이 server client
+  ID다.
 - Google 로그인과 이메일 로그인이 같은 기존 계정을 안전하게 사용할 수 있는지 테스트한다.
 - 앱 로그, crash report와 네트워크 진단에 ID token이 포함되지 않게 한다.
 

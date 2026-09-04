@@ -34,7 +34,7 @@ SENSTA iOS는 별도 데이터베이스를 두지 않습니다. Android와 웹�
 - 확인된 도구: Xcode 27.0 (`27A5252f`), Swift 6.4
 - 확인된 SDK와 시뮬레이터: iOS 27.0
 - 실제 iPhone: 준비됨
-- Apple Developer Program: 재가입 심사 대기
+- Apple Developer Program: 재가입 승인, Team·코드서명 연결 확인 예정
 
 터미널에서 현재 저장소용 Xcode를 선택하고 상태를 확인합니다.
 

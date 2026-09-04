@@ -12,9 +12,15 @@ SENSTA iOS는 기존 GOAPI API contract v1을 최대한 재사용한다. Android
 
 필요 작업:
 
-- Android 경로를 유지하면서 범용 mobile 또는 iOS 별칭을 추가한다.
-- iOS Google OAuth client ID를 별도 환경변수로 받고 ID token의 issuer, audience, expiry와 인증된 이메일을
-  서버에서 검증한다.
+- Android 경로를 유지하면서 `/auth/mobile/google`과 `/auth/mobile/refresh` 같은 범용 별칭을 추가한다.
+- iOS 앱 자체에는 iOS 유형 OAuth client ID가 필요하지만, GOAPI로 보낼 ID token은 Android와 같은 Web
+  유형 server client ID를 audience로 발급받는다. iOS client ID를 서버 audience로 혼동하지 않는다.
+- 기존 `OAUTH_GOOGLE_ANDROID_CLIENT_ID`가 실제로 가리키는 Web server client ID를 하위 호환을 유지하며
+  공용 mobile 설정으로 일반화한다.
+- 현재 production handler의 Google `tokeninfo` HTTP 호출은 디버깅 용도에 가깝다. Google 공개 키를
+  캐시하는 검증 라이브러리로 signature, issuer, audience와 expiry를 검증하고 인증된 이메일만 사용한다.
+- 장기적으로는 변경 가능한 이메일 대신 `provider + sub`를 외부 identity의 불변 키로 사용한다. 기존
+  SENSTA 계정 연결 규칙은 Apple 로그인용 external identity schema와 함께 명시적으로 설계한다.
 - access token 만료 시 refresh token을 회전하고 새 token 쌍을 원자적으로 저장하는 기존 계약을 유지한다.
 - 정지·탈퇴·존재하지 않는 사용자는 소셜 로그인과 refresh에서도 거부한다.
 - iOS 클라이언트는 access/refresh token을 Keychain에 저장하며 로그에 남기지 않는다.
@@ -82,5 +88,7 @@ Google 로그인을 제공하는 iOS 앱의 심사와 사용자 편의를 위해
 - iOS가 소비하는 endpoint만 먼저 표로 고정하고 실제 GOAPI binding 형식을 기록한다.
 - 공통 success/error envelope, HTTP 401 예외, code 분기를 Swift fixture test로 고정한다.
 - Android DTO fixture와 동일한 JSON을 가능한 범위에서 공동 사용한다.
+- 공용 mobile Google 경로와 기존 Android 경로가 동일한 Web server client audience와 응답 계약을
+  유지하는지 회귀 테스트한다.
 - GOAPI 변경 후 관련 focused test, `go test ./...`, `go vet ./...`를 실행한다.
 - 인증·업로드·알림 계약이 바뀌면 NUBO API contract와 Sensta Android 영향을 함께 확인한다.
