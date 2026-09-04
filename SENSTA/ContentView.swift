@@ -36,6 +36,7 @@ struct ContentView: View {
           PhotoFeedList(posts: posts, detailService: detailService) {
             await model.refresh()
           }
+          .toolbar(.hidden, for: .navigationBar)
         }
       }
       .navigationTitle("SENSTA")
@@ -61,40 +62,53 @@ private struct PhotoFeedList: View {
 
   var body: some View {
     GeometryReader { geometry in
-      ScrollView {
-        LazyVStack(spacing: 20) {
+      let viewportSize = CGSize(
+        width: geometry.size.width
+          + geometry.safeAreaInsets.leading
+          + geometry.safeAreaInsets.trailing,
+        height: geometry.size.height
+          + geometry.safeAreaInsets.top
+          + geometry.safeAreaInsets.bottom
+      )
+
+      ScrollView(.vertical) {
+        LazyVStack(spacing: 0) {
           ForEach(Array(posts.enumerated()), id: \.element.id) { index, post in
             NavigationLink {
               PhotoPostDetailView(postID: post.id, service: detailService)
             } label: {
-              PhotoFeedCard(post: post)
+              PhotoFeedCard(
+                post: post,
+                size: viewportSize,
+                safeAreaInsets: geometry.safeAreaInsets
+              )
             }
             .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
+            .frame(width: viewportSize.width, height: viewportSize.height)
             .accessibilityIdentifier("photo-feed-card")
             .task(id: post.id, priority: .utility) {
-              await prefetchNextCover(after: index, availableWidth: geometry.size.width)
+              await prefetchNextCover(after: index, targetSize: viewportSize)
             }
           }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 16)
+        .scrollTargetLayout()
       }
+      .scrollIndicators(.hidden)
+      .scrollTargetBehavior(.paging)
       .refreshable {
         await onRefresh()
       }
+      .ignoresSafeArea()
     }
-    .background(Color.secondary.opacity(0.06))
+    .background(Color.black.ignoresSafeArea())
   }
 
-  private func prefetchNextCover(after index: Int, availableWidth: CGFloat) async {
+  private func prefetchNextCover(after index: Int, targetSize: CGSize) async {
     let nextIndex = posts.index(after: index)
     guard posts.indices.contains(nextIndex) else { return }
-    let cardWidth = max(availableWidth - 24, 1)
     await PhotoImagePipeline.shared.prefetch(
       posts[nextIndex].coverURL,
-      targetSize: CGSize(width: cardWidth, height: cardWidth * 1.25),
+      targetSize: targetSize,
       displayScale: displayScale
     )
   }
@@ -102,42 +116,58 @@ private struct PhotoFeedList: View {
 
 private struct PhotoFeedCard: View {
   let post: PhotoPost
+  let size: CGSize
+  let safeAreaInsets: EdgeInsets
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      writerHeader
-        .padding(14)
-
+    ZStack(alignment: .topLeading) {
       cover
 
-      VStack(alignment: .leading, spacing: 10) {
+      LinearGradient(
+        stops: [
+          .init(color: .clear, location: 0),
+          .init(color: .black.opacity(0.12), location: 0.28),
+          .init(color: .black.opacity(0.9), location: 1),
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+      )
+      .frame(height: max(size.height * 0.5, 300))
+      .frame(maxHeight: .infinity, alignment: .bottom)
+      .allowsHitTesting(false)
+
+      Text("SENSTA")
+        .font(.custom("SnellRoundhand-Bold", fixedSize: 25))
+        .foregroundStyle(.white.opacity(0.68))
+        .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+        .padding(.leading, 18)
+        .padding(.top, safeAreaInsets.top + 14)
+        .accessibilityIdentifier("sensta-feed-wordmark")
+
+      VStack(alignment: .leading, spacing: 12) {
+        writerHeader
+
         Text(post.title)
-          .font(.headline)
+          .font(.title3.weight(.semibold))
+          .foregroundStyle(.white)
           .lineLimit(2)
+          .fixedSize(horizontal: false, vertical: true)
 
-        ViewThatFits(in: .horizontal) {
-          HStack(spacing: 16) {
-            counts
-            Spacer()
-            submittedDate
-          }
-
-          VStack(alignment: .leading, spacing: 8) {
-            counts
-            submittedDate
-          }
+        HStack(spacing: 16) {
+          counts
+          Spacer(minLength: 12)
+          submittedDate
         }
         .font(.caption)
       }
-      .padding(14)
+      .padding(.horizontal, 18)
+      .padding(.bottom, safeAreaInsets.bottom + 16)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
-    .background(.background)
-    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 18, style: .continuous)
-        .stroke(.quaternary, lineWidth: 0.5)
-    }
-    .frame(maxWidth: .infinity)
+    .frame(width: size.width, height: size.height)
+    .background(Color.black)
+    .clipped()
+    .contentShape(Rectangle())
     .accessibilityElement(children: .contain)
   }
 
@@ -149,20 +179,21 @@ private struct PhotoFeedCard: View {
         HStack(spacing: 5) {
           Text(post.writer.name)
             .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
             .lineLimit(1)
             .truncationMode(.tail)
             .layoutPriority(1)
           if post.writer.badgeKeys.contains("sensta-app") {
             Image(systemName: "camera.aperture")
               .font(.caption)
-              .foregroundStyle(.tint)
+              .foregroundStyle(.white.opacity(0.9))
               .accessibilityLabel("SENSTA 앱 포토그래퍼")
           }
         }
         Text("PHOTOGRAPHER")
           .font(.caption2)
           .tracking(1)
-          .foregroundStyle(.secondary)
+          .foregroundStyle(.white.opacity(0.72))
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -177,7 +208,7 @@ private struct PhotoFeedCard: View {
         } else {
           Image(systemName: "person.crop.circle.fill")
             .resizable()
-            .foregroundStyle(.tertiary)
+            .foregroundStyle(.white.opacity(0.72))
         }
       }
       .frame(width: 38, height: 38)
@@ -186,7 +217,7 @@ private struct PhotoFeedCard: View {
     } else {
       Image(systemName: "person.crop.circle.fill")
         .resizable()
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(.white.opacity(0.72))
         .frame(width: 38, height: 38)
         .accessibilityHidden(true)
     }
@@ -202,37 +233,33 @@ private struct PhotoFeedCard: View {
 
   private var submittedDate: some View {
     Text(post.submitted, format: .dateTime.year().month().day())
-      .foregroundStyle(.secondary)
+      .foregroundStyle(.white.opacity(0.72))
   }
 
   private var cover: some View {
-    GeometryReader { geometry in
-      ZStack {
-        Color.secondary.opacity(0.12)
+    ZStack {
+      Color.secondary.opacity(0.12)
 
-        if post.coverURL != nil {
-          CachedAsyncPhotoImage(url: post.coverURL, targetSize: geometry.size) { phase in
-            switch phase {
-            case .empty:
-              missingPhoto.opacity(0.35)
-            case .success(let image):
-              image
-                .resizable()
-                .scaledToFill()
-                .frame(width: geometry.size.width, height: geometry.size.height)
-            case .failure:
-              missingPhoto
-            }
+      if post.coverURL != nil {
+        CachedAsyncPhotoImage(url: post.coverURL, targetSize: size) { phase in
+          switch phase {
+          case .empty:
+            missingPhoto.opacity(0.35)
+          case .success(let image):
+            image
+              .resizable()
+              .scaledToFill()
+              .frame(width: size.width, height: size.height)
+          case .failure:
+            missingPhoto
           }
-        } else {
-          missingPhoto
         }
+      } else {
+        missingPhoto
       }
-      .frame(width: geometry.size.width, height: geometry.size.height)
-      .clipped()
     }
-    .aspectRatio(4 / 5, contentMode: .fit)
-    .frame(maxWidth: .infinity)
+    .frame(width: size.width, height: size.height)
+    .clipped()
     .accessibilityLabel(post.title)
   }
 
@@ -244,7 +271,7 @@ private struct PhotoFeedCard: View {
 
   private func countLabel(_ systemImage: String, count: Int, name: String) -> some View {
     Label(count.formatted(.number.notation(.compactName)), systemImage: systemImage)
-      .foregroundStyle(.secondary)
+      .foregroundStyle(.white.opacity(0.86))
       .accessibilityLabel("\(name) \(count)개")
   }
 }

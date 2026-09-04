@@ -16,9 +16,10 @@
   오류·재시도·당겨서 새로고침을 제공한다.
 - 목록 `cover` 상대 경로는 Android와 같이 `t*.webp`에서 `f*.webp` 미리보기로 바꾸고 `sensta.me`의
   HTTPS 절대 URL로 해석한다. 작성자, 앱 포토그래퍼 업적, 제목, 좋아요·댓글·조회수와 날짜를 네이티브
-  카드로 표시한다.
-- 원격 이미지의 고유 크기와 긴 통계 값이 카드 너비를 넓히지 않도록 이미지 Geometry와 카드 최대 너비를
-  분리했다. 피드 카드는 화면 양쪽 12pt 안에 고정하며 UI test로 프레임 좌표를 검증한다.
+  오버레이로 표시한다.
+- Android의 대표 피드 정체성을 이어받아 사진 한 장이 노치·홈 인디케이터 영역을 포함한 화면 전체를
+  채우고 세로 페이지 단위로 스냅되도록 구성했다. 좌상단 반투명 스크립트형 `SENSTA` 워드마크와 하단
+  그라데이션 위에 작성자·제목·통계를 배치하며, UI test가 카드의 화면 네 변과 워드마크를 검증한다.
 - 피드 카드를 누르면 익명 `GET /board/view?id=photo&postUid=...&needUpdateHit=0&latestLimit=5` 요청으로
   게시글 상세를 연다. 여러 사진을 가로로 넘기고 각 사진의 EXIF·AI 설명, 본문·태그·첨부 파일 정보·통계와
   시스템 공유를 표시한다. 상세 사진도 화면 양쪽 16pt 안에 고정하는 UI 회귀 테스트를 갖췄다.
@@ -47,7 +48,7 @@
   `https://sensta.me/goapi/`를 Info.plist에 주입한다. Associated Domains, Push Notifications와 Sign in
   with Apple entitlement도 App ID 설정과 맞췄다.
 - Xcode 27의 iPhone 17 Pro 시뮬레이터에서 Debug test build, Release build와 정적 분석을 통과했다. API
-  설정·피드/상세 계약·상태·이미지 파이프라인 unit test 18개와 launch·피드 폭·상세 이동/폭 UI test
+  설정·피드/상세 계약·상태·이미지 파이프라인 unit test 18개와 launch·전체 화면 피드·상세 이동/폭 UI test
   3개가 통과했으며 운영
   데이터 피드로 라이트·다크 모드와 큰 글자 레이아웃을 확인했다.
 - iPhone 17 실기기용 Debug 빌드를 Apple Development 인증서와 Team `WKPCU58CWL`로 서명했고,
@@ -80,8 +81,8 @@
 
 ## 다음 작업
 
-1. 제품 소유자가 실제 iPhone에서 첫/재방문 피드 스크롤과 상세 사진의 느린 드래그·빠른 스와이프·왕복을
-   리뷰한다. 승인 뒤 공개 피드 다음 페이지 로딩을 구현한다.
+1. 제품 소유자가 실제 iPhone에서 전체 화면 피드의 세로 페이지 스냅과 첫/재방문 스크롤, 상세 사진의
+   느린 드래그·빠른 스와이프·왕복을 리뷰한다. 승인 뒤 공개 피드 다음 페이지 로딩을 구현한다.
 2. Firebase iOS 앱과 APNs 인증 키는 알림 기능 작업이 시작될 때 등록한다.
 3. GOAPI의 공용 mobile Google 인증·refresh 경로와 Google ID token 검증 강화를 서버 작업 단위로
    구현하고 보안 회귀 테스트를 추가한다. 이후 Apple 로그인, push, 앱 출처와 업로드 계약을 각각 독립

@@ -28,6 +28,7 @@ struct PhotoPostDetailView: View {
     }
     .navigationTitle("사진")
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar(.visible, for: .navigationBar)
     .toolbar {
       if case .loaded(let detail) = model.state, let shareURL = detail.shareURL {
         ShareLink(item: shareURL) {
