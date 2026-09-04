@@ -136,12 +136,15 @@ private struct PhotoFeedCard: View {
       .frame(maxHeight: .infinity, alignment: .bottom)
       .allowsHitTesting(false)
 
-      Text("SENSTA")
-        .font(.custom("SnellRoundhand-Bold", fixedSize: 25))
-        .foregroundStyle(.white.opacity(0.68))
-        .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
+      Image("SenstaWordmark")
+        .renderingMode(.template)
+        .resizable()
+        .scaledToFit()
+        .frame(width: 61, height: 14)
+        .foregroundStyle(.white.opacity(0.6))
         .padding(.leading, 18)
         .padding(.top, safeAreaInsets.top + 14)
+        .accessibilityLabel("SENSTA")
         .accessibilityIdentifier("sensta-feed-wordmark")
 
       VStack(alignment: .leading, spacing: 12) {

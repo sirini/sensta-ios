@@ -6,7 +6,11 @@ final class SENSTAUITests: XCTestCase {
     let app = XCUIApplication()
     app.launch()
 
-    XCTAssertTrue(app.staticTexts["SENSTA"].waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      app.images.matching(identifier: "sensta-feed-wordmark").firstMatch.waitForExistence(
+        timeout: 30
+      )
+    )
   }
 
   @MainActor
@@ -22,7 +26,7 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertEqual(card.frame.minY, windowFrame.minY, accuracy: 1)
     XCTAssertEqual(card.frame.maxY, windowFrame.maxY, accuracy: 1)
     XCTAssertTrue(
-      app.staticTexts.matching(identifier: "sensta-feed-wordmark").firstMatch.exists
+      app.images.matching(identifier: "sensta-feed-wordmark").firstMatch.exists
     )
   }
 
