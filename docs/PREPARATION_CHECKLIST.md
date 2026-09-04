@@ -67,7 +67,7 @@
 - [ ] Firebase·Google 등 third-party SDK privacy manifest 확인
 - [ ] 앱 내 계정 삭제와 Sign in with Apple token 폐기 검증
 - [ ] 연령 등급 질문, 콘텐츠 권리와 수출 규정 답변 준비
-- [ ] 대한민국 비즈니스 규정 준수용 공개 연락처 이메일과 사업자등록번호 보유 여부 등록
+- [x] 대한민국 비즈니스 규정 준수용 연락처 및 사업자등록번호 보유 여부 확인 완료
 - [ ] App Review용 테스트 계정과 검토 메모 준비
 - [ ] 1024px App Store 아이콘과 기기별 스크린샷 준비
 - [ ] TestFlight 내부 테스트 후 실제 사용자 여정 회귀 테스트

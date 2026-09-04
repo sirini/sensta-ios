@@ -24,7 +24,8 @@
   Notifications, Sign in with Apple capability를 활성화했다.
 - App Store Connect에 `SENSTA` 앱(Apple ID `6808687447`, SKU `sensta-ios`)을 생성했다. 가격은 무료,
   배포 국가는 대한민국, 주 카테고리는 사진 및 비디오, 보조 카테고리는 소셜 네트워킹, 출시는 수동으로
-  설정했다. 검증 전인 Apple Silicon Mac과 Apple Vision Pro 배포는 껐다.
+  설정했다. 검증 전인 Apple Silicon Mac과 Apple Vision Pro 배포는 껐다. 개인 개발자 계정에 필요한
+  대한민국 연락처 및 사업자등록번호 보유 여부 확인도 완료했다.
 
 ## 결정
 
@@ -46,8 +47,6 @@
 - iOS 인증·푸시·앱 출처·HEIC 및 UGC 심사 대응을 위한 GOAPI 사전 작업
 - Firebase iOS 앱, Google OAuth iOS client, APNs 인증 키 준비
 - App Store 지원 페이지와 개인정보·심사 메타데이터 준비
-- 대한민국 배포용 공개 연락처 이메일과 국내 사업자등록번호 보유 여부를 확인해 App Store Connect의
-  대한민국 비즈니스 규정 준수 정보를 완료한다.
 
 ## 다음 작업
 
@@ -55,8 +54,7 @@
 2. 최소 지원 iOS 버전과 초기 iPhone 전용 범위를 확정하고 unit/UI test target을 포함한 최소 SwiftUI
    프로젝트를 만든다. 자동 서명으로 실제 iPhone에서 실행해
    Apple Development 인증서·기기 등록·provisioning 경로를 검증한다.
-3. 대한민국 비즈니스 규정 준수 정보, Firebase iOS 앱과 APNs 인증 키는 필요한 실제 정보와 프로젝트가
-   준비되는 즉시 등록한다.
+3. Firebase iOS 앱과 APNs 인증 키는 필요한 실제 정보와 프로젝트가 준비되는 즉시 등록한다.
 4. GOAPI의 공용 mobile Google 인증·refresh 경로와 Google ID token 검증 강화를 첫 서버 작업 단위로
    구현하고 보안 회귀 테스트를 추가한다. 이후 Apple 로그인, push, 앱 출처와 업로드 계약을 각각 독립
    작업으로 진행한다.
