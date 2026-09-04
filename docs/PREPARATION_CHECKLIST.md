@@ -25,7 +25,7 @@
 - [x] App Store Connect에서 `SENSTA` 앱 생성: Apple ID `6808687447`
 - [x] 무료 가격, 대한민국 배포, 사진 및 비디오·소셜 네트워킹 카테고리와 수동 출시 설정
 - [x] Apple Silicon Mac과 Apple Vision Pro 자동 배포 해제
-- [ ] 최소 지원 iOS 버전 확정
+- [x] 최소 지원 iOS 버전 확정: iOS 17 이상
 - [x] 초기 iPhone 전용 방향 확정, iPad는 별도 QA 뒤 확대
 - [ ] Universal Link와 알림 deep link 범위 확정
 
@@ -74,9 +74,9 @@
 
 ## 첫 개발 세션
 
-- [ ] Xcode 프로젝트와 unit/UI test target 생성
-- [ ] 저장소 shared scheme과 build configuration 정리
-- [ ] API base URL을 xcconfig로 분리
+- [x] Xcode 프로젝트와 unit/UI test target 생성
+- [x] 저장소 shared scheme과 Debug/Release build configuration 정리
+- [x] API base URL을 xcconfig로 분리: `https://sensta.me/goapi/`
 - [ ] 공통 API envelope와 오류 code 모델 구현
 - [ ] 공개 게시글 목록 fixture decoding test 작성
 - [ ] 빈 상태·통신 실패·재시도 UI를 포함한 첫 피드 화면 구현

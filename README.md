@@ -4,8 +4,8 @@
 [SENSTA Android](https://github.com/sirini/sensta)의 제품 경험과 NUBO API contract v1을 기준으로,
 Swift와 SwiftUI를 사용해 Apple 플랫폼에 맞는 앱을 새로 개발합니다.
 
-이 저장소는 현재 **개발 준비 단계**입니다. Xcode 프로젝트와 앱 기능 구현은 다음 작업 단위부터
-시작합니다.
+이 저장소는 현재 **초기 앱 기반 구성 단계**입니다. iPhone용 SwiftUI 프로젝트와 unit/UI test target을
+만들었으며, 다음 작업 단위부터 공개 피드 수직 기능을 구현합니다.
 
 ## 목표
 
@@ -36,13 +36,15 @@ SENSTA iOS는 별도 데이터베이스를 두지 않습니다. Android와 웹�
 - 실제 iPhone: 준비됨
 - Apple Developer Program: 활성, Team `WKPCU58CWL`, 2027-09-04 만료
 - App Store Connect: `SENSTA` Apple ID `6808687447`, 대한민국 무료 배포 준비 중
-- 코드서명: Xcode Team 연결과 실제 iPhone 자동 서명 확인 예정
+- 프로젝트: iOS 17 이상, iPhone 전용, Debug/Release xcconfig와 shared scheme
+- 코드서명: Team `WKPCU58CWL` 자동 서명 설정 완료, Xcode 계정 연결과 실제 iPhone 확인 예정
 
 터미널에서 현재 저장소용 Xcode를 선택하고 상태를 확인합니다.
 
 ```bash
 source ./scripts/xcode-env.sh
 ./scripts/check-environment.sh
+open SENSTA.xcodeproj
 ```
 
 시스템 전체 `xcode-select`를 바꾸지 않고 명령별 `DEVELOPER_DIR`를 사용합니다. Beta가 갱신되어도

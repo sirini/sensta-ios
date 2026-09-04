@@ -1,0 +1,5 @@
+#include "Base.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = me.sensta.ios.debug
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG $(inherited)
+SWIFT_OPTIMIZATION_LEVEL = -Onone

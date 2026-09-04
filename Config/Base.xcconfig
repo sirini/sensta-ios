@@ -1,0 +1,8 @@
+DEVELOPMENT_TEAM = WKPCU58CWL
+CODE_SIGN_STYLE = Automatic
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+TARGETED_DEVICE_FAMILY = 1
+SWIFT_VERSION = 6.0
+
+// xcconfig에서 //가 주석으로 해석되지 않도록 빈 빌드 설정을 사이에 둔다.
+API_BASE_URL = https:/$()/sensta.me/goapi/
