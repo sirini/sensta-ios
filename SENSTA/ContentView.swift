@@ -60,8 +60,10 @@ private struct PhotoFeedList: View {
       LazyVStack(spacing: 20) {
         ForEach(posts) { post in
           PhotoFeedCard(post: post)
+            .frame(maxWidth: .infinity)
         }
       }
+      .frame(maxWidth: .infinity)
       .padding(.horizontal, 12)
       .padding(.vertical, 16)
     }
@@ -109,7 +111,9 @@ private struct PhotoFeedCard: View {
       RoundedRectangle(cornerRadius: 18, style: .continuous)
         .stroke(.quaternary, lineWidth: 0.5)
     }
+    .frame(maxWidth: .infinity)
     .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("photo-feed-card")
   }
 
   private var writerHeader: some View {
@@ -120,6 +124,9 @@ private struct PhotoFeedCard: View {
         HStack(spacing: 5) {
           Text(post.writer.name)
             .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .layoutPriority(1)
           if post.writer.badgeKeys.contains("sensta-app") {
             Image(systemName: "camera.aperture")
               .font(.caption)
@@ -132,8 +139,7 @@ private struct PhotoFeedCard: View {
           .tracking(1)
           .foregroundStyle(.secondary)
       }
-
-      Spacer()
+      .frame(maxWidth: .infinity, alignment: .leading)
     }
   }
 
@@ -175,30 +181,35 @@ private struct PhotoFeedCard: View {
   }
 
   private var cover: some View {
-    ZStack {
-      Color.secondary.opacity(0.12)
+    GeometryReader { geometry in
+      ZStack {
+        Color.secondary.opacity(0.12)
 
-      if let coverURL = post.coverURL {
-        AsyncImage(url: coverURL) { phase in
-          switch phase {
-          case .empty:
-            ProgressView()
-          case .success(let image):
-            image
-              .resizable()
-              .scaledToFill()
-          case .failure:
-            missingPhoto
-          @unknown default:
-            EmptyView()
+        if let coverURL = post.coverURL {
+          AsyncImage(url: coverURL) { phase in
+            switch phase {
+            case .empty:
+              ProgressView()
+            case .success(let image):
+              image
+                .resizable()
+                .scaledToFill()
+                .frame(width: geometry.size.width, height: geometry.size.height)
+            case .failure:
+              missingPhoto
+            @unknown default:
+              EmptyView()
+            }
           }
+        } else {
+          missingPhoto
         }
-      } else {
-        missingPhoto
       }
+      .frame(width: geometry.size.width, height: geometry.size.height)
+      .clipped()
     }
     .aspectRatio(4 / 5, contentMode: .fit)
-    .clipped()
+    .frame(maxWidth: .infinity)
     .accessibilityLabel(post.title)
   }
 
@@ -209,7 +220,7 @@ private struct PhotoFeedCard: View {
   }
 
   private func countLabel(_ systemImage: String, count: Int, name: String) -> some View {
-    Label(String(count), systemImage: systemImage)
+    Label(count.formatted(.number.notation(.compactName)), systemImage: systemImage)
       .foregroundStyle(.secondary)
       .accessibilityLabel("\(name) \(count)개")
   }

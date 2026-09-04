@@ -17,6 +17,8 @@
 - 목록 `cover` 상대 경로는 Android와 같이 `t*.webp`에서 `f*.webp` 미리보기로 바꾸고 `sensta.me`의
   HTTPS 절대 URL로 해석한다. 작성자, 앱 포토그래퍼 업적, 제목, 좋아요·댓글·조회수와 날짜를 네이티브
   카드로 표시한다.
+- 원격 이미지의 고유 크기와 긴 통계 값이 카드 너비를 넓히지 않도록 이미지 Geometry와 카드 최대 너비를
+  분리했다. 피드 카드는 화면 양쪽 12pt 안에 고정하며 UI test로 프레임 좌표를 검증한다.
 - macOS 27 beta 환경에서 `/Applications/Xcode-beta.app`의 Xcode 27.0(`27A5252f`), Swift 6.4,
   iOS 27.0 SDK와 시뮬레이터를 확인했다.
 - 실제 iPhone은 준비되어 있다.
@@ -38,8 +40,8 @@
   `https://sensta.me/goapi/`를 Info.plist에 주입한다. Associated Domains, Push Notifications와 Sign in
   with Apple entitlement도 App ID 설정과 맞췄다.
 - Xcode 27의 iPhone 17 Pro 시뮬레이터에서 Debug test build, Release build와 정적 분석을 통과했다. API
-  설정·피드 계약·상태 unit test 9개와 launch UI test 1개가 통과했으며 운영 데이터로 라이트·다크 모드와
-  큰 글자 레이아웃을 확인했다.
+  설정·피드 계약·상태 unit test 9개와 launch·피드 폭 UI test 2개가 통과했으며 운영 데이터로 라이트·
+  다크 모드와 큰 글자 레이아웃을 확인했다.
 - iPhone 17 실기기용 Debug 빌드를 Apple Development 인증서와 Team `WKPCU58CWL`로 서명했고,
   첫 공개 피드가 포함된 `me.sensta.ios.debug` 설치·실행 및 실행 중 프로세스를 확인했다.
 
