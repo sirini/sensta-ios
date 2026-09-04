@@ -8,11 +8,11 @@
 - [x] 연간 멤버십 결제와 활성 상태 확인
 - [x] Team ID `WKPCU58CWL`와 2027-09-04 만료일 확인
 - [x] Apple Developer 계약과 App Store Connect 이용 약관 동의
-- [ ] Xcode에 Apple Account와 활성 Team 연결
+- [x] Xcode에 Apple Account와 Team `WKPCU58CWL` 연결
 - [x] 개발용 iPhone 준비
 - [x] Xcode 27 beta와 iOS 27 simulator 설치
 - [x] Xcode 라이선스 동의와 초기 구성 완료
-- [ ] iPhone을 Xcode에 연결하고 개발자 모드·서명·실행 확인
+- [x] iPhone을 Xcode에 연결하고 개발자 모드·자동 서명·설치·실행 확인
 
 개인정보나 인증서 비밀키는 문서와 Git에 기록하지 않는다.
 

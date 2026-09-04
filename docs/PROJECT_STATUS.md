@@ -16,9 +16,9 @@
 - 약 10년 전 만료됐던 Apple Developer Program 재가입이 2026-09-04 승인됐다. Team ID는
   `WKPCU58CWL`이며 멤버십은 2027-09-04까지 활성이다. Apple Developer 계약과 App Store Connect
   이용 약관도 동의했다.
-- Xcode 라이선스 동의와 초기 구성은 마쳤고 저장소 환경 점검도 다시 통과했다. 프로젝트에 Team
-  `WKPCU58CWL`과 Automatic Signing을 설정했지만 Xcode에 Apple Account가 아직 추가되지 않았다. 연결된
-  iPhone과 로컬 Apple Development identity도 없어 실기기 서명은 다음 단계다.
+- Xcode 라이선스·초기 구성과 Apple Account Team `WKPCU58CWL` 연결을 마쳤다. 실제 iPhone에서 개발자
+  모드를 켜고 자동 서명으로 기기 등록, Apple Development 인증서와 `me.sensta.ios.debug` provisioning
+  profile 생성, 앱 설치·실행까지 확인했다.
 - 계정의 2011년 레거시 기기 3대를 제거하고 연간 등록 슬롯을 초기화했다. 기존 SENSTA App ID나 App
   Store Connect 앱 레코드는 없었다.
 - 운영 `me.sensta.ios`와 개발 `me.sensta.ios.debug` App ID를 만들고 Associated Domains, Push
@@ -32,6 +32,8 @@
   with Apple entitlement도 App ID 설정과 맞췄다.
 - Xcode 27의 iPhone 17 Pro 시뮬레이터에서 Debug·Release 빌드, API 설정 unit test 3개와 초기 화면 UI
   test 1개를 통과했다.
+- iPhone 17 실기기용 Debug 빌드를 Apple Development 인증서와 Team `WKPCU58CWL`로 서명했고,
+  `me.sensta.ios.debug` 설치·실행 및 실행 중 프로세스를 확인했다.
 
 ## 결정
 
@@ -49,18 +51,15 @@
 
 ## 선행 조건
 
-- Xcode Apple Account에서 Team `WKPCU58CWL`을 연결하고 실제 iPhone 자동 서명을 확인한다.
 - iOS 인증·푸시·앱 출처·HEIC 및 UGC 심사 대응을 위한 GOAPI 사전 작업
 - Firebase iOS 앱, Google OAuth iOS client, APNs 인증 키 준비
 - App Store 지원 페이지와 개인정보·심사 메타데이터 준비
 
 ## 다음 작업
 
-1. Xcode Settings의 Accounts에 Apple Account를 추가하고 실제 iPhone을 연결한다. 자동 서명으로 앱을
-   실행해 Apple Development 인증서·기기 등록·provisioning 경로를 검증한다.
-2. 공개 게시글 목록 응답 fixture와 Swift DTO decoding test를 먼저 만들고, 빈 상태·오류·재시도를 포함한
+1. 공개 게시글 목록 응답 fixture와 Swift DTO decoding test를 먼저 만들고, 빈 상태·오류·재시도를 포함한
    첫 사진 피드 수직 기능을 구현한다.
-3. Firebase iOS 앱과 APNs 인증 키는 알림 기능 작업이 시작될 때 등록한다.
-4. GOAPI의 공용 mobile Google 인증·refresh 경로와 Google ID token 검증 강화를 서버 작업 단위로
+2. Firebase iOS 앱과 APNs 인증 키는 알림 기능 작업이 시작될 때 등록한다.
+3. GOAPI의 공용 mobile Google 인증·refresh 경로와 Google ID token 검증 강화를 서버 작업 단위로
    구현하고 보안 회귀 테스트를 추가한다. 이후 Apple 로그인, push, 앱 출처와 업로드 계약을 각각 독립
    작업으로 진행한다.

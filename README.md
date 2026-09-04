@@ -37,7 +37,7 @@ SENSTA iOS는 별도 데이터베이스를 두지 않습니다. Android와 웹�
 - Apple Developer Program: 활성, Team `WKPCU58CWL`, 2027-09-04 만료
 - App Store Connect: `SENSTA` Apple ID `6808687447`, 대한민국 무료 배포 준비 중
 - 프로젝트: iOS 17 이상, iPhone 전용, Debug/Release xcconfig와 shared scheme
-- 코드서명: Team `WKPCU58CWL` 자동 서명 설정 완료, Xcode 계정 연결과 실제 iPhone 확인 예정
+- 코드서명: Team `WKPCU58CWL` 자동 서명과 실제 iPhone 설치·실행 확인 완료
 
 터미널에서 현재 저장소용 Xcode를 선택하고 상태를 확인합니다.
 

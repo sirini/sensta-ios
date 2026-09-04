@@ -12,8 +12,9 @@
 | Swift | 6.4 |
 | iOS SDK | iOS 27.0 |
 | Simulator runtime | iOS 27.0 (`24A5423a`) |
-| 실제 기기 | iPhone 준비됨 |
+| 실제 기기 | iPhone 17 연결, 개발자 모드·자동 서명·설치·실행 확인 |
 | Xcode 초기 설정 | 라이선스 동의와 추가 구성 완료 |
+| Xcode Apple Account | Team `WKPCU58CWL` 연결 완료 |
 | Apple Developer Program | 활성, Team `WKPCU58CWL`, 2027-09-04 만료 |
 | App Store Connect | `SENSTA` Apple ID `6808687447`, 대한민국 무료 배포 준비 중 |
 | Xcode 프로젝트 | SwiftUI app과 unit/UI test target, Debug/Release 빌드 확인 |
@@ -86,11 +87,10 @@ xcodebuild -project SENSTA.xcodeproj -scheme SENSTA \
 
 ## 실제 iPhone 자동 서명
 
-현재 프로젝트에는 Team `WKPCU58CWL`과 Automatic Signing이 설정되어 있다. 이 Mac의 Xcode에는 아직
-Apple Account가 추가되지 않았고 연결된 iPhone도 없어 실기기용 인증서와 provisioning profile은 생성되지
-않았다.
+프로젝트의 Team `WKPCU58CWL`과 Automatic Signing을 사용해 실제 iPhone 검증을 완료했다. Xcode가
+Apple Development 인증서를 만들고 iPhone을 개발자 계정에 등록했으며,
+`me.sensta.ios.debug`용 iOS Team Provisioning Profile을 생성했다. 서명된 Debug 앱을 실제 기기에
+설치하고 실행 중인 프로세스까지 확인했다.
 
-1. Xcode에서 **Xcode → Settings → Accounts**를 열고 개발자 Apple Account를 추가한다.
-2. iPhone을 Mac에 연결해 신뢰와 개발자 모드를 승인한다.
-3. `SENSTA.xcodeproj`를 열고 `SENSTA` scheme, 연결한 iPhone을 선택해 Run한다.
-4. Xcode가 생성한 Apple Development 인증서와 provisioning profile은 내보내거나 Git에 추가하지 않는다.
+다시 실행할 때는 `SENSTA.xcodeproj`를 열고 `SENSTA` scheme과 연결한 iPhone을 선택해 Run한다. Xcode가
+생성한 Apple Development 인증서와 provisioning profile은 내보내거나 Git에 추가하지 않는다.
