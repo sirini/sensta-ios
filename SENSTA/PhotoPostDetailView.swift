@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PhotoPostDetailView: View {
   @State private var model: PhotoPostDetailViewModel
-  @State private var selectedImageIndex = 0
+  @State private var selectedImageID: PhotoPostImage.ID?
 
   init(postID: Int, service: any PhotoPostDetailServing) {
     _model = State(initialValue: PhotoPostDetailViewModel(postID: postID, service: service))
@@ -46,7 +46,7 @@ struct PhotoPostDetailView: View {
 
         PhotoDetailImagePager(
           images: detail.images,
-          selectedIndex: $selectedImageIndex,
+          selectedImageID: $selectedImageID,
           fallbackTitle: detail.post.title
         )
 
@@ -112,8 +112,8 @@ struct PhotoPostDetailView: View {
   @ViewBuilder
   private func profileImage(for writer: PhotoPostWriter) -> some View {
     if let profileURL = writer.profileURL {
-      AsyncImage(url: profileURL) { phase in
-        if let image = phase.image {
+      CachedAsyncPhotoImage(url: profileURL, targetSize: CGSize(width: 42, height: 42)) { phase in
+        if case .success(let image) = phase {
           image.resizable().scaledToFill()
         } else {
           Image(systemName: "person.crop.circle.fill")
@@ -164,34 +164,66 @@ struct PhotoPostDetailView: View {
   }
 
   private func selectedImage(in images: [PhotoPostImage]) -> PhotoPostImage? {
-    guard images.indices.contains(selectedImageIndex) else { return nil }
-    return images[selectedImageIndex]
+    guard let selectedImageID else { return images.first }
+    return images.first { $0.id == selectedImageID } ?? images.first
   }
 }
 
 private struct PhotoDetailImagePager: View {
   let images: [PhotoPostImage]
-  @Binding var selectedIndex: Int
+  @Binding var selectedImageID: PhotoPostImage.ID?
   let fallbackTitle: String
+  @Environment(\.displayScale) private var displayScale
 
   var body: some View {
     GeometryReader { geometry in
-      Group {
+      ZStack(alignment: .bottom) {
         if images.isEmpty {
           missingPhoto
         } else {
-          TabView(selection: $selectedIndex) {
-            ForEach(Array(images.enumerated()), id: \.element.id) { index, image in
-              detailImage(image, index: index, size: geometry.size)
-                .tag(index)
+          ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+              ForEach(Array(images.enumerated()), id: \.element.id) { index, image in
+                detailImage(image, index: index, size: geometry.size)
+                  .frame(width: geometry.size.width, height: geometry.size.height)
+                  .id(image.id)
+              }
             }
+            .scrollTargetLayout()
           }
-          .tabViewStyle(.page(indexDisplayMode: images.count > 1 ? .automatic : .never))
+          .scrollIndicators(.hidden)
+          .scrollTargetBehavior(.paging)
+          .scrollPosition(id: $selectedImageID, anchor: .center)
+
+          if images.count > 1 {
+            HStack(spacing: 6) {
+              ForEach(images) { image in
+                Circle()
+                  .fill(isSelected(image) ? Color.white : Color.white.opacity(0.45))
+                  .frame(width: isSelected(image) ? 7 : 6, height: isSelected(image) ? 7 : 6)
+                  .accessibilityHidden(true)
+              }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(.black.opacity(0.28), in: Capsule())
+            .padding(.bottom, 14)
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("사진 페이지")
+            .accessibilityValue("\(selectedIndex + 1)/\(images.count)")
+          }
         }
       }
       .frame(width: geometry.size.width, height: geometry.size.height)
       .background(Color.secondary.opacity(0.12))
       .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+      .task(id: selectedImageID ?? images.first?.id, priority: .utility) {
+        if selectedImageID == nil {
+          selectedImageID = images.first?.id
+        }
+        await prefetchAdjacentImages(size: geometry.size)
+      }
     }
     .aspectRatio(4 / 5, contentMode: .fit)
     .frame(maxWidth: .infinity)
@@ -202,10 +234,10 @@ private struct PhotoDetailImagePager: View {
   @ViewBuilder
   private func detailImage(_ image: PhotoPostImage, index: Int, size: CGSize) -> some View {
     if let url = image.largeURL ?? image.smallURL {
-      AsyncImage(url: url) { phase in
+      CachedAsyncPhotoImage(url: url, targetSize: size) { phase in
         switch phase {
         case .empty:
-          ProgressView().frame(width: size.width, height: size.height)
+          missingPhoto.opacity(0.35)
         case .success(let loadedImage):
           loadedImage
             .resizable()
@@ -214,14 +246,45 @@ private struct PhotoDetailImagePager: View {
             .clipped()
         case .failure:
           missingPhoto
-        @unknown default:
-          EmptyView()
         }
       }
       .accessibilityLabel(image.description.isEmpty ? fallbackTitle : image.description)
       .accessibilityValue("\(index + 1)/\(images.count)")
     } else {
       missingPhoto
+    }
+  }
+
+  private var selectedIndex: Int {
+    guard let selectedImageID,
+      let index = images.firstIndex(where: { $0.id == selectedImageID })
+    else {
+      return 0
+    }
+    return index
+  }
+
+  private func isSelected(_ image: PhotoPostImage) -> Bool {
+    (selectedImageID ?? images.first?.id) == image.id
+  }
+
+  private func prefetchAdjacentImages(size: CGSize) async {
+    guard !images.isEmpty else { return }
+    let currentIndex = selectedIndex
+    let adjacentIndices = [currentIndex - 1, currentIndex + 1]
+      .filter { images.indices.contains($0) }
+
+    await withTaskGroup(of: Void.self) { group in
+      for index in adjacentIndices {
+        let url = images[index].largeURL ?? images[index].smallURL
+        group.addTask {
+          await PhotoImagePipeline.shared.prefetch(
+            url,
+            targetSize: size,
+            displayScale: displayScale
+          )
+        }
+      }
     }
   }
 

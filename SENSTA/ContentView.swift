@@ -57,29 +57,46 @@ private struct PhotoFeedList: View {
   let posts: [PhotoPost]
   let detailService: any PhotoPostDetailServing
   let onRefresh: @MainActor @Sendable () async -> Void
+  @Environment(\.displayScale) private var displayScale
 
   var body: some View {
-    ScrollView {
-      LazyVStack(spacing: 20) {
-        ForEach(posts) { post in
-          NavigationLink {
-            PhotoPostDetailView(postID: post.id, service: detailService)
-          } label: {
-            PhotoFeedCard(post: post)
+    GeometryReader { geometry in
+      ScrollView {
+        LazyVStack(spacing: 20) {
+          ForEach(Array(posts.enumerated()), id: \.element.id) { index, post in
+            NavigationLink {
+              PhotoPostDetailView(postID: post.id, service: detailService)
+            } label: {
+              PhotoFeedCard(post: post)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("photo-feed-card")
+            .task(id: post.id, priority: .utility) {
+              await prefetchNextCover(after: index, availableWidth: geometry.size.width)
+            }
           }
-          .buttonStyle(.plain)
-          .frame(maxWidth: .infinity)
-          .accessibilityIdentifier("photo-feed-card")
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 16)
       }
-      .frame(maxWidth: .infinity)
-      .padding(.horizontal, 12)
-      .padding(.vertical, 16)
+      .refreshable {
+        await onRefresh()
+      }
     }
     .background(Color.secondary.opacity(0.06))
-    .refreshable {
-      await onRefresh()
-    }
+  }
+
+  private func prefetchNextCover(after index: Int, availableWidth: CGFloat) async {
+    let nextIndex = posts.index(after: index)
+    guard posts.indices.contains(nextIndex) else { return }
+    let cardWidth = max(availableWidth - 24, 1)
+    await PhotoImagePipeline.shared.prefetch(
+      posts[nextIndex].coverURL,
+      targetSize: CGSize(width: cardWidth, height: cardWidth * 1.25),
+      displayScale: displayScale
+    )
   }
 }
 
@@ -154,8 +171,8 @@ private struct PhotoFeedCard: View {
   @ViewBuilder
   private var profileImage: some View {
     if let url = post.writer.profileURL {
-      AsyncImage(url: url) { phase in
-        if let image = phase.image {
+      CachedAsyncPhotoImage(url: url, targetSize: CGSize(width: 38, height: 38)) { phase in
+        if case .success(let image) = phase {
           image.resizable().scaledToFill()
         } else {
           Image(systemName: "person.crop.circle.fill")
@@ -193,11 +210,11 @@ private struct PhotoFeedCard: View {
       ZStack {
         Color.secondary.opacity(0.12)
 
-        if let coverURL = post.coverURL {
-          AsyncImage(url: coverURL) { phase in
+        if post.coverURL != nil {
+          CachedAsyncPhotoImage(url: post.coverURL, targetSize: geometry.size) { phase in
             switch phase {
             case .empty:
-              ProgressView()
+              missingPhoto.opacity(0.35)
             case .success(let image):
               image
                 .resizable()
@@ -205,8 +222,6 @@ private struct PhotoFeedCard: View {
                 .frame(width: geometry.size.width, height: geometry.size.height)
             case .failure:
               missingPhoto
-            @unknown default:
-              EmptyView()
             }
           }
         } else {
