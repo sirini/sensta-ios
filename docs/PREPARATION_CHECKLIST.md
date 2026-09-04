@@ -5,8 +5,9 @@
 - [x] Apple Developer Program 재가입 신청
 - [x] 결제 카드 등록
 - [x] Apple Developer Program 재가입 승인
-- [ ] 실제 카드 결제 완료 확인
-- [ ] Developer 계정의 활성 상태, Team ID와 만료일 확인
+- [x] 연간 멤버십 결제와 활성 상태 확인
+- [x] Team ID `WKPCU58CWL`와 2027-09-04 만료일 확인
+- [x] Apple Developer 계약과 App Store Connect 이용 약관 동의
 - [ ] Xcode에 Apple Account와 활성 Team 연결
 - [x] 개발용 iPhone 준비
 - [x] Xcode 27 beta와 iOS 27 simulator 설치
@@ -17,12 +18,15 @@
 
 ## 앱 식별자와 범위
 
-- [ ] 재활성화된 계정의 기존 SENSTA App ID·App Store Connect 레코드 확인
-- [ ] 운영 bundle ID 확정: 제안 `me.sensta.ios`
-- [ ] 개발 bundle ID 확정: 제안 `me.sensta.ios.debug`
-- [ ] App Store Connect에서 `SENSTA` 이름과 앱 레코드 생성
+- [x] 재활성화된 계정의 기존 SENSTA App ID·App Store Connect 레코드 확인
+- [x] 2011년 레거시 개발 기기 3대 제거와 연간 등록 슬롯 초기화
+- [x] 운영 bundle ID 확정: `me.sensta.ios`
+- [x] 개발 bundle ID 확정: `me.sensta.ios.debug`
+- [x] App Store Connect에서 `SENSTA` 앱 생성: Apple ID `6808687447`
+- [x] 무료 가격, 대한민국 배포, 사진 및 비디오·소셜 네트워킹 카테고리와 수동 출시 설정
+- [x] Apple Silicon Mac과 Apple Vision Pro 자동 배포 해제
 - [ ] 최소 지원 iOS 버전 확정
-- [ ] 초기 iPhone 지원 방향과 iPad 노출 정책 확정
+- [x] 초기 iPhone 전용 방향 확정, iPad는 별도 QA 뒤 확대
 - [ ] Universal Link와 알림 deep link 범위 확정
 
 ## GOAPI와 NUBO
@@ -43,10 +47,11 @@
 - [ ] Firebase 프로젝트에 운영 iOS 앱 등록
 - [ ] Firebase 프로젝트에 개발 iOS 앱 등록
 - [ ] 각 앱의 `GoogleService-Info.plist`를 로컬에 안전하게 배치
-- [ ] Apple App ID에서 Push Notifications 활성화
+- [x] 운영·개발 Apple App ID에서 Push Notifications 활성화
+- [x] 운영·개발 Apple App ID에서 Associated Domains와 Sign in with Apple 활성화
 - [ ] APNs 인증 키 생성 및 Firebase Console에 업로드
 - [ ] Google OAuth iOS client ID 생성
-- [ ] Sign in with Apple capability와 server configuration 준비
+- [ ] Sign in with Apple server configuration과 GOAPI 검증 준비
 - [ ] 실제 iPhone에서 foreground/background/종료 상태 알림 검증
 
 세부 내용은 [Firebase와 Apple 서비스 준비](FIREBASE_APPLE_SETUP.md)를 따른다.
@@ -62,6 +67,7 @@
 - [ ] Firebase·Google 등 third-party SDK privacy manifest 확인
 - [ ] 앱 내 계정 삭제와 Sign in with Apple token 폐기 검증
 - [ ] 연령 등급 질문, 콘텐츠 권리와 수출 규정 답변 준비
+- [ ] 대한민국 비즈니스 규정 준수용 공개 연락처 이메일과 사업자등록번호 보유 여부 등록
 - [ ] App Review용 테스트 계정과 검토 메모 준비
 - [ ] 1024px App Store 아이콘과 기기별 스크린샷 준비
 - [ ] TestFlight 내부 테스트 후 실제 사용자 여정 회귀 테스트

@@ -2,12 +2,12 @@
 
 이 문서는 필요한 항목을 기록한 체크리스트이며 자격 증명 자체를 저장하지 않는다.
 
-## 제안 식별자
+## 확정 식별자
 
-Apple Developer Program 승인은 완료됐다. 최종 bundle ID는 App ID와 App Store Connect 레코드를 만들기
-전에 확정한다.
+Apple Developer Program Team `WKPCU58CWL`에 다음 explicit App ID를 만들었다. 두 App ID 모두
+Associated Domains, Push Notifications와 Sign in with Apple capability가 활성화되어 있다.
 
-| 용도 | bundle ID 제안 | Firebase 앱 |
+| 용도 | bundle ID | Firebase 앱 |
 | --- | --- | --- |
 | 운영 | `me.sensta.ios` | SENSTA iOS |
 | 개발·QA | `me.sensta.ios.debug` | SENSTA iOS Debug |
