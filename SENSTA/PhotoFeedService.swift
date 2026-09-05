@@ -2,6 +2,13 @@ import Foundation
 
 protocol PhotoFeedServing: Sendable {
   func fetchPage(_ page: Int) async throws -> PhotoFeedPage
+  func search(_ keyword: String, page: Int) async throws -> PhotoFeedPage
+}
+
+extension PhotoFeedServing {
+  func search(_ keyword: String, page: Int) async throws -> PhotoFeedPage {
+    throw NuboAPIError.configuration
+  }
 }
 
 enum NuboAPIError: Error, Equatable, LocalizedError, Sendable {
@@ -30,7 +37,7 @@ enum NuboAPIError: Error, Equatable, LocalizedError, Sendable {
 }
 
 enum PhotoFeedEndpoint {
-  static func makeRequest(apiBaseURL: URL, page: Int) throws -> URLRequest {
+  static func makeRequest(apiBaseURL: URL, page: Int, keyword: String = "") throws -> URLRequest {
     guard page > 0 else {
       throw NuboAPIError.invalidRequest
     }
@@ -43,7 +50,10 @@ enum PhotoFeedEndpoint {
       URLQueryItem(name: "id", value: "photo"),
       URLQueryItem(name: "page", value: String(page)),
       URLQueryItem(name: "option", value: "0"),
-      URLQueryItem(name: "keyword", value: ""),
+      // GOAPI는 Query 값에 QueryUnescape를 한 번 더 적용하므로 검색어를 한 번 더 인코딩한다.
+      URLQueryItem(
+        name: "keyword", value: keyword.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
+      ),
     ]
     guard let url = components.url else {
       throw NuboAPIError.invalidRequest
@@ -107,7 +117,12 @@ struct PhotoFeedService: PhotoFeedServing {
   }
 
   func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
-    let request = try PhotoFeedEndpoint.makeRequest(apiBaseURL: client.apiBaseURL, page: page)
+    try await search("", page: page)
+  }
+
+  func search(_ keyword: String, page: Int) async throws -> PhotoFeedPage {
+    let request = try PhotoFeedEndpoint.makeRequest(
+      apiBaseURL: client.apiBaseURL, page: page, keyword: keyword)
     let data = try await client.data(for: request)
 
     let envelope: BoardListResponseDTO

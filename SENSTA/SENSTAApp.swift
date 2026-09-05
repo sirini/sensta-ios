@@ -52,6 +52,12 @@ struct SENSTAApp: App {
   // 운영 데이터에 의존하지 않고 페이지 경계와 재시도 UI를 검증하는 전용 시나리오다.
   private actor PaginationUITestService: PhotoFeedServing {
     private var failedSecondPage = false
+    func search(_ keyword: String, page: Int) async throws -> PhotoFeedPage {
+      if keyword == "empty" { return PhotoFeedPage(totalPostCount: 0, posts: []) }
+      let result = try await fetchPage(1)
+      return PhotoFeedPage(totalPostCount: result.posts.count, posts: result.posts)
+    }
+
     func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
       if page == 2 && !failedSecondPage {
         failedSecondPage = true

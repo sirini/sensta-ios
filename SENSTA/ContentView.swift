@@ -3,10 +3,12 @@ import SwiftUI
 struct ContentView: View {
   @State private var model: PhotoFeedViewModel
   private let detailService: any PhotoPostDetailServing
+  private let feedService: any PhotoFeedServing
 
   init(service: any PhotoFeedServing, detailService: any PhotoPostDetailServing) {
     _model = State(initialValue: PhotoFeedViewModel(service: service))
     self.detailService = detailService
+    self.feedService = service
   }
 
   var body: some View {
@@ -54,6 +56,21 @@ struct ContentView: View {
               .padding()
               .accessibilityIdentifier("photo-feed-refresh-error")
             }
+          }
+          .overlay(alignment: .topTrailing) {
+            NavigationLink {
+              PhotoSearchView(service: feedService, detailService: detailService)
+            } label: {
+              Image(systemName: "magnifyingglass")
+                .font(.body.weight(.medium))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(.black.opacity(0.25), in: Circle())
+            }
+            .accessibilityLabel("사진 찾기")
+            .accessibilityIdentifier("photo-feed-search")
+            .padding(.trailing, 16)
+            .padding(.top, 8)
           }
           .toolbar(.hidden, for: .navigationBar)
         }

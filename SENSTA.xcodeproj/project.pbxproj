@@ -31,6 +31,7 @@
 		B10000000000000000000001 /* PhotoViewer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* PhotoViewer.swift */; };
 		B10000000000000000000002 /* PhotoComments.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* PhotoComments.swift */; };
 		B10000000000000000000003 /* PhotoCommentsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* PhotoCommentsTests.swift */; };
+		B10000000000000000000004 /* PhotoSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* PhotoSearchView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +84,7 @@
 		B20000000000000000000001 /* PhotoViewer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoViewer.swift; sourceTree = "<group>"; };
 		B20000000000000000000002 /* PhotoComments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoComments.swift; sourceTree = "<group>"; };
 		B20000000000000000000003 /* PhotoCommentsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCommentsTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000004 /* PhotoSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoSearchView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -135,6 +137,7 @@
 				A20000000000000000000017 /* PhotoPostDetailViewModel.swift */,
 				A20000000000000000000018 /* PhotoPostDetailView.swift */,
 				B20000000000000000000001 /* PhotoViewer.swift */,
+				B20000000000000000000004 /* PhotoSearchView.swift */,
 				B20000000000000000000002 /* PhotoComments.swift */,
 				A2000000000000000000001C /* PhotoImagePipeline.swift */,
 				A20000000000000000000007 /* Assets.xcassets */,
@@ -349,6 +352,7 @@
 				A1000000000000000000000F /* PhotoPostDetailViewModel.swift in Sources */,
 				A10000000000000000000010 /* PhotoPostDetailView.swift in Sources */,
 				B10000000000000000000001 /* PhotoViewer.swift in Sources */,
+				B10000000000000000000004 /* PhotoSearchView.swift in Sources */,
 				B10000000000000000000002 /* PhotoComments.swift in Sources */,
 				A10000000000000000000014 /* PhotoImagePipeline.swift in Sources */,
 				A10000000000000000000001 /* SENSTAApp.swift in Sources */,

@@ -93,6 +93,21 @@ struct PhotoFeedContractTests {
     #expect(try !short.makeFeedPage(apiBaseURL: baseURL).hasMorePages)
   }
 
+  @Test
+  func searchEncodesKeywordForServerQueryUnescape() throws {
+    let keyword = "빛 + 여백 100% & 하늘"
+    let request = try PhotoFeedEndpoint.makeRequest(
+      apiBaseURL: #require(URL(string: "https://sensta.me/goapi/")), page: 2, keyword: keyword)
+    let requestURL = try #require(request.url)
+    let components = try #require(
+      URLComponents(url: requestURL, resolvingAgainstBaseURL: false))
+    let encoded = try #require(components.queryItems?.first { $0.name == "keyword" }?.value)
+    #expect(encoded.removingPercentEncoding == keyword)
+    #expect(!encoded.contains("+"))
+    #expect(components.queryItems?.first { $0.name == "option" }?.value == "0")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+  }
+
   private func fixtureData(named name: String) throws -> Data {
     let url = try #require(
       Bundle(for: FixtureBundleMarker.self).url(forResource: name, withExtension: "json")

@@ -123,6 +123,28 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testSearchAndOpenResult() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let search = app.buttons["photo-feed-search"]
+    XCTAssertTrue(search.waitForExistence(timeout: 10))
+    search.tap()
+    let field = app.searchFields.firstMatch
+    XCTAssertTrue(field.waitForExistence(timeout: 5))
+    field.tap()
+    field.typeText("photo\n")
+    let result = app.buttons.matching(identifier: "photo-search-result").firstMatch
+    XCTAssertTrue(result.waitForExistence(timeout: 5))
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Photo search"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    result.tap()
+    XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
+  }
+
+  @MainActor
   func testLaunchesWithBrand() throws {
     let app = XCUIApplication()
     app.launch()
