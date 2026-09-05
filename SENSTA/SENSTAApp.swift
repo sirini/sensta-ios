@@ -182,9 +182,16 @@ extension ContentView {
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
         if request.url?.path.hasSuffix("/comment/like") == true {
           commentLiked = body["liked"] as! Bool
+        } else if request.url?.path.hasSuffix("/comment/modify") == true {
+          if (body["content"] as? String)?.contains("reject") == true {
+            return Data(#"{"success":false,"code":3,"result":null}"#.utf8)
+          }
         } else {
           liked = body["liked"] as! Bool
         }
+        return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+      }
+      if request.httpMethod == "DELETE", request.url?.path.hasSuffix("/comment/remove") == true {
         return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
       }
       if request.url?.path.hasSuffix("/comment/list") == true {

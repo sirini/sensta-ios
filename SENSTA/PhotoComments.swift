@@ -6,7 +6,7 @@ struct PhotoComment: Identifiable, Equatable, Sendable {
   let id: Int
   let replyID: Int
   let writer: String
-  let content: String
+  var content: String
   let submitted: Date
   var likeCount: Int
   var writerID = 0
@@ -141,6 +141,9 @@ final class PhotoCommentsViewModel {
   private(set) var pendingLikeIDs: Set<Int> = []
   private(set) var likeErrors: [Int: String] = [:]
   private var uncertainLikeIDs: Set<Int> = []
+  private(set) var pendingManagementIDs: Set<Int> = []
+  private(set) var managementErrors: [Int: String] = [:]
+  private var uncertainRemovalIDs: Set<Int> = []
   private(set) var totalCount: Int?
 
   func accountChanged() {
@@ -148,6 +151,9 @@ final class PhotoCommentsViewModel {
     pendingLikeIDs = []
     likeErrors = [:]
     uncertainLikeIDs = []
+    pendingManagementIDs = []
+    managementErrors = [:]
+    uncertainRemovalIDs = []
     for index in serverComments.indices { serverComments[index].isLiked = false }
     for (id, var comment) in localComments {
       comment.isLiked = false
@@ -158,6 +164,10 @@ final class PhotoCommentsViewModel {
 
   func hasPersonalizedState(for account: AccountSession) -> Bool {
     account.user != nil && personalizedIdentity == account.sessionIdentity
+  }
+
+  func canManage(_ comment: PhotoComment, account: AccountSession) -> Bool {
+    comment.canReply && comment.writerID > 0 && comment.writerID == account.user?.uid
   }
 
   func appendConfirmed(_ comment: PhotoComment) {
@@ -232,6 +242,80 @@ final class PhotoCommentsViewModel {
     }
   }
 
+  func modify(commentID: Int, content: String, account: AccountSession) async -> Bool {
+    let content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let baseURL = account.apiBaseURL,
+      let comment = comments.first(where: { $0.id == commentID }),
+      canManage(comment, account: account), content.utf16.count >= 2,
+      !pendingManagementIDs.contains(commentID)
+    else { return false }
+    let identity = account.sessionIdentity
+    pendingManagementIDs.insert(commentID)
+    managementErrors[commentID] = nil
+    defer { if identity == account.sessionIdentity { pendingManagementIDs.remove(commentID) } }
+    do {
+      let request = try PhotoCommentManagementEndpoint.modifyRequest(
+        baseURL: baseURL, boardID: boardID, postID: postID, commentID: commentID,
+        content: content)
+      let data = try await account.sendAuthenticated(request)
+      try JSONDecoder().decode(PhotoCommentManagementEndpoint.Response.self, from: data).check()
+      guard identity == account.sessionIdentity else { return false }
+      updateComment(id: commentID) { $0.content = content }
+      return true
+    } catch {
+      guard identity == account.sessionIdentity else { return false }
+      managementErrors[commentID] = "댓글을 수정하지 못했어요. 초안은 보관하고 있어요."
+      return false
+    }
+  }
+
+  func remove(commentID: Int, account: AccountSession) async -> Bool {
+    guard let baseURL = account.apiBaseURL,
+      let comment = comments.first(where: { $0.id == commentID }),
+      canManage(comment, account: account), !pendingManagementIDs.contains(commentID),
+      !uncertainRemovalIDs.contains(commentID)
+    else { return false }
+    let identity = account.sessionIdentity
+    let keepsPlaceholder = comments.contains { $0.id != commentID && $0.replyID == commentID }
+    let baselineCount = totalCount ?? comments.filter(\.canReply).count
+    pendingManagementIDs.insert(commentID)
+    managementErrors[commentID] = nil
+    defer { if identity == account.sessionIdentity { pendingManagementIDs.remove(commentID) } }
+    do {
+      let request = try PhotoCommentManagementEndpoint.removeRequest(
+        baseURL: baseURL, boardID: boardID, commentID: commentID)
+      let data = try await account.sendAuthenticated(request)
+      try JSONDecoder().decode(PhotoCommentManagementEndpoint.Response.self, from: data).check()
+      guard identity == account.sessionIdentity else { return false }
+      if keepsPlaceholder {
+        updateComment(id: commentID) {
+          $0.content = "삭제된 댓글입니다."
+          $0.canReply = false
+        }
+      } else {
+        serverComments.removeAll { $0.id == commentID }
+        localComments.removeValue(forKey: commentID)
+        pendingLikeIDs.remove(commentID)
+        likeErrors[commentID] = nil
+        comments = merged(serverComments)
+        totalCount = max(0, baselineCount - 1)
+      }
+      account.recordCommentRemoval(
+        id: commentID, postID: postID, baseline: baselineCount,
+        keepsPlaceholder: keepsPlaceholder)
+      return true
+    } catch {
+      guard identity == account.sessionIdentity else { return false }
+      if case NuboAPIError.server = error {
+        managementErrors[commentID] = "댓글을 삭제하지 못했어요. 작성 권한을 확인해 주세요."
+      } else {
+        uncertainRemovalIDs.insert(commentID)
+        managementErrors[commentID] = "삭제 결과를 확인하지 못했어요. 댓글 목록을 새로고침해 주세요."
+      }
+      return false
+    }
+  }
+
   private func updateComment(id: Int, mutate: (inout PhotoComment) -> Void) {
     if let index = serverComments.firstIndex(where: { $0.id == id }) {
       mutate(&serverComments[index])
@@ -284,6 +368,8 @@ final class PhotoCommentsViewModel {
           personalizedIdentity = account?.user == nil ? nil : account?.sessionIdentity
           uncertainLikeIDs = []
           likeErrors = [:]
+          uncertainRemovalIDs = []
+          managementErrors = [:]
           hasLoaded = true
           hasMore = page.hasMore
           nextPage = pageNumber
@@ -302,6 +388,9 @@ struct PhotoCommentsSection: View {
   @State private var model: PhotoCommentsViewModel
   @State private var composer = PhotoCommentComposerModel()
   @State private var showsLogin = false
+  @State private var editingComment: PhotoComment?
+  @State private var deletingComment: PhotoComment?
+  @State private var showsDeleteConfirmation = false
   @Environment(\.accountSession) private var account
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -367,6 +456,20 @@ struct PhotoCommentsSection: View {
               Spacer(minLength: 8)
               Text(comment.submitted, format: .dateTime.month().day())
                 .font(.caption).foregroundStyle(.secondary)
+              if let account, model.canManage(comment, account: account) {
+                Menu("댓글 관리", systemImage: "ellipsis") {
+                  Button("수정", systemImage: "pencil") { editingComment = comment }
+                    .accessibilityIdentifier("comment-edit-\(comment.id)")
+                  Button("삭제", systemImage: "trash", role: .destructive) {
+                    deletingComment = comment
+                    showsDeleteConfirmation = true
+                  }
+                  .accessibilityIdentifier("comment-delete-\(comment.id)")
+                }
+                .labelStyle(.iconOnly)
+                .disabled(model.pendingManagementIDs.contains(comment.id))
+                .accessibilityIdentifier("comment-manage-\(comment.id)")
+              }
             }
             Text(comment.content)
               .font(.body)
@@ -431,6 +534,14 @@ struct PhotoCommentsSection: View {
                   .accessibilityIdentifier("comment-like-retry-\(comment.id)")
               }
             }
+            if let error = model.managementErrors[comment.id] {
+              HStack {
+                Text(error).font(.caption).foregroundStyle(.secondary)
+                  .accessibilityIdentifier("comment-management-error-\(comment.id)")
+                Button("목록 새로고침") { Task { await model.refresh(account: account) } }
+                  .font(.caption)
+              }
+            }
           }
           .padding(.leading, comment.isReply ? 20 : 0)
           Divider()
@@ -453,6 +564,9 @@ struct PhotoCommentsSection: View {
       }
       .task(id: account?.sessionIdentity) {
         composer.reset()
+        editingComment = nil
+        deletingComment = nil
+        showsDeleteConfirmation = false
         model.accountChanged()
         await model.refresh(account: account)
       }
@@ -462,6 +576,37 @@ struct PhotoCommentsSection: View {
           AccountView(session: account, detailService: detailService)
             .environment(\.dynamicTypeSize, dynamicTypeSize).presentationDragIndicator(.visible)
         }
+      }
+      .sheet(item: $editingComment) { comment in
+        PhotoCommentEditorSheet(
+          comment: comment, isSaving: model.pendingManagementIDs.contains(comment.id),
+          error: model.managementErrors[comment.id]
+        ) { content in
+          guard let account else { return }
+          Task {
+            if await model.modify(commentID: comment.id, content: content, account: account) {
+              editingComment = nil
+            }
+          }
+        }
+        .environment(\.dynamicTypeSize, dynamicTypeSize)
+      }
+      .confirmationDialog(
+        "댓글 삭제", isPresented: $showsDeleteConfirmation, titleVisibility: .visible,
+        presenting: deletingComment
+      ) { comment in
+        Button("삭제하기", role: .destructive) {
+          guard let account else { return }
+          Task {
+            if await model.remove(commentID: comment.id, account: account) {
+              deletingComment = nil
+              await model.refresh(account: account)
+            }
+          }
+        }
+        Button("취소", role: .cancel) { deletingComment = nil }
+      } message: { _ in
+        Text("답글이 있는 댓글은 내용을 지우고 자리를 남겨 대화 흐름을 보존합니다.")
       }
     }
   }

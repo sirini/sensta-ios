@@ -369,3 +369,162 @@ private actor CommentLikeServiceStub: AccountServing {
     #expect(model.comments.first?.isLiked == false)
   }
 }
+
+private actor CommentManagementServiceStub: AccountServing {
+  enum Mode { case normal, rejectedModify, uncertainRemove, pausedModify }
+  let mode: Mode
+  var rootContent = "원래 댓글 내용입니다."
+  var hasReply = true
+  var mutationCount = 0
+  var continuation: CheckedContinuation<Void, Never>?
+  init(_ mode: Mode = .normal) { self.mode = mode }
+  func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
+    (try await load(token: ""), AccountTokens(token: "access", refresh: "refresh"))
+  }
+  func load(token: String) async throws -> AccountUser {
+    AccountUser(uid: 7, name: "사진가", id: "photo@example.com", blocked: false)
+  }
+  func refresh(_ refresh: String) async throws -> AccountTokens {
+    throw NuboAPIError.httpStatus(401)
+  }
+  func logout(token: String) async throws {}
+  func resume() {
+    continuation?.resume()
+    continuation = nil
+  }
+  func data(for request: URLRequest) async throws -> Data {
+    if request.httpMethod == "PATCH" {
+      mutationCount += 1
+      if mode == .pausedModify { await withCheckedContinuation { continuation = $0 } }
+      if mode == .rejectedModify {
+        return Data(#"{"success":false,"code":3,"result":null}"#.utf8)
+      }
+      let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+      rootContent = body["content"] as! String
+      return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+    }
+    if request.httpMethod == "DELETE" {
+      mutationCount += 1
+      if mode == .uncertainRemove { throw NuboAPIError.networkFailure }
+      let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+      let id = Int(query.first { $0.name == "removeTargetUid" }!.value!)!
+      if id == 31 { rootContent = "(deleted)" } else { hasReply = false }
+      return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+    }
+    var comments: [[String: Any]] = [comment(id: 31, replyID: 31, content: rootContent)]
+    if hasReply { comments.append(comment(id: 32, replyID: 31, content: "내 답글 내용입니다.")) }
+    return try JSONSerialization.data(withJSONObject: [
+      "success": true, "error": "", "code": 0,
+      "result": ["boardUid": 2, "totalCommentCount": comments.count, "comments": comments],
+    ])
+  }
+  private func comment(id: Int, replyID: Int, content: String) -> [String: Any] {
+    [
+      "uid": id, "replyUid": replyID, "postUid": 10,
+      "writer": ["uid": 7, "name": "사진가", "profile": "", "signature": ""],
+      "like": 0, "liked": false, "submitted": 1_778_000_000_000 as Int64,
+      "modified": 0, "status": 0, "content": content,
+    ]
+  }
+}
+
+@MainActor struct PhotoCommentManagementTests {
+  private func setup(_ service: CommentManagementServiceStub) async -> AccountSession {
+    let account = AccountSession(
+      service: service, store: CommentLikeTokenStore(), apiBaseURL: commentLikeBaseURL)
+    await account.restore()
+    return account
+  }
+
+  @Test func modifyAndRemoveRequestsMatchAndroidContracts() throws {
+    let modify = try PhotoCommentManagementEndpoint.modifyRequest(
+      baseURL: commentLikeBaseURL, boardID: 2, postID: 10, commentID: 31,
+      content: "  <script>\"사진\" & '빛'</script>  ")
+    let modifyData = try #require(modify.httpBody)
+    let body = try #require(
+      JSONSerialization.jsonObject(with: modifyData) as? [String: Any])
+    #expect(modify.url?.path == "/goapi/comment/modify")
+    #expect(modify.httpMethod == "PATCH")
+    #expect(body.count == 4)
+    #expect(body["boardUid"] as? Int == 2)
+    #expect(body["postUid"] as? Int == 10)
+    #expect(body["modifyTargetUid"] as? Int == 31)
+    #expect(
+      body["content"] as? String == "&lt;script&gt;&quot;사진&quot; &amp; &#39;빛&#39;&lt;/script&gt;")
+    #expect(body["userUid"] == nil)
+
+    let remove = try PhotoCommentManagementEndpoint.removeRequest(
+      baseURL: commentLikeBaseURL, boardID: 2, commentID: 31)
+    let removeURL = try #require(remove.url)
+    let components = try #require(URLComponents(url: removeURL, resolvingAgainstBaseURL: false))
+    let query = Dictionary(
+      uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+    #expect(remove.url?.path == "/goapi/comment/remove")
+    #expect(remove.httpMethod == "DELETE")
+    #expect(remove.httpBody == nil)
+    #expect(query == ["boardUid": "2", "removeTargetUid": "31"])
+  }
+
+  @Test func modifiesOwnCommentAndPreservesConversationWhenRemovingRoot() async {
+    let service = CommentManagementServiceStub()
+    let account = await setup(service)
+    let model = PhotoCommentsViewModel(
+      boardID: 2, postID: 10, service: CommentsScript([]))
+    await model.refresh(account: account)
+    #expect(model.comments.count == 2)
+    #expect(model.canManage(model.comments[0], account: account))
+    #expect(await model.modify(commentID: 31, content: "  <새 댓글> & '빛'  ", account: account))
+    #expect(model.comments[0].content == "<새 댓글> & '빛'")
+    #expect(await model.remove(commentID: 31, account: account))
+    #expect(model.comments[0].content == "삭제된 댓글입니다.")
+    #expect(!model.comments[0].canReply)
+    #expect(model.comments.count == 2)
+    #expect(await model.remove(commentID: 32, account: account))
+    #expect(model.comments.map(\.id) == [31])
+    #expect(model.totalCount == 1)
+    #expect(account.commentCounts[10] == 1)
+  }
+
+  @Test func rejectsOtherWriterAndPreservesContentAfterModifyFailure() async {
+    let service = CommentManagementServiceStub(.rejectedModify)
+    let account = await setup(service)
+    let model = PhotoCommentsViewModel(
+      boardID: 2, postID: 10, service: CommentsScript([]))
+    await model.refresh(account: account)
+    var other = model.comments[0]
+    other.writerID = 99
+    #expect(!model.canManage(other, account: account))
+    #expect(await model.modify(commentID: 31, content: "수정할 댓글", account: account) == false)
+    #expect(model.comments[0].content == "원래 댓글 내용입니다.")
+    #expect(model.managementErrors[31] != nil)
+  }
+
+  @Test func uncertainRemoveRequiresReloadAndLateLogoutModifyIsIgnored() async {
+    let removeService = CommentManagementServiceStub(.uncertainRemove)
+    let removeAccount = await setup(removeService)
+    let removeModel = PhotoCommentsViewModel(
+      boardID: 2, postID: 10, service: CommentsScript([]))
+    await removeModel.refresh(account: removeAccount)
+    #expect(await removeModel.remove(commentID: 32, account: removeAccount) == false)
+    #expect(await removeModel.remove(commentID: 32, account: removeAccount) == false)
+    #expect(await removeService.mutationCount == 1)
+    await removeModel.refresh(account: removeAccount)
+    #expect(await removeModel.remove(commentID: 32, account: removeAccount) == false)
+    #expect(await removeService.mutationCount == 2)
+
+    let modifyService = CommentManagementServiceStub(.pausedModify)
+    let modifyAccount = await setup(modifyService)
+    let modifyModel = PhotoCommentsViewModel(
+      boardID: 2, postID: 10, service: CommentsScript([]))
+    await modifyModel.refresh(account: modifyAccount)
+    let pending = Task {
+      await modifyModel.modify(commentID: 31, content: "늦게 도착한 수정", account: modifyAccount)
+    }
+    while await modifyService.mutationCount == 0 { await Task.yield() }
+    await modifyAccount.logout()
+    modifyModel.accountChanged()
+    await modifyService.resume()
+    #expect(await pending.value == false)
+    #expect(modifyModel.comments[0].content == "원래 댓글 내용입니다.")
+  }
+}

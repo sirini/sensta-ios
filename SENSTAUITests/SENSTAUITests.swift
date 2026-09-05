@@ -69,6 +69,86 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testOwnCommentEditAndDeletePreservesReplies() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+    XCTAssertTrue(card.waitForExistence(timeout: 10))
+    card.tap()
+    let login = app.buttons["comment-login"]
+    for _ in 0..<6 where !login.isHittable { app.swipeUp() }
+    login.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+    XCTAssertTrue(app.buttons["account-logout"].waitForExistence(timeout: 5))
+    app.buttons["account-close"].tap()
+
+    let draft = app.descendants(matching: .any).matching(identifier: "comment-draft").firstMatch
+    XCTAssertTrue(draft.waitForExistence(timeout: 5))
+    for _ in 0..<3 where !draft.isHittable { app.swipeUp() }
+    draft.tap()
+    draft.typeText("Original comment text")
+    app.buttons["comment-send"].tap()
+    let originalComment = app.staticTexts["Original comment text"]
+    for _ in 0..<4 where !originalComment.exists { app.swipeUp() }
+    XCTAssertTrue(originalComment.waitForExistence(timeout: 5))
+
+    let rootMenu = app.buttons["comment-manage-101"]
+    for _ in 0..<4 where !rootMenu.isHittable { app.swipeUp() }
+    rootMenu.tap()
+    let edit = app.buttons["comment-edit-101"]
+    XCTAssertTrue(edit.waitForExistence(timeout: 5))
+    edit.tap()
+    let editDraft = app.descendants(matching: .any).matching(identifier: "comment-edit-draft")
+      .firstMatch
+    XCTAssertTrue(editDraft.waitForExistence(timeout: 5))
+    editDraft.tap()
+    editDraft.typeKey("a", modifierFlags: .command)
+    editDraft.typeText("Edited comment text")
+    app.buttons["comment-edit-save"].tap()
+    XCTAssertTrue(app.staticTexts["Edited comment text"].waitForExistence(timeout: 5))
+
+    let reply = app.buttons["comment-reply-101"]
+    for _ in 0..<4 where !reply.isHittable { app.swipeUp() }
+    reply.tap()
+    draft.tap()
+    draft.typeText("Reply that must remain")
+    app.buttons["comment-send"].tap()
+    XCTAssertTrue(app.staticTexts["Reply that must remain"].waitForExistence(timeout: 5))
+
+    for _ in 0..<4 where !rootMenu.isHittable { app.swipeUp() }
+    rootMenu.tap()
+    app.buttons["comment-delete-101"].tap()
+    XCTAssertTrue(app.buttons["삭제하기"].waitForExistence(timeout: 5))
+    app.buttons["삭제하기"].tap()
+    XCTAssertTrue(app.staticTexts["삭제된 댓글입니다."].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["Reply that must remain"].exists)
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Edited and deleted comment"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+
+    let replyMenu = app.buttons["comment-manage-102"]
+    for _ in 0..<4 where !replyMenu.isHittable { app.swipeUp() }
+    replyMenu.tap()
+    app.buttons["comment-delete-102"].tap()
+    app.buttons["삭제하기"].tap()
+    expectation(
+      for: NSPredicate(format: "exists == false"),
+      evaluatedWith: app.staticTexts["Reply that must remain"])
+    waitForExpectations(timeout: 5)
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(card.waitForExistence(timeout: 5))
+    XCTAssertEqual(app.staticTexts["photo-feed-comments-1"].label, "댓글 2개")
+  }
+
+  @MainActor
   func testLikeRequiresLoginAndSynchronizesAcrossDetailAndFeed() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]

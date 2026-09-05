@@ -211,6 +211,11 @@ final class AccountSession {
     guard writtenCommentIDs.insert(id).inserted else { return }
     commentCounts[postID] = max(0, commentCounts[postID] ?? baseline) + 1
   }
+  func recordCommentRemoval(id: Int, postID: Int, baseline: Int, keepsPlaceholder: Bool) {
+    guard !keepsPlaceholder else { return }
+    writtenCommentIDs.remove(id)
+    commentCounts[postID] = max(0, (commentCounts[postID] ?? baseline) - 1)
+  }
   private var refreshTask: Task<AccountTokens, Error>?
 
   var profileURL: URL? {
