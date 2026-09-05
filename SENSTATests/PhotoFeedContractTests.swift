@@ -64,6 +64,35 @@ struct PhotoFeedContractTests {
     }
   }
 
+  @Test
+  func paginationUsesRawPostsAndSubtractsNotices() throws {
+    let data = try fixtureData(named: "board-list-photo")
+    var envelope = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    var result = try #require(envelope["result"] as? [String: Any])
+    var config = try #require(result["config"] as? [String: Any])
+    let posts = try #require(result["posts"] as? [[String: Any]])
+    config["rowCount"] = 3
+    result["config"] = config
+    result["notices"] = [posts[0]]
+    result["totalPostCount"] = 4
+    envelope["result"] = result
+    let response = try JSONDecoder().decode(
+      BoardListResponseDTO.self, from: JSONSerialization.data(withJSONObject: envelope)
+    )
+    let baseURL = try #require(URL(string: "https://sensta.me/goapi/"))
+    let first = try response.makeFeedPage(apiBaseURL: baseURL, requestedPage: 1)
+    #expect(first.posts.count == 1)
+    #expect(first.hasMorePages)
+    #expect(try !response.makeFeedPage(apiBaseURL: baseURL, requestedPage: 2).hasMorePages)
+
+    result["posts"] = [posts[0]]
+    envelope["result"] = result
+    let short = try JSONDecoder().decode(
+      BoardListResponseDTO.self, from: JSONSerialization.data(withJSONObject: envelope)
+    )
+    #expect(try !short.makeFeedPage(apiBaseURL: baseURL).hasMorePages)
+  }
+
   private func fixtureData(named name: String) throws -> Data {
     let url = try #require(
       Bundle(for: FixtureBundleMarker.self).url(forResource: name, withExtension: "json")

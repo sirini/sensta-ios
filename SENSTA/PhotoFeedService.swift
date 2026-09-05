@@ -116,7 +116,7 @@ struct PhotoFeedService: PhotoFeedServing {
     } catch {
       throw NuboAPIError.malformedResponse
     }
-    return try envelope.makeFeedPage(apiBaseURL: client.apiBaseURL)
+    return try envelope.makeFeedPage(apiBaseURL: client.apiBaseURL, requestedPage: page)
   }
 }
 

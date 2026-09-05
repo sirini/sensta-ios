@@ -3,6 +3,7 @@ import Foundation
 struct PhotoFeedPage: Equatable, Sendable {
   let totalPostCount: Int
   let posts: [PhotoPost]
+  var hasMorePages: Bool = false
 }
 
 struct PhotoPost: Identifiable, Equatable, Sendable {
@@ -31,7 +32,7 @@ struct BoardListResponseDTO: Decodable, Sendable {
   let code: Int
   let result: BoardListResultDTO?
 
-  func makeFeedPage(apiBaseURL: URL) throws -> PhotoFeedPage {
+  func makeFeedPage(apiBaseURL: URL, requestedPage: Int = 1) throws -> PhotoFeedPage {
     guard success, code == 0 else {
       throw NuboAPIError.server(code: code, message: error)
     }
@@ -44,7 +45,17 @@ struct BoardListResponseDTO: Decodable, Sendable {
       .filter { !blockedWriterIDs.contains($0.writer.uid) }
       .map { $0.makePhotoPost(apiBaseURL: apiBaseURL) }
 
-    return PhotoFeedPage(totalPostCount: result.totalPostCount, posts: posts)
+    // 공지는 매 페이지의 일반글 한도를 줄이며, 차단 필터 전 개수로 마지막 페이지를 판단한다.
+    let pageSize = result.config.rowCount - result.notices.count
+    let pageCount =
+      pageSize > 0
+      ? result.totalPostCount / pageSize + (result.totalPostCount % pageSize == 0 ? 0 : 1)
+      : 0
+    return PhotoFeedPage(
+      totalPostCount: result.totalPostCount,
+      posts: posts,
+      hasMorePages: pageSize > 0 && result.posts.count >= pageSize && requestedPage < pageCount
+    )
   }
 }
 

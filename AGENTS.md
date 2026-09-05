@@ -49,5 +49,5 @@ The iOS app should feel native to Apple platforms while preserving the product b
 
 ## Current scope
 
-The repository is in preparation only. Do not begin application feature implementation until the product owner
-starts the first development work unit.
+Application development has started. Preserve the approved immersive photo browsing experience while
+adding public feed pagination and subsequent small, tested feature units.

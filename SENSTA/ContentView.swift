@@ -33,9 +33,15 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
           }
         case .loaded(let posts):
-          PhotoFeedList(posts: posts, detailService: detailService) {
-            await model.refresh()
-          }
+          PhotoFeedList(
+            posts: posts,
+            detailService: detailService,
+            isLoadingMore: model.isLoadingMore,
+            loadMoreError: model.loadMoreError,
+            onRefresh: { await model.refresh() },
+            onLoadMore: { await model.loadMoreIfNeeded(currentPostID: $0) },
+            onRetryLoadMore: { await model.loadMore() }
+          )
           .overlay(alignment: .top) {
             if let message = model.refreshError {
               VStack(spacing: 8) {
@@ -70,7 +76,12 @@ struct ContentView: View {
 private struct PhotoFeedList: View {
   let posts: [PhotoPost]
   let detailService: any PhotoPostDetailServing
+  let isLoadingMore: Bool
+  let loadMoreError: String?
   let onRefresh: @MainActor @Sendable () async -> Void
+  let onLoadMore: @MainActor @Sendable (Int) async -> Void
+  let onRetryLoadMore: @MainActor @Sendable () async -> Void
+  @State private var visiblePostID: Int?
   @Environment(\.displayScale) private var displayScale
 
   var body: some View {
@@ -98,6 +109,7 @@ private struct PhotoFeedList: View {
             }
             .buttonStyle(.plain)
             .frame(width: viewportSize.width, height: viewportSize.height)
+            .id(post.id)
             .accessibilityIdentifier("photo-feed-card")
             .task(id: post.id, priority: .utility) {
               await prefetchNextCover(after: index, targetSize: viewportSize)
@@ -108,6 +120,34 @@ private struct PhotoFeedList: View {
       }
       .scrollIndicators(.hidden)
       .scrollTargetBehavior(.paging)
+      .scrollPosition(id: $visiblePostID)
+      .onChange(of: visiblePostID) { _, currentID in
+        if let currentID { Task { await onLoadMore(currentID) } }
+      }
+      .onChange(of: posts.last?.id, initial: true) { _, _ in
+        if let currentID = visiblePostID ?? posts.first?.id {
+          Task { await onLoadMore(currentID) }
+        }
+      }
+      .overlay(alignment: .top) {
+        if visiblePostID == posts.last?.id {
+          VStack(spacing: 8) {
+            if isLoadingMore {
+              ProgressView("다음 사진을 불러오는 중…")
+            } else if let loadMoreError {
+              Text(loadMoreError)
+              Button("다음 사진 다시 불러오기") { Task { await onRetryLoadMore() } }
+                .accessibilityIdentifier("photo-feed-load-more-retry")
+            }
+          }
+          .font(.subheadline)
+          .padding()
+          .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+          .padding(.top, geometry.safeAreaInsets.top + 44)
+          .padding(.horizontal)
+          .opacity(isLoadingMore || loadMoreError != nil ? 1 : 0)
+        }
+      }
       .refreshable {
         await onRefresh()
       }

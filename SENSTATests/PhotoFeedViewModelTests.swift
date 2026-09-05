@@ -71,9 +71,109 @@ struct PhotoFeedViewModelTests {
     #expect(model.refreshError == nil)
   }
 
-  private func makePost() -> PhotoPost {
+  @Test
+  func appendsUniquePhotosAndStopsAtEnd() async {
+    let first = makePost(id: 101)
+    let second = makePost(id: 102)
+    let service = ScriptedFeedService([
+      .success(PhotoFeedPage(totalPostCount: 3, posts: [first], hasMorePages: true)),
+      .success(PhotoFeedPage(totalPostCount: 3, posts: [first, second])),
+    ])
+    let model = PhotoFeedViewModel(service: service)
+    await model.loadIfNeeded()
+    await model.loadMoreIfNeeded(currentPostID: first.id)
+    await model.loadMore()
+    #expect(model.state == .loaded([first, second]))
+    #expect(!model.hasMorePages)
+    #expect(await service.pages == [1, 2])
+  }
+
+  @Test
+  func skipsFilteredAndDuplicateOnlyPages() async {
+    let first = makePost(id: 101)
+    let second = makePost(id: 102)
+    let service = ScriptedFeedService([
+      .success(PhotoFeedPage(totalPostCount: 5, posts: [], hasMorePages: true)),
+      .success(PhotoFeedPage(totalPostCount: 5, posts: [first], hasMorePages: true)),
+      .success(PhotoFeedPage(totalPostCount: 5, posts: [first], hasMorePages: true)),
+      .success(PhotoFeedPage(totalPostCount: 5, posts: [], hasMorePages: true)),
+      .success(PhotoFeedPage(totalPostCount: 5, posts: [second])),
+    ])
+    let model = PhotoFeedViewModel(service: service)
+    await model.loadIfNeeded()
+    #expect(model.state == .loaded([first]))
+    await model.loadMore()
+    #expect(model.state == .loaded([first, second]))
+    #expect(await service.pages == [1, 2, 3, 4, 5])
+  }
+
+  @Test
+  func failedPageKeepsPhotosAndRetriesSamePageOnlyOnRequest() async {
+    let first = makePost(id: 101)
+    let second = makePost(id: 102)
+    let service = ScriptedFeedService([
+      .success(PhotoFeedPage(totalPostCount: 2, posts: [first], hasMorePages: true)),
+      .failure(.networkUnavailable),
+      .success(PhotoFeedPage(totalPostCount: 2, posts: [second])),
+    ])
+    let model = PhotoFeedViewModel(service: service)
+    await model.loadIfNeeded()
+    await model.loadMore()
+    #expect(model.state == .loaded([first]))
+    #expect(model.loadMoreError != nil)
+    #expect(!model.isLoadingMore)
+    await model.loadMoreIfNeeded(currentPostID: first.id)
+    #expect(await service.pages == [1, 2])
+    await model.loadMore()
+    #expect(await service.pages == [1, 2, 2])
+    #expect(model.state == .loaded([first, second]))
+    #expect(model.loadMoreError == nil)
+  }
+
+  @Test
+  func refreshResetsPagination() async {
+    let first = makePost(id: 101)
+    let second = makePost(id: 102)
+    let service = ScriptedFeedService([
+      .success(PhotoFeedPage(totalPostCount: 2, posts: [first], hasMorePages: true)),
+      .success(PhotoFeedPage(totalPostCount: 2, posts: [second])),
+      .success(PhotoFeedPage(totalPostCount: 2, posts: [second], hasMorePages: true)),
+      .success(PhotoFeedPage(totalPostCount: 2, posts: [first])),
+    ])
+    let model = PhotoFeedViewModel(service: service)
+    await model.loadIfNeeded()
+    await model.loadMore()
+    await model.refresh()
+    #expect(model.state == .loaded([second]))
+    await model.loadMore()
+    #expect(await service.pages == [1, 2, 1, 2])
+    #expect(model.state == .loaded([second, first]))
+  }
+
+  @Test
+  func refreshSupersedesInFlightPageAndPreventsDuplicateRequests() async {
+    let first = makePost(id: 101)
+    let old = makePost(id: 102)
+    let fresh = makePost(id: 103)
+    let service = SuspendedFeedService(first: first, old: old, fresh: fresh)
+    let model = PhotoFeedViewModel(service: service)
+    await model.loadIfNeeded()
+    let paging = Task { await model.loadMore() }
+    await service.waitForPageRequest()
+    await model.loadMore()
+    #expect(await service.pages == [1, 2])
+    await model.refresh()
+    await service.finishOldPage()
+    await paging.value
+    #expect(model.state == .loaded([fresh]))
+    #expect(!model.isLoadingMore)
+    #expect(!model.hasMorePages)
+    #expect(await service.pages == [1, 2, 1])
+  }
+
+  private func makePost(id: Int = 101) -> PhotoPost {
     PhotoPost(
-      id: 101,
+      id: id,
       title: "테스트 사진",
       content: "",
       submitted: Date(timeIntervalSince1970: 1_788_500_000),
@@ -125,4 +225,52 @@ private actor RefreshPhotoFeedService: PhotoFeedServing {
 
 private struct CancelledPhotoFeedService: PhotoFeedServing {
   func fetchPage(_ page: Int) async throws -> PhotoFeedPage { throw CancellationError() }
+}
+
+private actor ScriptedFeedService: PhotoFeedServing {
+  private var responses: [Result<PhotoFeedPage, NuboAPIError>]
+  private(set) var pages: [Int] = []
+  init(_ responses: [Result<PhotoFeedPage, NuboAPIError>]) { self.responses = responses }
+  func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
+    pages.append(page)
+    guard !responses.isEmpty else { throw NuboAPIError.invalidRequest }
+    return try responses.removeFirst().get()
+  }
+}
+
+private actor SuspendedFeedService: PhotoFeedServing {
+  let first: PhotoPost
+  let old: PhotoPost
+  let fresh: PhotoPost
+  private(set) var pages: [Int] = []
+  private var continuation: CheckedContinuation<PhotoFeedPage, Never>?
+  private var started: CheckedContinuation<Void, Never>?
+  init(first: PhotoPost, old: PhotoPost, fresh: PhotoPost) {
+    self.first = first
+    self.old = old
+    self.fresh = fresh
+  }
+  func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
+    pages.append(page)
+    if page == 2 {
+      return await withCheckedContinuation { continuation in
+        self.continuation = continuation
+        started?.resume()
+        started = nil
+      }
+    }
+    return PhotoFeedPage(
+      totalPostCount: 2,
+      posts: [pages.count == 1 ? first : fresh],
+      hasMorePages: pages.count == 1
+    )
+  }
+  func waitForPageRequest() async {
+    if continuation != nil { return }
+    await withCheckedContinuation { started = $0 }
+  }
+  func finishOldPage() {
+    continuation?.resume(returning: PhotoFeedPage(totalPostCount: 2, posts: [old]))
+    continuation = nil
+  }
 }
