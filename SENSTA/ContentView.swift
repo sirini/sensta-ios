@@ -71,7 +71,8 @@ struct ContentView: View {
                       .frame(width: 44, height: 44)
                       .background(.black.opacity(0.25), in: Circle())
                   } else {
-                    Image(systemName: "arrow.right.to.line")
+                    Image(systemName: "ipad.and.arrow.forward")
+                      .environment(\.layoutDirection, .leftToRight)
                       .font(.body.weight(.medium)).foregroundStyle(.white)
                       .frame(width: 44, height: 44).background(.black.opacity(0.25), in: Circle())
                   }
