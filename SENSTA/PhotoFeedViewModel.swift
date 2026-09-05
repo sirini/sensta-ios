@@ -15,6 +15,7 @@ final class PhotoFeedViewModel {
   private let service: any PhotoFeedServing
   private var requestInFlight = false
   private(set) var state: State = .idle
+  private(set) var refreshError: String?
 
   init(service: any PhotoFeedServing) {
     self.service = service
@@ -37,6 +38,7 @@ final class PhotoFeedViewModel {
     guard !requestInFlight else { return }
     let previousState = state
     requestInFlight = true
+    refreshError = nil
     if showsLoadingState {
       state = .loading
     }
@@ -44,11 +46,17 @@ final class PhotoFeedViewModel {
 
     do {
       let page = try await service.fetchPage(1)
+      try Task.checkCancellation()
       state = page.posts.isEmpty ? .empty : .loaded(page.posts)
     } catch is CancellationError {
       state = previousState
     } catch {
-      state = .failed(Self.userMessage(for: error))
+      if case .loaded = previousState, !showsLoadingState {
+        state = previousState
+        refreshError = Self.userMessage(for: error)
+      } else {
+        state = .failed(Self.userMessage(for: error))
+      }
     }
   }
 

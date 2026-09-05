@@ -36,6 +36,19 @@ struct ContentView: View {
           PhotoFeedList(posts: posts, detailService: detailService) {
             await model.refresh()
           }
+          .overlay(alignment: .top) {
+            if let message = model.refreshError {
+              VStack(spacing: 8) {
+                Text(message)
+                Button("새로고침 재시도") { Task { await model.refresh() } }
+              }
+              .font(.subheadline)
+              .padding()
+              .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+              .padding()
+              .accessibilityIdentifier("photo-feed-refresh-error")
+            }
+          }
           .toolbar(.hidden, for: .navigationBar)
         }
       }

@@ -73,3 +73,30 @@ struct PhotoFeedContractTests {
 }
 
 private final class FixtureBundleMarker {}
+
+struct NuboAPIClientCancellationTests {
+  @Test
+  func urlSessionCancellationRemainsCancellation() async throws {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [CancelledAPIURLProtocol.self]
+    let session = URLSession(configuration: configuration)
+    defer { session.invalidateAndCancel() }
+    let url = try #require(URL(string: "https://example.test/goapi/"))
+    let client = NuboAPIClient(apiBaseURL: url, session: session)
+    do {
+      _ = try await client.data(for: URLRequest(url: url))
+      Issue.record("취소한 요청은 성공하면 안 됩니다.")
+    } catch {
+      #expect(error is CancellationError)
+    }
+  }
+}
+
+private final class CancelledAPIURLProtocol: URLProtocol, @unchecked Sendable {
+  override class func canInit(with request: URLRequest) -> Bool { true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func startLoading() {
+    client?.urlProtocol(self, didFailWithError: URLError(.cancelled))
+  }
+  override func stopLoading() {}
+}

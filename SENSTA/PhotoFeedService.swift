@@ -76,6 +76,8 @@ struct NuboAPIClient: Sendable {
       throw CancellationError()
     } catch let error as URLError {
       switch error.code {
+      case .cancelled:
+        throw CancellationError()
       case .notConnectedToInternet, .networkConnectionLost:
         throw NuboAPIError.networkUnavailable
       case .timedOut:

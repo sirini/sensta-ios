@@ -50,6 +50,27 @@ struct PhotoFeedViewModelTests {
     #expect(await service.attemptCount == 2)
   }
 
+  @Test
+  func failedRefreshPreservesPhotosAndCanRetry() async {
+    let page = PhotoFeedPage(totalPostCount: 1, posts: [makePost()])
+    let model = PhotoFeedViewModel(service: RefreshPhotoFeedService(page: page))
+    await model.loadIfNeeded()
+    await model.refresh()
+    #expect(model.state == .loaded(page.posts))
+    #expect(model.refreshError != nil)
+    await model.refresh()
+    #expect(model.state == .loaded(page.posts))
+    #expect(model.refreshError == nil)
+  }
+
+  @Test
+  func cancelledLoadReturnsToIdleAndCanLoadAgain() async {
+    let model = PhotoFeedViewModel(service: CancelledPhotoFeedService())
+    await model.loadIfNeeded()
+    #expect(model.state == .idle)
+    #expect(model.refreshError == nil)
+  }
+
   private func makePost() -> PhotoPost {
     PhotoPost(
       id: 101,
@@ -89,4 +110,19 @@ private actor RetryPhotoFeedService: PhotoFeedServing {
     }
     return self.page
   }
+}
+
+private actor RefreshPhotoFeedService: PhotoFeedServing {
+  let page: PhotoFeedPage
+  private var attempts = 0
+  init(page: PhotoFeedPage) { self.page = page }
+  func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
+    attempts += 1
+    if attempts == 2 { throw NuboAPIError.networkUnavailable }
+    return self.page
+  }
+}
+
+private struct CancelledPhotoFeedService: PhotoFeedServing {
+  func fetchPage(_ page: Int) async throws -> PhotoFeedPage { throw CancellationError() }
 }

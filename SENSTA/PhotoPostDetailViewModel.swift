@@ -37,7 +37,9 @@ final class PhotoPostDetailViewModel {
     defer { requestInFlight = false }
 
     do {
-      state = .loaded(try await service.fetchPost(id: postID))
+      let detail = try await service.fetchPost(id: postID)
+      try Task.checkCancellation()
+      state = .loaded(detail)
     } catch is CancellationError {
       state = previousState
     } catch {
