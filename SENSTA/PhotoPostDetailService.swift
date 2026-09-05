@@ -1,7 +1,13 @@
 import Foundation
 
-protocol PhotoPostDetailServing: Sendable {
+protocol PhotoPostDetailServing: PhotoCommentsServing {
   func fetchPost(id: Int) async throws -> PhotoPostDetail
+}
+
+extension PhotoPostDetailServing {
+  func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {
+    throw NuboAPIError.configuration
+  }
 }
 
 enum PhotoPostDetailEndpoint {
@@ -37,6 +43,17 @@ struct PhotoPostDetailService: PhotoPostDetailServing {
 
   init(apiBaseURL: URL, session: URLSession = .shared) {
     client = NuboAPIClient(apiBaseURL: apiBaseURL, session: session)
+  }
+
+  func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {
+    let request = try PhotoCommentsEndpoint.makeRequest(
+      apiBaseURL: client.apiBaseURL, boardID: boardID, postID: postID, page: page)
+    let data = try await client.data(for: request)
+    let envelope: PhotoCommentsResponseDTO
+    do { envelope = try JSONDecoder().decode(PhotoCommentsResponseDTO.self, from: data) } catch {
+      throw NuboAPIError.malformedResponse
+    }
+    return try envelope.makePage(boardID: boardID, postID: postID, page: page)
   }
 
   func fetchPost(id: Int) async throws -> PhotoPostDetail {

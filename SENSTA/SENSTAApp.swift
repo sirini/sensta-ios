@@ -63,7 +63,19 @@ struct SENSTAApp: App {
 #endif
 
 #if DEBUG
-  private struct PhotoViewerUITestService: PhotoPostDetailServing {
+  private actor PhotoViewerUITestService: PhotoPostDetailServing {
+    private var commentAttempts = 0
+
+    func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {
+      commentAttempts += 1
+      if commentAttempts == 1 { throw NuboAPIError.networkUnavailable }
+      return PhotoCommentsPage(
+        comments: [
+          PhotoComment(
+            id: page, replyID: 1, writer: "사진가", content: "여백이 아름다운 사진입니다. \(page)",
+            submitted: .now, likeCount: 2)
+        ], hasMore: page == 1)
+    }
     func fetchPost(id: Int) async throws -> PhotoPostDetail {
       let post = PhotoPost(
         id: id, title: "빛과 여백", content: "사진의 전체 구도를 감상하세요.",
@@ -79,7 +91,7 @@ struct SENSTAApp: App {
             id: $0, largeURL: nil, smallURL: nil,
             description: "테스트 사진 \($0)", exif: exif)
         },
-        tags: [], attachments: [], previousPostID: nil, nextPostID: nil, shareURL: nil)
+        tags: [], attachments: [], previousPostID: nil, nextPostID: nil, shareURL: nil, boardID: 2)
     }
   }
 #endif

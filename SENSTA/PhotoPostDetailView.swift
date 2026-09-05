@@ -4,8 +4,11 @@ struct PhotoPostDetailView: View {
   @State private var model: PhotoPostDetailViewModel
   @State private var selectedImageID: PhotoPostImage.ID?
   @State private var showsPhotoViewer = false
+  @State private var showsComments = false
+  private let commentsService: any PhotoCommentsServing
 
   init(postID: Int, service: any PhotoPostDetailServing) {
+    commentsService = service
     _model = State(initialValue: PhotoPostDetailViewModel(postID: postID, service: service))
   }
 
@@ -31,11 +34,22 @@ struct PhotoPostDetailView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar(.visible, for: .navigationBar)
     .toolbar {
-      if case .loaded(let detail) = model.state, let shareURL = detail.shareURL {
-        ShareLink(item: shareURL) {
-          Image(systemName: "square.and.arrow.up")
+      if case .loaded(let detail) = model.state {
+        ToolbarItemGroup(placement: .topBarTrailing) {
+          if detail.boardID != nil {
+            Button("댓글 보기", systemImage: "bubble.right") { showsComments = true }
+              .accessibilityIdentifier("photo-detail-comments")
+          }
+          if let shareURL = detail.shareURL {
+            ShareLink(item: shareURL) { Image(systemName: "square.and.arrow.up") }
+              .accessibilityLabel("게시물 공유")
+          }
         }
-        .accessibilityLabel("게시물 공유")
+      }
+    }
+    .sheet(isPresented: $showsComments) {
+      if case .loaded(let detail) = model.state, let boardID = detail.boardID {
+        PhotoCommentsView(boardID: boardID, postID: detail.post.id, service: commentsService)
       }
     }
     .fullScreenCover(isPresented: $showsPhotoViewer) {
@@ -399,7 +413,7 @@ private struct PhotoFact: Identifiable {
 }
 
 extension String {
-  fileprivate var nuboPlainText: String {
+  var nuboPlainText: String {
     replacingOccurrences(of: #"(?i)<br\s*/?>"#, with: "\n", options: .regularExpression)
       .replacingOccurrences(of: #"(?i)</(?:p|div)>"#, with: "\n", options: .regularExpression)
       .replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)

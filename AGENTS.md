@@ -22,6 +22,15 @@ The iOS app should feel native to Apple platforms while preserving the product b
   credentials, tokens, or local environment files.
 - New or meaning-correcting code comments should be written in Korean.
 
+## Product-owner priorities
+
+- Prioritize iOS-only progress and reuse existing Android-compatible API contracts before backend changes.
+  Defer server work when possible; preserve deployed Android clients when changes become necessary.
+- Keep the approved immersive feed identity. Other screens should favor native iOS controls, restrained
+  decoration, visible whitespace, and the full photographic composition.
+- The product owner handles production backend updates/restarts and browser-based Firebase/OAuth/APNs setup.
+  Provide precise deployment or setup instructions when those steps become necessary.
+
 ## Technical direction
 
 - Build a native SwiftUI app with Swift concurrency and Apple frameworks first. Add third-party packages only

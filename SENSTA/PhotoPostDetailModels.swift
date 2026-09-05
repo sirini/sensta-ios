@@ -8,6 +8,7 @@ struct PhotoPostDetail: Equatable, Sendable {
   let previousPostID: Int?
   let nextPostID: Int?
   let shareURL: URL?
+  var boardID: Int? = nil
 }
 
 struct PhotoPostImage: Identifiable, Equatable, Sendable {
@@ -67,7 +68,8 @@ struct BoardViewResponseDTO: Decodable, Sendable {
       shareURL: MediaURLResolver.url(
         for: "/board/photo/\(result.post.uid)",
         apiBaseURL: apiBaseURL
-      )
+      ),
+      boardID: result.config.uid
     )
   }
 }

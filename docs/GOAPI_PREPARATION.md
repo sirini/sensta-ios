@@ -12,7 +12,11 @@ SENSTA iOS는 기존 GOAPI API contract v1을 최대한 재사용한다. Android
 
 필요 작업:
 
-- Android 경로를 유지하면서 `/auth/mobile/google`과 `/auth/mobile/refresh` 같은 범용 별칭을 추가한다.
+- 2026-09-05 소스 확인: Google handler와 `MobileRefreshAccessTokenHandler`는 Android 기기 검사를
+  하지 않는다. 기존 token audience·form/body 계약이 맞으면 iOS도 같은 경로를 사용할 수 있다. 실제 iOS
+  OAuth 발급 검증은 로그인 작업에서 수행한다.
+- `/auth/mobile/google`과 `/auth/mobile/refresh` 별칭은 선택 사항이며, 이름만 바꾸기 위한 서버 배포는
+  선행 조건으로 두지 않는다. 기존 Android 경로·설정과 응답 계약을 유지한다.
 - iOS 앱 자체에는 iOS 유형 OAuth client ID가 필요하지만, GOAPI로 보낼 ID token은 Android와 같은 Web
   유형 server client ID를 audience로 발급받는다. iOS client ID를 서버 audience로 혼동하지 않는다.
 - 기존 `OAUTH_GOOGLE_ANDROID_CLIENT_ID`가 실제로 가리키는 Web server client ID를 하위 호환을 유지하며

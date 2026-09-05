@@ -55,6 +55,31 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testCommentsRetryPaginationAndDismissal() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+    XCTAssertTrue(card.waitForExistence(timeout: 10))
+    card.tap()
+    let comments = app.buttons["photo-detail-comments"]
+    XCTAssertTrue(comments.waitForExistence(timeout: 10))
+    comments.tap()
+    let retry = app.buttons["photo-comments-retry"]
+    XCTAssertTrue(retry.waitForExistence(timeout: 5))
+    retry.tap()
+    XCTAssertTrue(app.staticTexts["여백이 아름다운 사진입니다. 1"].waitForExistence(timeout: 5))
+    app.buttons["댓글 더 보기"].tap()
+    XCTAssertTrue(app.staticTexts["여백이 아름다운 사진입니다. 2"].waitForExistence(timeout: 5))
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Photo comments"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    app.buttons["photo-comments-close"].tap()
+    XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
+  }
+
+  @MainActor
   func testLaunchesWithBrand() throws {
     let app = XCUIApplication()
     app.launch()
