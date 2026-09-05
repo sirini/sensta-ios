@@ -248,6 +248,24 @@ extension ContentView {
         AccountTokens(token: "ui-access", refresh: "ui-refresh")
       )
     }
+    func signupStatus() async throws -> SignupStatus {
+      SignupStatus(
+        mode: "verified_email", mailConfigured: true, oauthRegistrationAllowed: true)
+    }
+    func signup(email: String, password: String, name: String, invite: String) async throws
+      -> SignupResult
+    {
+      guard email == "new@example.com", password == "Password!1", name == "새 사진가" else {
+        throw NuboAPIError.server(code: 3, message: "")
+      }
+      return SignupResult(target: 42, requiresVerification: true, completed: false)
+    }
+    func verifySignup(target: Int, code: String, email: String, password: String, name: String)
+      async throws -> Bool
+    {
+      target == 42 && code == "123456" && email == "new@example.com"
+        && password == "Password!1" && name == "새 사진가"
+    }
     func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
       guard idToken == "ui-test-google-id-token" else { throw NuboAPIError.httpStatus(401) }
       return (

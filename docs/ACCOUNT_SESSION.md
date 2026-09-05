@@ -11,13 +11,17 @@
 댓글 좋아요·취소와 본인 댓글 수정·삭제를 제공한다. Google 로그인은 설정이 준비된 빌드에서 공식
 다색 G 자산과 현지화 문구를 사용한 단일 버튼으로 제공한다. Apple 로그인은 Apple 기본 버튼과 서버
 발급 일회성 nonce를 사용하며, 기존 계정에는 로그인 후 명시적으로 Apple ID를 연결한다.
-회원가입·비밀번호 재설정은 후속 기능이다.
+이메일 회원가입은 서버 정책을 먼저 확인한 뒤 이메일 인증 또는 초대 코드 방식으로 제공한다.
+비밀번호 재설정은 후속 기능이다.
 
 ## 기존 Android/GOAPI 계약
 
 | 동작 | 요청 | 처리 |
 | --- | --- | --- |
 | 로그인 | `POST /auth/signin`, form `id`, `password` | `uid`, `name`, `id`, `blocked`, `token`, `refresh` |
+| 가입 정책 | `GET /auth/signup/status` | `verified_email`, `invite_only`, `disabled`와 메일·OAuth 가능 여부 |
+| 이메일 가입 | `POST /auth/signup`, form `id`, `password`, `name`, `invite` | 즉시 완료 또는 인증 대상 UID 반환 |
+| 가입 인증 | `POST /auth/verify`, form `target`, `code`, `id`, `password`, `name` | 6자리 이메일 코드 소비 후 계정 생성 |
 | Google 로그인 | `POST /auth/android/google`, form `id_token` | Android와 같은 Web client audience를 검증하고 같은 token 쌍 반환 |
 | Apple nonce | `POST /auth/apple/nonce` | 5분 안에 한 번만 쓸 로그인 nonce 반환 |
 | Apple 로그인 | `POST /auth/apple`, JSON `identityToken`, `nonce`, `name` | Apple subject에 연결된 계정의 token 쌍 반환 또는 새 계정 생성 |
@@ -54,7 +58,8 @@ Apple의 안정적인 `sub`를 계정 식별자로 저장하고 이메일을 식
 
 - access/refresh 쌍만 API base URL과 bundle ID로 구분한 Keychain 단일 항목에 저장한다.
   `WhenUnlockedThisDeviceOnly`를 사용해 기기 간 동기화·백업 이동을 하지 않는다.
-- 사용자 정보는 메모리에만 유지하고 비밀번호는 요청 직후 입력란에서 지운다.
+- 사용자 정보는 메모리에만 유지한다. 로그인 비밀번호는 요청 직후 지우고, 가입 비밀번호와 인증 코드는
+  이메일 인증이 끝나거나 가입 화면을 벗어날 때 지운다.
 - 인증 URLSession은 ephemeral이며 쿠키·디스크 캐시·HTTP 리다이렉트를 사용하지 않는다.
 - 앱 시작 시 저장된 access token으로 계정을 확인하고, HTTP 401일 때만 refresh를 한 번 시도한다.
   회전된 토큰은 후속 계정 조회 전에 저장한다. 중복 세션 작업은 실행하지 않는다.
@@ -122,6 +127,12 @@ Debug·Release bundle ID를 `OAUTH_APPLE_CLIENT_IDS`로 설정하고, 최초 반
 OAuth identity·nonce 테이블을 생성해야 한다. migration을 이미 적용한 뒤 진단용 runtime만 교체할 때는
 `install`을 다시 실행하지 않는다. 실패 시 버튼 아래 안내와 서버의 `apple oauth: identity token
 verification failed` 로그를 함께 확인한다.
+
+이메일 가입 QA: 비로그인 계정 시트에서 위로 스크롤 → 이메일로 회원가입 → 사용하지 않은 이메일·이름·
+규칙에 맞는 비밀번호 입력 → 약관 동의 → 계정 만들기 → 받은 6자리 코드 입력 → 가입 완료 → 로그인으로
+돌아가기를 확인한다. 로그인 이메일이 자동으로 채워지는지와 만든 계정의 로그인·재실행 세션 복원도
+확인한다. 메일을 받지 못하면 재발송은 잠시 기다린 뒤 한 번만 시도하고, 운영 로그와 메일 공급자 상태를
+함께 확인한다.
 
 댓글 QA: 사진 상세 → 댓글 영역 → 10자 이상 입력 시 길이 안내가 사라지는지 확인 → 등록 → 목록·피드
 댓글 수 확인 → 댓글의 답글 버튼 → 대상 이름 확인 → 답글 등록 → 댓글 좋아요·취소를 확인한다. 본인

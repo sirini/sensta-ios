@@ -249,6 +249,55 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testEmailSignupVerifiesCodeAndReturnsToLogin() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let signup = app.buttons["account-email-signup"]
+    for _ in 0..<3 where !signup.exists { app.swipeUp() }
+    XCTAssertTrue(signup.waitForExistence(timeout: 5))
+    signup.tap()
+
+    let email = app.textFields["signup-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("new@example.com")
+    let name = app.textFields["signup-name"]
+    name.tap()
+    name.typeText("새 사진가")
+    app.secureTextFields["signup-password"].tap()
+    app.secureTextFields["signup-password"].typeText("Password!1")
+    app.secureTextFields["signup-password-confirmation"].tap()
+    app.secureTextFields["signup-password-confirmation"].typeText("Password!1")
+
+    let policy = app.buttons["signup-policy"]
+    for _ in 0..<4 where !policy.isHittable { app.swipeUp() }
+    XCTAssertTrue(policy.isHittable)
+    policy.tap()
+    XCTAssertEqual(policy.value as? String, "동의함")
+    let submit = app.buttons["signup-submit"]
+    for _ in 0..<3 where !submit.isHittable { app.swipeUp() }
+    submit.tap()
+
+    let code = app.textFields["signup-verification-code"]
+    XCTAssertTrue(code.waitForExistence(timeout: 5))
+    code.tap()
+    code.typeText("123456")
+    app.buttons["signup-verify"].tap()
+    let returnToLogin = app.buttons["signup-return-to-login"]
+    XCTAssertTrue(returnToLogin.waitForExistence(timeout: 5))
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "Verified email signup completed"
+    capture.lifetime = .keepAlways
+    add(capture)
+    returnToLogin.tap()
+    XCTAssertEqual(app.textFields["account-email"].value as? String, "new@example.com")
+  }
+
+  @MainActor
   func testGoogleLoginPublishesAccountAndProfileEntry() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer", "--ui-test-google"]

@@ -126,6 +126,61 @@ struct AccountContractTests {
     #expect(form == "id=photo%2Bios%40example.com&password=%20%EB%B9%84%EB%B0%80%20%2B%26%25%3D%20")
   }
 
+  @Test func signupAndVerificationUseTheExistingAndroidFormContract() throws {
+    let baseURL = URL(string: "https://example.com/goapi/")!
+    let signup = try AccountEndpoint.signup(
+      baseURL: baseURL, email: " photo+ios@example.com ", password: "Password!+1",
+      name: " 사진가 ", invite: " invite+code ")
+    #expect(signup.url?.path == "/goapi/auth/signup")
+    #expect(signup.httpMethod == "POST")
+    #expect(signup.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(signup.httpShouldHandleCookies == false)
+    #expect(
+      String(decoding: signup.httpBody!, as: UTF8.self)
+        == "id=photo%2Bios%40example.com&password=Password%21%2B1&name=%EC%82%AC%EC%A7%84%EA%B0%80&invite=invite%2Bcode"
+    )
+
+    let verify = try AccountEndpoint.verifySignup(
+      baseURL: baseURL, target: 42, code: "123456", email: "photo+ios@example.com",
+      password: "Password!+1", name: "사진가")
+    #expect(verify.url?.path == "/goapi/auth/verify")
+    #expect(
+      String(decoding: verify.httpBody!, as: UTF8.self)
+        == "target=42&code=123456&id=photo%2Bios%40example.com&password=Password%21%2B1&name=%EC%82%AC%EC%A7%84%EA%B0%80"
+    )
+  }
+
+  @Test func decodesSignupPolicyAndVerificationResult() throws {
+    let status = try JSONDecoder().decode(
+      AccountEnvelope<SignupStatus>.self,
+      from: Data(
+        #"{"success":true,"code":0,"result":{"mode":"verified_email","mailConfigured":true,"oauthRegistrationAllowed":true}}"#
+          .utf8)
+    ).checked()
+    #expect(status.mode == "verified_email")
+    #expect(status.mailConfigured)
+    let result = try JSONDecoder().decode(
+      AccountEnvelope<SignupResult>.self,
+      from: Data(
+        #"{"success":true,"code":0,"result":{"target":42,"requiresVerification":true,"completed":false}}"#
+          .utf8)
+    ).checked()
+    #expect(result == SignupResult(target: 42, requiresVerification: true, completed: false))
+  }
+
+  @Test func signupValidationMatchesServerPasswordRules() {
+    #expect(EmailSignupValidator.emailIsValid("photo+ios@example.com"))
+    #expect(!EmailSignupValidator.emailIsValid("photo@localhost"))
+    #expect(EmailSignupValidator.passwordIsValid("Password!1"))
+    #expect(!EmailSignupValidator.passwordIsValid("password!"))
+    #expect(!EmailSignupValidator.passwordIsValid("Password1"))
+    #expect(!EmailSignupValidator.passwordIsValid("Pass word!1"))
+    #expect(
+      EmailSignupValidator.message(
+        email: "photo@example.com", name: "사진가", password: "Password!1",
+        confirmation: "Password!1", accepted: true) == nil)
+  }
+
   @Test func refreshUsesAndroidJSONContractAndNoCookies() throws {
     let request = try AccountEndpoint.refresh(
       baseURL: URL(string: "https://example.com/goapi/")!, refresh: "token+&")

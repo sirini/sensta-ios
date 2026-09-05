@@ -77,6 +77,6 @@
 - [x] Xcode 프로젝트와 unit/UI test target 생성
 - [x] 저장소 shared scheme과 Debug/Release build configuration 정리
 - [x] API base URL을 xcconfig로 분리: `https://sensta.me/goapi/`
-- [ ] 공통 API envelope와 오류 code 모델 구현
-- [ ] 공개 게시글 목록 fixture decoding test 작성
-- [ ] 빈 상태·통신 실패·재시도 UI를 포함한 첫 피드 화면 구현
+- [x] 공통 API envelope와 오류 code 모델 구현
+- [x] 공개 게시글 목록 fixture decoding test 작성
+- [x] 빈 상태·통신 실패·재시도 UI를 포함한 첫 피드 화면 구현

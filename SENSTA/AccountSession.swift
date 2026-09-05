@@ -55,6 +55,18 @@ struct OAuthIdentityStatus: Decodable, Equatable, Sendable {
   let linked: Bool
 }
 
+struct SignupStatus: Decodable, Equatable, Sendable {
+  let mode: String
+  let mailConfigured: Bool
+  let oauthRegistrationAllowed: Bool
+}
+
+struct SignupResult: Decodable, Equatable, Sendable {
+  let target: Int
+  let requiresVerification: Bool
+  let completed: Bool
+}
+
 private struct AppleAuthBody: Encodable {
   let identityToken: String
   let nonce: String
@@ -80,9 +92,45 @@ enum AccountEndpoint {
     let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !email.isEmpty, !password.isEmpty else { throw NuboAPIError.invalidRequest }
     var request = try request(baseURL: baseURL, path: "auth/signin", method: "POST")
-    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-    let encode: (String) -> String = { $0.addingPercentEncoding(withAllowedCharacters: allowed)! }
-    request.httpBody = Data("id=\(encode(email))&password=\(encode(password))".utf8)
+    request.httpBody = try formBody([("id", email), ("password", password)])
+    request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+    return request
+  }
+
+  static func signupStatus(baseURL: URL) throws -> URLRequest {
+    try request(baseURL: baseURL, path: "auth/signup/status")
+  }
+
+  static func signup(
+    baseURL: URL, email: String, password: String, name: String, invite: String
+  ) throws -> URLRequest {
+    let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    let invite = invite.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !email.isEmpty, !password.isEmpty, !name.isEmpty else {
+      throw NuboAPIError.invalidRequest
+    }
+    var request = try request(baseURL: baseURL, path: "auth/signup", method: "POST")
+    request.httpBody = try formBody([
+      ("id", email), ("password", password), ("name", name), ("invite", invite),
+    ])
+    request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+    return request
+  }
+
+  static func verifySignup(
+    baseURL: URL, target: Int, code: String, email: String, password: String, name: String
+  ) throws -> URLRequest {
+    let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard target > 0, code.count == 6, !email.isEmpty, !password.isEmpty, !name.isEmpty else {
+      throw NuboAPIError.invalidRequest
+    }
+    var request = try request(baseURL: baseURL, path: "auth/verify", method: "POST")
+    request.httpBody = try formBody([
+      ("target", String(target)), ("code", code), ("id", email),
+      ("password", password), ("name", name),
+    ])
     request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
     return request
   }
@@ -103,6 +151,17 @@ enum AccountEndpoint {
     request.httpBody = Data("id_token=\(encoded)".utf8)
     request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
     return request
+  }
+
+  private static func formBody(_ fields: [(String, String)]) throws -> Data {
+    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+    let encoded = try fields.map { key, value in
+      guard let key = key.addingPercentEncoding(withAllowedCharacters: allowed),
+        let value = value.addingPercentEncoding(withAllowedCharacters: allowed)
+      else { throw NuboAPIError.invalidRequest }
+      return "\(key)=\(value)"
+    }.joined(separator: "&")
+    return Data(encoded.utf8)
   }
 
   static func appleNonce(baseURL: URL) throws -> URLRequest {
@@ -150,6 +209,11 @@ enum AccountEndpoint {
 protocol AccountServing: Sendable {
   func data(for request: URLRequest) async throws -> Data
   func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens)
+  func signupStatus() async throws -> SignupStatus
+  func signup(email: String, password: String, name: String, invite: String) async throws
+    -> SignupResult
+  func verifySignup(target: Int, code: String, email: String, password: String, name: String)
+    async throws -> Bool
   func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens)
   func appleNonce() async throws -> String
   func signinWithApple(identityToken: String, nonce: String, name: String) async throws
@@ -161,6 +225,13 @@ protocol AccountServing: Sendable {
 
 extension AccountServing {
   func data(for request: URLRequest) async throws -> Data { throw NuboAPIError.configuration }
+  func signupStatus() async throws -> SignupStatus { throw NuboAPIError.configuration }
+  func signup(email: String, password: String, name: String, invite: String) async throws
+    -> SignupResult
+  { throw NuboAPIError.configuration }
+  func verifySignup(target: Int, code: String, email: String, password: String, name: String)
+    async throws -> Bool
+  { throw NuboAPIError.configuration }
   func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
     throw NuboAPIError.configuration
   }
@@ -197,6 +268,30 @@ struct AccountService: AccountServing {
     let result = try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: data)
       .checked()
     return try checkedSignin(result)
+  }
+
+  func signupStatus() async throws -> SignupStatus {
+    let data = try await client.data(for: AccountEndpoint.signupStatus(baseURL: baseURL))
+    return try JSONDecoder().decode(AccountEnvelope<SignupStatus>.self, from: data).checked()
+  }
+
+  func signup(email: String, password: String, name: String, invite: String) async throws
+    -> SignupResult
+  {
+    let data = try await client.data(
+      for: AccountEndpoint.signup(
+        baseURL: baseURL, email: email, password: password, name: name, invite: invite))
+    return try JSONDecoder().decode(AccountEnvelope<SignupResult>.self, from: data).checked()
+  }
+
+  func verifySignup(target: Int, code: String, email: String, password: String, name: String)
+    async throws -> Bool
+  {
+    let data = try await client.data(
+      for: AccountEndpoint.verifySignup(
+        baseURL: baseURL, target: target, code: code, email: email, password: password,
+        name: name))
+    return try JSONDecoder().decode(AccountEnvelope<Bool>.self, from: data).checked()
   }
 
   func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
@@ -359,6 +454,21 @@ final class AccountSession {
         ? "로그인 정보를 안전하게 저장하지 못했어요. 기기 잠금을 해제한 뒤 다시 시도해 주세요."
         : "로그인하지 못했어요. 이메일·비밀번호와 네트워크 연결을 확인해 주세요."
     }
+  }
+
+  func signupStatus() async throws -> SignupStatus { try await service.signupStatus() }
+
+  func signup(email: String, password: String, name: String, invite: String) async throws
+    -> SignupResult
+  {
+    try await service.signup(email: email, password: password, name: name, invite: invite)
+  }
+
+  func verifySignup(target: Int, code: String, email: String, password: String, name: String)
+    async throws -> Bool
+  {
+    try await service.verifySignup(
+      target: target, code: code, email: email, password: password, name: name)
   }
 
   func signinWithGoogle(idToken: String) async {

@@ -120,6 +120,13 @@ struct AccountView: View {
             Button(action: signin) {
               Text("로그인").frame(maxWidth: .infinity)
             }.disabled(!canSignin).accessibilityIdentifier("account-signin")
+            NavigationLink {
+              EmailSignupView(session: session, loginEmail: $email)
+                .onAppear { detent = .large }
+            } label: {
+              Label("이메일로 회원가입", systemImage: "person.badge.plus")
+            }
+            .accessibilityIdentifier("account-email-signup")
           }.disabled(session.isBusy).listRowBackground(rowBackground)
         }
         if session.isBusy {
