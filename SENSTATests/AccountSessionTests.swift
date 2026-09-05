@@ -111,6 +111,25 @@ private actor AppleLinkStub: AccountServing {
   func logout(token: String) async throws {}
 }
 
+private actor UploadAccountStub: AccountServing {
+  private(set) var authorizationHeaders: [String] = []
+  private(set) var uploadedBodies: [Data] = []
+
+  func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
+    (testUser, testTokens)
+  }
+  func load(token: String) async throws -> AccountUser { testUser }
+  func refresh(_ refresh: String) async throws -> AccountTokens { rotatedTokens }
+  func logout(token: String) async throws {}
+
+  func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> Data {
+    authorizationHeaders.append(request.value(forHTTPHeaderField: "Authorization") ?? "")
+    uploadedBodies.append(try Data(contentsOf: fileURL))
+    if authorizationHeaders.count == 1 { throw NuboAPIError.httpStatus(401) }
+    return Data(#"{"success":true,"code":0,"result":101}"#.utf8)
+  }
+}
+
 struct AccountContractTests {
   @Test func formPreservesUnicodeAndPasswordWhitespace() throws {
     let request = try AccountEndpoint.signin(
@@ -454,6 +473,29 @@ extension AccountContractTests {
 }
 
 extension AccountSessionTests {
+  @Test func authenticatedFileUploadRotatesAndRetriesTheSameBody() async throws {
+    let baseURL = URL(string: "https://example.com/goapi/")!
+    let service = UploadAccountStub()
+    let store = MemoryTokenStore(testTokens)
+    let session = AccountSession(service: service, store: store, apiBaseURL: baseURL)
+    await session.restore()
+    let fileURL = FileManager.default.temporaryDirectory
+      .appending(path: "account-upload-\(UUID().uuidString)")
+    let body = Data("same-upload-body".utf8)
+    try body.write(to: fileURL)
+    defer { try? FileManager.default.removeItem(at: fileURL) }
+    var request = URLRequest(url: baseURL.appending(path: "editor/write"))
+    request.httpMethod = "POST"
+
+    let response = try await session.uploadAuthenticated(request, fromFile: fileURL)
+
+    #expect(String(decoding: response, as: UTF8.self).contains("101"))
+    #expect(
+      await service.authorizationHeaders == ["Bearer access-one", "Bearer access-two"])
+    #expect(await service.uploadedBodies == [body, body])
+    #expect(store.value == rotatedTokens)
+  }
+
   @Test func keychainRoundTripReplacesPairAndDeletes() throws {
     let store = KeychainAccountStore(service: "me.sensta.tests.\(UUID().uuidString)")
     defer { try? store.clear() }

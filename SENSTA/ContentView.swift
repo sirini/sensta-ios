@@ -2,8 +2,11 @@ import SwiftUI
 
 struct ContentView: View {
   @State private var model: PhotoFeedViewModel
+  @State private var notificationCenter = PhotoNotificationCenter()
   @State private var showAccount = false
+  @State private var showUpload = false
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @Environment(\.scenePhase) private var scenePhase
   var account: AccountSession? = nil
   private let detailService: any PhotoPostDetailServing
   private let feedService: any PhotoFeedServing
@@ -43,7 +46,12 @@ struct ContentView: View {
             detailService: detailService,
             isLoadingMore: model.isLoadingMore,
             loadMoreError: model.loadMoreError,
-            onRefresh: { await model.refresh() },
+            onRefresh: {
+              await model.refresh()
+              if let account, account.user != nil {
+                await notificationCenter.load(using: account, force: true)
+              }
+            },
             onLoadMore: { await model.loadMoreIfNeeded(currentPostID: $0) },
             onRetryLoadMore: { await model.loadMore() }
           )
@@ -67,9 +75,18 @@ struct ContentView: View {
                   showAccount = true
                 } label: {
                   if account.user != nil {
-                    AccountAvatar(url: account.profileURL, size: 36)
-                      .frame(width: 44, height: 44)
-                      .background(.black.opacity(0.25), in: Circle())
+                    if account.profileURL != nil {
+                      AccountAvatar(url: account.profileURL, size: 36)
+                        .frame(width: 44, height: 44)
+                        .background(.black.opacity(0.25), in: Circle())
+                    } else {
+                      Image(systemName: "person.crop.circle")
+                        .font(.title2.weight(.regular))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(.black.opacity(0.25), in: Circle())
+                        .accessibilityIdentifier("photo-feed-account-without-profile")
+                    }
                   } else {
                     Image(systemName: "ipad.and.arrow.forward")
                       .environment(\.layoutDirection, .leftToRight)
@@ -91,9 +108,41 @@ struct ContentView: View {
               }
               .accessibilityLabel("탐색")
               .accessibilityIdentifier("photo-feed-search")
+              if let account, account.user != nil {
+                NavigationLink {
+                  PhotoNotificationsView(
+                    center: notificationCenter, account: account, detailService: detailService)
+                } label: {
+                  PhotoNotificationBell(hasUnread: notificationCenter.hasUnread)
+                }
+                .accessibilityLabel(notificationCenter.hasUnread ? "읽지 않은 알림" : "알림")
+                .accessibilityValue(notificationCenter.hasUnread ? "새 알림 있음" : "새 알림 없음")
+                .accessibilityIdentifier("photo-feed-notifications")
+              }
             }
             .padding(.trailing, 16)
             .padding(.top, 8)
+          }
+          .overlay(alignment: .bottom) {
+            Button {
+              if account?.user == nil {
+                showAccount = true
+              } else {
+                showUpload = true
+              }
+            } label: {
+              Image(systemName: "plus")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 58, height: 58)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay(Circle().stroke(.white.opacity(0.45), lineWidth: 1))
+                .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(account?.user == nil ? "로그인하고 사진 올리기" : "사진 올리기")
+            .accessibilityIdentifier("photo-feed-upload")
+            .padding(.bottom, 12)
           }
           .toolbar(.hidden, for: .navigationBar)
         }
@@ -119,8 +168,27 @@ struct ContentView: View {
           .presentationDragIndicator(.visible)
       }
     }
+    .fullScreenCover(isPresented: $showUpload) {
+      if let account, account.user != nil {
+        PhotoUploadView(account: account) {
+          showUpload = false
+          Task { await model.refresh() }
+        }
+      }
+    }
     .task {
       await model.loadIfNeeded()
+    }
+    .task(id: account?.sessionIdentity) {
+      guard let account, account.user != nil else {
+        notificationCenter.reset()
+        return
+      }
+      await notificationCenter.load(using: account)
+    }
+    .onChange(of: scenePhase) { _, phase in
+      guard phase == .active, let account, account.user != nil else { return }
+      Task { await notificationCenter.load(using: account, force: true) }
     }
   }
 }
@@ -270,7 +338,7 @@ private struct PhotoFeedCard: View {
         .font(.caption)
       }
       .padding(.horizontal, 18)
-      .padding(.bottom, safeAreaInsets.bottom + 16)
+      .padding(.bottom, safeAreaInsets.bottom + 92)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
     .frame(width: size.width, height: size.height)
@@ -282,7 +350,7 @@ private struct PhotoFeedCard: View {
 
   private var writerHeader: some View {
     HStack(spacing: 10) {
-      profileImage
+      if post.writer.profileURL != nil { profileImage }
 
       VStack(alignment: .leading, spacing: 2) {
         HStack(spacing: 5) {
@@ -324,11 +392,7 @@ private struct PhotoFeedCard: View {
       .clipShape(Circle())
       .accessibilityLabel("\(post.writer.name) 프로필 사진")
     } else {
-      Image(systemName: "person.crop.circle.fill")
-        .resizable()
-        .foregroundStyle(.white.opacity(0.72))
-        .frame(width: 38, height: 38)
-        .accessibilityHidden(true)
+      EmptyView()
     }
   }
 
@@ -343,7 +407,6 @@ private struct PhotoFeedCard: View {
         "bubble.right", count: account?.commentCounts[post.id] ?? post.commentCount, name: "댓글"
       )
       .accessibilityIdentifier("photo-feed-comments-\(post.id)")
-      countLabel("eye", count: post.viewCount, name: "조회")
     }
   }
 

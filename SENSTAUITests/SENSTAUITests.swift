@@ -653,6 +653,61 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testFeedControlsAdaptToProfileNotificationsAndUpload() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+
+    let upload = app.buttons["photo-feed-upload"]
+    let account = app.buttons["photo-feed-account"]
+    let search = app.buttons["photo-feed-search"]
+    XCTAssertTrue(upload.waitForExistence(timeout: 10))
+    XCTAssertTrue(account.exists)
+    XCTAssertTrue(search.exists)
+    XCTAssertFalse(app.buttons["photo-feed-notifications"].exists)
+    XCTAssertFalse(
+      app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "조회")).firstMatch
+        .exists)
+    let writer = app.staticTexts.matching(identifier: "테스트 사진가").firstMatch
+    XCTAssertTrue(writer.exists)
+    XCTAssertLessThanOrEqual(writer.frame.minX, 22)
+    XCTAssertLessThan(writer.frame.maxY, upload.frame.minY)
+
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+    XCTAssertTrue(app.buttons["account-logout"].waitForExistence(timeout: 5))
+    app.buttons["account-close"].tap()
+
+    XCTAssertEqual(account.label, "내 계정")
+    XCTAssertEqual(account.value as? String, "로그인 상태")
+    let notifications = app.buttons["photo-feed-notifications"]
+    XCTAssertTrue(notifications.waitForExistence(timeout: 5))
+    XCTAssertEqual(notifications.value as? String, "새 알림 있음")
+    XCTAssertLessThan(search.frame.maxX, notifications.frame.minX)
+    notifications.tap()
+    XCTAssertTrue(app.navigationBars["알림"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.descendants(matching: .any)["notification-77"].exists)
+    app.buttons["notification-mark-all-read"].tap()
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertEqual(notifications.value as? String, "새 알림 없음")
+
+    upload.tap()
+    XCTAssertTrue(app.navigationBars["새 사진"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["photo-upload-picker"].exists)
+    XCTAssertFalse(app.buttons["photo-upload-submit"].isEnabled)
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "Native photo upload entry"
+    capture.lifetime = .keepAlways
+    add(capture)
+  }
+
+  @MainActor
   func testOpensPhotoDetailFromFeed() throws {
     let app = XCUIApplication()
     app.launch()

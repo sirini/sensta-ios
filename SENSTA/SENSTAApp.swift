@@ -170,6 +170,7 @@ extension ContentView {
     private var commentLiked = false
     private var commentID = 100
     private var appleLinked = false
+    private var notificationRead = false
     func data(for request: URLRequest) async throws -> Data {
       if request.url?.path.hasSuffix("/auth/apple/status") == true {
         return try JSONSerialization.data(withJSONObject: [
@@ -187,6 +188,28 @@ extension ContentView {
         else { throw NuboAPIError.httpStatus(401) }
         appleLinked = true
         return Data(#"{"success":true,"code":0,"result":{"linked":true}}"#.utf8)
+      }
+      if request.url?.path.hasSuffix("/home/noti/load") == true {
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "error": "",
+          "result": [
+            [
+              "uid": 77,
+              "fromUser": ["uid": 2, "name": "알림 사진가", "profile": ""],
+              "type": 2, "id": "photo", "boardType": 1, "postUid": 1,
+              "checked": notificationRead, "timestamp": 1_788_600_000_000 as Int64,
+            ]
+          ],
+        ])
+      }
+      if request.httpMethod == "PATCH", request.url?.path.contains("/home/noti/checked") == true {
+        notificationRead = true
+        return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+      }
+      if request.url?.path.hasSuffix("/editor/config") == true {
+        return Data(
+          #"{"success":true,"code":0,"error":"","result":{"config":{"uid":2,"useCategory":false},"categories":[{"uid":5,"name":"lounge"}]}}"#
+            .utf8)
       }
       if request.httpMethod == "POST", request.url?.path.contains("/comment/") == true {
         if String(data: request.httpBody ?? Data(), encoding: .utf8)?.contains("reject") == true {

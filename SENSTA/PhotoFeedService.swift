@@ -112,6 +112,38 @@ struct NuboAPIClient: Sendable {
     }
     return data
   }
+
+  func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> Data {
+    let data: Data
+    let response: URLResponse
+
+    do {
+      (data, response) = try await session.upload(for: request, fromFile: fileURL)
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch let error as URLError {
+      switch error.code {
+      case .cancelled:
+        throw CancellationError()
+      case .notConnectedToInternet, .networkConnectionLost:
+        throw NuboAPIError.networkUnavailable
+      case .timedOut:
+        throw NuboAPIError.timedOut
+      default:
+        throw NuboAPIError.networkFailure
+      }
+    } catch {
+      throw NuboAPIError.networkFailure
+    }
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw NuboAPIError.invalidResponse
+    }
+    guard (200..<300).contains(httpResponse.statusCode) else {
+      throw NuboAPIError.httpStatus(httpResponse.statusCode)
+    }
+    return data
+  }
 }
 
 struct PhotoFeedService: PhotoFeedServing {

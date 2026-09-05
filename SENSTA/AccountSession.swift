@@ -208,6 +208,7 @@ enum AccountEndpoint {
 
 protocol AccountServing: Sendable {
   func data(for request: URLRequest) async throws -> Data
+  func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> Data
   func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens)
   func signupStatus() async throws -> SignupStatus
   func signup(email: String, password: String, name: String, invite: String) async throws
@@ -225,6 +226,9 @@ protocol AccountServing: Sendable {
 
 extension AccountServing {
   func data(for request: URLRequest) async throws -> Data { throw NuboAPIError.configuration }
+  func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> Data {
+    throw NuboAPIError.configuration
+  }
   func signupStatus() async throws -> SignupStatus { throw NuboAPIError.configuration }
   func signup(email: String, password: String, name: String, invite: String) async throws
     -> SignupResult
@@ -245,6 +249,9 @@ extension AccountServing {
 
 struct AccountService: AccountServing {
   func data(for request: URLRequest) async throws -> Data { try await client.data(for: request) }
+  func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> Data {
+    try await client.upload(for: request, fromFile: fileURL)
+  }
   let baseURL: URL
   private let client: NuboAPIClient
 
@@ -675,6 +682,34 @@ final class AccountSession {
       request.cachePolicy = .reloadIgnoringLocalCacheData
       request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
       let data = try await service.data(for: request)
+      try Task.checkCancellation()
+      guard identity == self.identity else { throw CancellationError() }
+      return data
+    }
+    do { return try await send(tokens.token) } catch NuboAPIError.httpStatus(401) {
+      guard identity == self.identity else { throw CancellationError() }
+      let updated = try await refreshedTokens(after: tokens, identity: identity)
+      do { return try await send(updated.token) } catch NuboAPIError.httpStatus(401) {
+        if identity == self.identity { expireSession() }
+        throw NuboAPIError.httpStatus(401)
+      }
+    }
+  }
+
+  func uploadAuthenticated(_ request: URLRequest, fromFile fileURL: URL) async throws -> Data {
+    guard let baseURL = apiBaseURL, let url = request.url,
+      url.scheme == "https", url.host == baseURL.host, url.port == baseURL.port,
+      url.path.hasPrefix(baseURL.path.hasSuffix("/") ? baseURL.path : baseURL.path + "/")
+    else { throw NuboAPIError.invalidRequest }
+    guard let tokens, user != nil else { throw NuboAPIError.httpStatus(401) }
+    let identity = identity
+    func send(_ token: String) async throws -> Data {
+      guard identity == self.identity, user != nil else { throw CancellationError() }
+      var request = request
+      request.httpShouldHandleCookies = false
+      request.cachePolicy = .reloadIgnoringLocalCacheData
+      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+      let data = try await service.upload(for: request, fromFile: fileURL)
       try Task.checkCancellation()
       guard identity == self.identity else { throw CancellationError() }
       return data

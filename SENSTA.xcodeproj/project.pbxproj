@@ -44,6 +44,9 @@
 		C10000000000000000000001 /* GoogleSignInClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* GoogleSignInClient.swift */; };
 		C10000000000000000000002 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = C80000000000000000000001 /* GoogleSignIn */; };
 		D10000000000000000000001 /* EmailSignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20000000000000000000001 /* EmailSignupView.swift */; };
+		E10000000000000000000001 /* PhotoNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* PhotoNotifications.swift */; };
+		E10000000000000000000002 /* PhotoUpload.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* PhotoUpload.swift */; };
+		E10000000000000000000003 /* PhotoUploadAndNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* PhotoUploadAndNotificationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -108,6 +111,9 @@
 		B2000000000000000000000D /* PhotoCommentManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCommentManagement.swift; sourceTree = "<group>"; };
 		C20000000000000000000001 /* GoogleSignInClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInClient.swift; sourceTree = "<group>"; };
 		D20000000000000000000001 /* EmailSignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailSignupView.swift; sourceTree = "<group>"; };
+		E20000000000000000000001 /* PhotoNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoNotifications.swift; sourceTree = "<group>"; };
+		E20000000000000000000002 /* PhotoUpload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUpload.swift; sourceTree = "<group>"; };
+		E20000000000000000000003 /* PhotoUploadAndNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadAndNotificationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -171,6 +177,8 @@
 				B2000000000000000000000B /* PhotoCommentComposer.swift */,
 				B2000000000000000000000D /* PhotoCommentManagement.swift */,
 				B20000000000000000000002 /* PhotoComments.swift */,
+				E20000000000000000000001 /* PhotoNotifications.swift */,
+				E20000000000000000000002 /* PhotoUpload.swift */,
 				A2000000000000000000001C /* PhotoImagePipeline.swift */,
 				A20000000000000000000007 /* Assets.xcassets */,
 				A2000000000000000000000E /* Info.plist */,
@@ -192,6 +200,7 @@
 				B2000000000000000000000C /* PhotoCommentComposerTests.swift */,
 				A2000000000000000000001A /* PhotoPostDetailViewModelTests.swift */,
 				A2000000000000000000001D /* PhotoImagePipelineTests.swift */,
+				E20000000000000000000003 /* PhotoUploadAndNotificationTests.swift */,
 				A50000000000000000000007 /* Fixtures */,
 			);
 			path = SENSTATests;
@@ -403,6 +412,8 @@
 				B1000000000000000000000D /* PhotoCommentManagement.swift in Sources */,
 				C10000000000000000000001 /* GoogleSignInClient.swift in Sources */,
 				B10000000000000000000002 /* PhotoComments.swift in Sources */,
+				E10000000000000000000001 /* PhotoNotifications.swift in Sources */,
+				E10000000000000000000002 /* PhotoUpload.swift in Sources */,
 				A10000000000000000000014 /* PhotoImagePipeline.swift in Sources */,
 				A10000000000000000000001 /* SENSTAApp.swift in Sources */,
 			);
@@ -420,6 +431,7 @@
 				B10000000000000000000008 /* AccountSessionTests.swift in Sources */,
 				B1000000000000000000000A /* PhotoPostLikesTests.swift in Sources */,
 				B1000000000000000000000C /* PhotoCommentComposerTests.swift in Sources */,
+				E10000000000000000000003 /* PhotoUploadAndNotificationTests.swift in Sources */,
 				A10000000000000000000012 /* PhotoPostDetailViewModelTests.swift in Sources */,
 				A10000000000000000000015 /* PhotoImagePipelineTests.swift in Sources */,
 			);
