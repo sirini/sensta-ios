@@ -543,7 +543,7 @@ final class SENSTAUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]
     app.launch()
-    let search = app.buttons["photo-feed-search"]
+    let search = app.buttons.matching(identifier: "photo-feed-search").firstMatch
     XCTAssertTrue(search.waitForExistence(timeout: 10))
     search.tap()
     let field = app.searchFields.firstMatch
@@ -566,8 +566,9 @@ final class SENSTAUITests: XCTestCase {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]
     app.launch()
-    XCTAssertTrue(app.buttons["photo-feed-search"].waitForExistence(timeout: 10))
-    app.buttons["photo-feed-search"].tap()
+    let search = app.buttons.matching(identifier: "photo-feed-search").firstMatch
+    XCTAssertTrue(search.waitForExistence(timeout: 10))
+    search.tap()
     XCTAssertTrue(app.staticTexts["최근 사진"].waitForExistence(timeout: 5))
     XCTAssertTrue(
       app.buttons.matching(identifier: "photo-search-result").firstMatch.waitForExistence(
@@ -660,10 +661,14 @@ final class SENSTAUITests: XCTestCase {
 
     let upload = app.buttons["photo-feed-upload"]
     let account = app.buttons["photo-feed-account"]
-    let search = app.buttons["photo-feed-search"]
+    let search = app.buttons.matching(identifier: "photo-feed-search").firstMatch
+    let title = app.staticTexts["photo-feed-title-1"]
     XCTAssertTrue(upload.waitForExistence(timeout: 10))
     XCTAssertTrue(account.exists)
     XCTAssertTrue(search.exists)
+    XCTAssertTrue(title.exists)
+    XCTAssertEqual(search.frame.midY, title.frame.midY, accuracy: 2)
+    XCTAssertGreaterThan(search.frame.minY, account.frame.maxY)
     XCTAssertFalse(app.buttons["photo-feed-notifications"].exists)
     XCTAssertFalse(
       app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "조회")).firstMatch
@@ -689,7 +694,7 @@ final class SENSTAUITests: XCTestCase {
     let notifications = app.buttons["photo-feed-notifications"]
     XCTAssertTrue(notifications.waitForExistence(timeout: 5))
     XCTAssertEqual(notifications.value as? String, "새 알림 있음")
-    XCTAssertLessThan(search.frame.maxX, notifications.frame.minX)
+    XCTAssertLessThan(account.frame.maxX, notifications.frame.minX)
     notifications.tap()
     XCTAssertTrue(app.navigationBars["알림"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.descendants(matching: .any)["notification-77"].exists)

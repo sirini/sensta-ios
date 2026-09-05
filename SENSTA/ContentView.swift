@@ -4,7 +4,9 @@ struct ContentView: View {
   @State private var model: PhotoFeedViewModel
   @State private var notificationCenter = PhotoNotificationCenter()
   @State private var showAccount = false
+  @State private var showSearch = false
   @State private var showUpload = false
+  @State private var selectedPostID: Int?
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.scenePhase) private var scenePhase
   var account: AccountSession? = nil
@@ -43,9 +45,10 @@ struct ContentView: View {
         case .loaded(let posts):
           PhotoFeedList(
             posts: posts,
-            detailService: detailService,
             isLoadingMore: model.isLoadingMore,
             loadMoreError: model.loadMoreError,
+            onOpenPost: { selectedPostID = $0 },
+            onOpenSearch: { showSearch = true },
             onRefresh: {
               await model.refresh()
               if let account, account.user != nil {
@@ -97,17 +100,6 @@ struct ContentView: View {
                   .accessibilityValue(account.user == nil ? "로그아웃 상태" : "로그인 상태")
                   .accessibilityIdentifier("photo-feed-account")
               }
-              NavigationLink {
-                PhotoSearchView(service: feedService, detailService: detailService)
-              } label: {
-                Image(systemName: "magnifyingglass")
-                  .font(.body.weight(.medium))
-                  .foregroundStyle(.white)
-                  .frame(width: 44, height: 44)
-                  .background(.black.opacity(0.25), in: Circle())
-              }
-              .accessibilityLabel("탐색")
-              .accessibilityIdentifier("photo-feed-search")
               if let account, account.user != nil {
                 NavigationLink {
                   PhotoNotificationsView(
@@ -160,6 +152,12 @@ struct ContentView: View {
             .accessibilityHidden(true)
         }
       }
+      .navigationDestination(item: $selectedPostID) { postID in
+        PhotoPostDetailView(postID: postID, service: detailService)
+      }
+      .navigationDestination(isPresented: $showSearch) {
+        PhotoSearchView(service: feedService, detailService: detailService)
+      }
     }
     .sheet(isPresented: $showAccount) {
       if let account {
@@ -195,9 +193,10 @@ struct ContentView: View {
 
 private struct PhotoFeedList: View {
   let posts: [PhotoPost]
-  let detailService: any PhotoPostDetailServing
   let isLoadingMore: Bool
   let loadMoreError: String?
+  let onOpenPost: @MainActor @Sendable (Int) -> Void
+  let onOpenSearch: @MainActor @Sendable () -> Void
   let onRefresh: @MainActor @Sendable () async -> Void
   let onLoadMore: @MainActor @Sendable (Int) async -> Void
   let onRetryLoadMore: @MainActor @Sendable () async -> Void
@@ -218,19 +217,15 @@ private struct PhotoFeedList: View {
       ScrollView(.vertical) {
         LazyVStack(spacing: 0) {
           ForEach(Array(posts.enumerated()), id: \.element.id) { index, post in
-            NavigationLink {
-              PhotoPostDetailView(postID: post.id, service: detailService)
-            } label: {
-              PhotoFeedCard(
-                post: post,
-                size: viewportSize,
-                safeAreaInsets: geometry.safeAreaInsets
-              )
-            }
-            .buttonStyle(.plain)
+            PhotoFeedCard(
+              post: post,
+              size: viewportSize,
+              safeAreaInsets: geometry.safeAreaInsets,
+              onOpenPost: { onOpenPost(post.id) },
+              onOpenSearch: onOpenSearch
+            )
             .frame(width: viewportSize.width, height: viewportSize.height)
             .id(post.id)
-            .accessibilityIdentifier("photo-feed-card")
             .task(id: post.id, priority: .utility) {
               await prefetchNextCover(after: index, targetSize: viewportSize)
             }
@@ -292,6 +287,8 @@ private struct PhotoFeedCard: View {
   let post: PhotoPost
   let size: CGSize
   let safeAreaInsets: EdgeInsets
+  let onOpenPost: @MainActor @Sendable () -> Void
+  let onOpenSearch: @MainActor @Sendable () -> Void
 
   var body: some View {
     ZStack(alignment: .topLeading) {
@@ -310,6 +307,15 @@ private struct PhotoFeedCard: View {
       .frame(maxHeight: .infinity, alignment: .bottom)
       .allowsHitTesting(false)
 
+      Button(action: onOpenPost) {
+        Color.clear
+          .contentShape(Rectangle())
+          .frame(width: size.width, height: size.height)
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("\(post.writer.name)의 \(post.title)")
+      .accessibilityIdentifier("photo-feed-card")
+
       Image("SenstaWordmark")
         .renderingMode(.template)
         .resizable()
@@ -323,22 +329,36 @@ private struct PhotoFeedCard: View {
 
       VStack(alignment: .leading, spacing: 12) {
         writerHeader
+          .allowsHitTesting(false)
 
         Text(post.title)
           .font(.title3.weight(.semibold))
           .foregroundStyle(.white)
           .lineLimit(2)
           .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.trailing, 56)
+          .accessibilityIdentifier("photo-feed-title-\(post.id)")
+          .allowsHitTesting(false)
+          .overlay(alignment: .trailing) {
+            Button(action: onOpenSearch) {
+              Image(systemName: "magnifyingglass")
+                .font(.body.weight(.medium))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(.black.opacity(0.25), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("탐색")
+            .accessibilityIdentifier("photo-feed-search")
+          }
 
-        HStack(spacing: 16) {
-          counts
-          Spacer(minLength: 12)
-          submittedDate
-        }
-        .font(.caption)
+        counts
+          .font(.caption)
+          .allowsHitTesting(false)
       }
       .padding(.horizontal, 18)
-      .padding(.bottom, safeAreaInsets.bottom + 92)
+      .padding(.bottom, safeAreaInsets.bottom + 72)
       .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
     }
     .frame(width: size.width, height: size.height)
@@ -408,11 +428,6 @@ private struct PhotoFeedCard: View {
       )
       .accessibilityIdentifier("photo-feed-comments-\(post.id)")
     }
-  }
-
-  private var submittedDate: some View {
-    Text(post.submitted, format: .dateTime.year().month().day())
-      .foregroundStyle(.white.opacity(0.72))
   }
 
   private var cover: some View {
