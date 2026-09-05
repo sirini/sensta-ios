@@ -1,0 +1,5 @@
+// Firebase의 me.sensta.ios 운영 앱에서 받은 값으로 복사한 뒤
+// 파일명을 Release.local.xcconfig로 바꾼다. 이 파일은 Git에 포함하지 않는다.
+GOOGLE_IOS_CLIENT_ID = 000000000000-example.apps.googleusercontent.com
+GOOGLE_SERVER_CLIENT_ID = 000000000000-server.apps.googleusercontent.com
+GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.000000000000-example

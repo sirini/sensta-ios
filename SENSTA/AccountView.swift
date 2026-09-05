@@ -7,6 +7,7 @@ struct AccountView: View {
   @State private var password = ""
   @State private var confirmLogout = false
   @State private var detent: PresentationDetent = .medium
+  private let googleSignIn = GoogleSignInClient()
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
   @Environment(\.dismiss) private var dismiss
@@ -55,6 +56,22 @@ struct AccountView: View {
                 .font(.subheadline).foregroundStyle(.secondary)
             }.padding(.vertical, 4)
           }.listRowBackground(Color.clear)
+          if googleSignIn.isAvailable {
+            Section {
+              SENSTAGoogleSignInButton(isEnabled: !session.isBusy) { signinWithGoogle() }
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .accessibilityLabel("Google로 로그인")
+            }
+            .listRowBackground(rowBackground)
+
+            HStack {
+              Rectangle().frame(height: 1).foregroundStyle(.separator)
+              Text("또는").font(.caption).foregroundStyle(.secondary)
+              Rectangle().frame(height: 1).foregroundStyle(.separator)
+            }
+            .listRowBackground(Color.clear)
+            .accessibilityHidden(true)
+          }
           Section("이메일로 로그인") {
             TextField("이메일", text: $email)
               .textContentType(.username).keyboardType(.emailAddress)
@@ -124,6 +141,19 @@ struct AccountView: View {
     let secret = password
     password = ""
     Task { await session.signin(email: email, password: secret) }
+  }
+
+  private func signinWithGoogle() {
+    field = nil
+    Task {
+      do {
+        let token = try await googleSignIn.idToken()
+        await session.signinWithGoogle(idToken: token)
+      } catch is CancellationError {
+      } catch {
+        session.reportGoogleSignInFailure()
+      }
+    }
   }
 }
 

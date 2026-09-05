@@ -41,6 +41,8 @@
 		B1000000000000000000000B /* PhotoCommentComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000B /* PhotoCommentComposer.swift */; };
 		B1000000000000000000000C /* PhotoCommentComposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000C /* PhotoCommentComposerTests.swift */; };
 		B1000000000000000000000D /* PhotoCommentManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000D /* PhotoCommentManagement.swift */; };
+		C10000000000000000000001 /* GoogleSignInClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000000001 /* GoogleSignInClient.swift */; };
+		C10000000000000000000002 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = C80000000000000000000001 /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -103,6 +105,7 @@
 		B2000000000000000000000B /* PhotoCommentComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCommentComposer.swift; sourceTree = "<group>"; };
 		B2000000000000000000000C /* PhotoCommentComposerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCommentComposerTests.swift; sourceTree = "<group>"; };
 		B2000000000000000000000D /* PhotoCommentManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCommentManagement.swift; sourceTree = "<group>"; };
+		C20000000000000000000001 /* GoogleSignInClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleSignInClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -110,6 +113,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C10000000000000000000002 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -159,6 +163,7 @@
 				B20000000000000000000005 /* PhotographerView.swift */,
 				B20000000000000000000007 /* AccountView.swift */,
 				B20000000000000000000006 /* AccountSession.swift */,
+				C20000000000000000000001 /* GoogleSignInClient.swift */,
 				B20000000000000000000009 /* PhotoPostLikes.swift */,
 				B2000000000000000000000B /* PhotoCommentComposer.swift */,
 				B2000000000000000000000D /* PhotoCommentManagement.swift */,
@@ -242,6 +247,9 @@
 			dependencies = (
 			);
 			name = SENSTA;
+			packageProductDependencies = (
+				C80000000000000000000001 /* GoogleSignIn */,
+			);
 			productName = SENSTA;
 			productReference = A20000000000000000000001 /* SENSTA.app */;
 			productType = "com.apple.product-type.application";
@@ -327,6 +335,9 @@
 			);
 			mainGroup = A50000000000000000000001;
 			productRefGroup = A50000000000000000000006 /* Products */;
+			packageReferences = (
+				C70000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -386,6 +397,7 @@
 				B10000000000000000000009 /* PhotoPostLikes.swift in Sources */,
 				B1000000000000000000000B /* PhotoCommentComposer.swift in Sources */,
 				B1000000000000000000000D /* PhotoCommentManagement.swift in Sources */,
+				C10000000000000000000001 /* GoogleSignInClient.swift in Sources */,
 				B10000000000000000000002 /* PhotoComments.swift in Sources */,
 				A10000000000000000000014 /* PhotoImagePipeline.swift in Sources */,
 				A10000000000000000000001 /* SENSTAApp.swift in Sources */,
@@ -431,6 +443,25 @@
 			targetProxy = A30000000000000000000002 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C70000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C80000000000000000000001 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C70000000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		AA0000000000000000000001 /* Debug */ = {

@@ -249,6 +249,24 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testGoogleLoginPublishesAccountAndProfileEntry() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-google"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let google = app.buttons["account-google-signin"]
+    XCTAssertTrue(google.waitForExistence(timeout: 5))
+    XCTAssertGreaterThanOrEqual(google.frame.height, 44)
+    google.tap()
+    XCTAssertTrue(app.staticTexts["Google 사진가"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["account-logout"].exists)
+    app.buttons["account-close"].tap()
+    XCTAssertEqual(account.value as? String, "로그인 상태")
+  }
+
+  @MainActor
   func testAccountSheetDarkAndLargeText() throws {
     for mode in ["--ui-test-dark", "--ui-test-large-text"] {
       let app = XCUIApplication()

@@ -30,11 +30,16 @@ private actor AccountStub: AccountServing {
   let mode: Mode
   var refreshCount = 0
   var signinCount = 0
+  var googleSigninCount = 0
   private var continuation: CheckedContinuation<Void, Never>?
   init(_ mode: Mode = .normal) { self.mode = mode }
   func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
     signinCount += 1
     if mode == .paused { await withCheckedContinuation { continuation = $0 } }
+    return (testUser, testTokens)
+  }
+  func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
+    googleSigninCount += 1
     return (testUser, testTokens)
   }
   func resume() {
@@ -86,6 +91,18 @@ struct AccountContractTests {
     #expect(load.value(forHTTPHeaderField: "Authorization") == "Bearer access")
   }
 
+  @Test func googleSigninUsesSharedAndroidContractAndNoCookies() throws {
+    let request = try AccountEndpoint.googleSignin(
+      baseURL: URL(string: "https://example.com/goapi/")!, idToken: "header.payload+signature")
+    #expect(request.url?.path == "/goapi/auth/android/google")
+    #expect(request.httpMethod == "POST")
+    #expect(request.httpShouldHandleCookies == false)
+    #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(
+      request.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
+    #expect(String(decoding: request.httpBody!, as: UTF8.self) == "id_token=header.payload%2Bsignature")
+  }
+
   @Test func rejectsInsecureBaseAndEmptyTokens() {
     #expect(throws: NuboAPIError.configuration) {
       try AccountEndpoint.signin(
@@ -123,6 +140,28 @@ struct AccountSessionTests {
     #expect(session.profileURL?.absoluteString == "https://example.com/upload/profile/7.webp")
     #expect(session.user == testUser)
     #expect(!session.needsRestoration)
+  }
+
+  @Test func googleSigninPersistsTheSameMobileSessionPair() async {
+    let service = AccountStub()
+    let store = MemoryTokenStore()
+    let session = AccountSession(service: service, store: store)
+    await session.signinWithGoogle(idToken: "google-id-token")
+    #expect(await service.googleSigninCount == 1)
+    #expect(store.value == testTokens)
+    #expect(session.user == testUser)
+    #expect(!session.needsRestoration)
+  }
+
+  @Test func googleButtonRequiresBothClientIDs() {
+    #expect(!GoogleSignInClient(info: [:]).isAvailable)
+    #expect(
+      !GoogleSignInClient(info: ["GIDClientID": "ios.apps.googleusercontent.com"]).isAvailable)
+    #expect(
+      GoogleSignInClient(info: [
+        "GIDClientID": "ios.apps.googleusercontent.com",
+        "GIDServerClientID": "server.apps.googleusercontent.com",
+      ]).isAvailable)
   }
 
   @Test func failedKeychainSaveDoesNotPublishLogin() async {

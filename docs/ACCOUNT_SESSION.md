@@ -8,14 +8,15 @@
 아이콘을 표시한다. 시트는 절반 높이·시스템 블러로 시작하고 입력·프로필 탐색 때 확장한다.
 접근성 큰 글자에서는 전체 높이를 사용하며, 투명도 줄이기 설정이면 불투명 배경으로 전환한다. 공개 사진 감상은 로그인 없이 유지한다.
 게시글 상세에서 좋아요·취소를 제공하고 피드에 수치를 공유한다. 본문 아래에서 댓글 작성·답글과
-댓글 좋아요·취소와 본인 댓글 수정·삭제를 제공한다. Google·Apple 로그인, 회원가입·비밀번호 재설정은
-후속 기능이다.
+댓글 좋아요·취소와 본인 댓글 수정·삭제를 제공한다. Google 로그인은 설정이 준비된 빌드에서 공식
+Google 버튼으로 제공한다. Apple 로그인, 회원가입·비밀번호 재설정은 후속 기능이다.
 
 ## 기존 Android/GOAPI 계약
 
 | 동작 | 요청 | 처리 |
 | --- | --- | --- |
 | 로그인 | `POST /auth/signin`, form `id`, `password` | `uid`, `name`, `id`, `blocked`, `token`, `refresh` |
+| Google 로그인 | `POST /auth/android/google`, form `id_token` | Android와 같은 Web client audience를 검증하고 같은 token 쌍 반환 |
 | 세션 확인 | `GET /auth/load`, Bearer access token | 존재하는 비차단 계정만 로그인 상태로 표시 |
 | 토큰 갱신 | `POST /auth/android/refresh`, JSON `refresh` | access/refresh 쌍을 교체한 뒤 세션 확인 재시도 |
 | 로그아웃 | `POST /auth/logout`, Bearer access token | 로컬 삭제 성공 후 서버에도 폐기를 요청 |
@@ -23,6 +24,12 @@
 GOAPI와 Android·NUBO 요청 계약은 변경하지 않는다. 로그인 비밀번호는 해시하거나 공백을 제거하지
 않으며 HTTPS form으로 전달한다. 이메일 양끝 공백만 제거한다. `/auth/android/refresh`는 플랫폼 검사가
 없는 기존 네이티브 계약이다. 서버가 사용자별 refresh token을 관리하는 기존 정책도 그대로 따른다.
+
+Google 공식 iOS SDK가 iOS client ID로 인증 화면을 열고 Web 유형 server client ID를 audience로 하는
+ID token을 GOAPI에 전달한다. server client ID는 Android의 `google_web_client_id` 및 운영
+`OAUTH_GOOGLE_ANDROID_CLIENT_ID`와 같아야 한다. 앱은 access/refresh 쌍을 Keychain에 저장하기 전에는
+로그인 계정을 화면에 공개하지 않는다. client ID 설정이 없는 빌드에서는 Google 버튼을 숨기며 이메일
+로그인에는 영향을 주지 않는다. ID token은 로그나 저장소에 기록하지 않는다.
 
 ## 저장과 오류 복구
 
@@ -84,9 +91,13 @@ GOAPI와 Android·NUBO 요청 계약은 변경하지 않는다. 로그인 비밀
 로그아웃을 확인한다. 로그인 실패·통신 단절 시 기존 사진 감상이 유지되는지도 확인한다.
 실제 계정 비밀번호는 제품 소유자가 iPhone에서 직접 입력한다.
 
+Google QA: 비로그인 계정 시트 → Google 버튼 → 계정 선택 → 기존 Android Google 계정으로 로그인 →
+피드 프로필 사진 확인 → 앱 종료·재실행 후 세션 복원 → 로그아웃을 확인한다. 취소했을 때 오류 문구가
+남지 않는지, 다른 audience의 token과 미인증 이메일이 거부되는지도 확인한다.
+
 댓글 QA: 사진 상세 → 댓글 영역 → 10자 이상 입력 시 길이 안내가 사라지는지 확인 → 등록 → 목록·피드
 댓글 수 확인 → 댓글의 답글 버튼 → 대상 이름 확인 → 답글 등록 → 댓글 좋아요·취소를 확인한다. 본인
-댓글의 더 보기 메뉴에서 수정하고, 답글이 달린 원댓글 삭제 시 자리와 답글이 유지되는지 확인한다. 답글을
+댓글 아래 좋아요 옆 수정 버튼으로 편집하고, 답글이 달린 원댓글 삭제 시 자리와 답글이 유지되는지 확인한다. 답글을
 삭제했을 때 목록과 피드 댓글 수가 함께 줄어드는지도 확인한다.
 네트워크를 끊었을 때 초안이 유지되는지, 결과 확인 안내가 표시되는지도 확인한다. 운영 댓글 작성과
 좋아요는 제품 소유자가 직접 수행한다.

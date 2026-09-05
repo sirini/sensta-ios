@@ -75,11 +75,23 @@ enum AccountEndpoint {
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     return request
   }
+
+  static func googleSignin(baseURL: URL, idToken: String) throws -> URLRequest {
+    let idToken = idToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !idToken.isEmpty else { throw NuboAPIError.invalidRequest }
+    var request = try request(baseURL: baseURL, path: "auth/android/google", method: "POST")
+    let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
+    let encoded = idToken.addingPercentEncoding(withAllowedCharacters: allowed)!
+    request.httpBody = Data("id_token=\(encoded)".utf8)
+    request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+    return request
+  }
 }
 
 protocol AccountServing: Sendable {
   func data(for request: URLRequest) async throws -> Data
   func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens)
+  func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens)
   func load(token: String) async throws -> AccountUser
   func refresh(_ refresh: String) async throws -> AccountTokens
   func logout(token: String) async throws
@@ -87,6 +99,9 @@ protocol AccountServing: Sendable {
 
 extension AccountServing {
   func data(for request: URLRequest) async throws -> Data { throw NuboAPIError.configuration }
+  func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
+    throw NuboAPIError.configuration
+  }
 }
 
 struct AccountService: AccountServing {
@@ -113,11 +128,15 @@ struct AccountService: AccountServing {
       for: AccountEndpoint.signin(baseURL: baseURL, email: email, password: password))
     let result = try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: data)
       .checked()
-    let user = AccountUser(
-      uid: result.uid, name: result.name, id: result.id, blocked: result.blocked,
-      profile: result.profile)
-    guard user.uid > 0, !user.blocked else { throw NuboAPIError.invalidResponse }
-    return (user, try AccountTokens(token: result.token, refresh: result.refresh).checked())
+    return try checkedSignin(result)
+  }
+
+  func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
+    let data = try await client.data(
+      for: AccountEndpoint.googleSignin(baseURL: baseURL, idToken: idToken))
+    let result = try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: data)
+      .checked()
+    return try checkedSignin(result)
   }
 
   func load(token: String) async throws -> AccountUser {
@@ -139,6 +158,14 @@ struct AccountService: AccountServing {
     _ = try await client.data(
       for: AccountEndpoint.request(
         baseURL: baseURL, path: "auth/logout", method: "POST", token: token))
+  }
+
+  private func checkedSignin(_ result: AccountSigninResult) throws -> (AccountUser, AccountTokens) {
+    let user = AccountUser(
+      uid: result.uid, name: result.name, id: result.id, blocked: result.blocked,
+      profile: result.profile)
+    guard user.uid > 0, !user.blocked else { throw NuboAPIError.invalidResponse }
+    return (user, try AccountTokens(token: result.token, refresh: result.refresh).checked())
   }
 }
 
@@ -236,20 +263,45 @@ final class AccountSession {
     error = nil
     defer { isBusy = false }
     do {
-      let (user, tokens) = try await service.signin(email: email, password: password)
-      try Task.checkCancellation()
-      try store.save(tokens)
-      identity = UUID()
-      postLikes.reset()
-      self.tokens = tokens
-      self.user = user
-      needsRestoration = false
+      let response = try await service.signin(email: email, password: password)
+      try finishSignin(response)
     } catch is CancellationError { return } catch {
       self.error =
         error is AccountStorageError
         ? "로그인 정보를 안전하게 저장하지 못했어요. 기기 잠금을 해제한 뒤 다시 시도해 주세요."
         : "로그인하지 못했어요. 이메일·비밀번호와 네트워크 연결을 확인해 주세요."
     }
+  }
+
+  func signinWithGoogle(idToken: String) async {
+    guard !isBusy else { return }
+    isBusy = true
+    error = nil
+    defer { isBusy = false }
+    do {
+      let response = try await service.signinWithGoogle(idToken: idToken)
+      try finishSignin(response)
+    } catch is CancellationError { return } catch {
+      self.error =
+        error is AccountStorageError
+        ? "로그인 정보를 안전하게 저장하지 못했어요. 기기 잠금을 해제한 뒤 다시 시도해 주세요."
+        : "Google로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    }
+  }
+
+  func reportGoogleSignInFailure() {
+    guard !isBusy else { return }
+    error = "Google로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+  }
+
+  private func finishSignin(_ response: (AccountUser, AccountTokens)) throws {
+    try Task.checkCancellation()
+    try store.save(response.1)
+    identity = UUID()
+    postLikes.reset()
+    tokens = response.1
+    user = response.0
+    needsRestoration = false
   }
 
   func restore() async {

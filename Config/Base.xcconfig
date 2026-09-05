@@ -6,3 +6,8 @@ SWIFT_VERSION = 6.0
 
 // xcconfig에서 //가 주석으로 해석되지 않도록 빈 빌드 설정을 사이에 둔다.
 API_BASE_URL = https:/$()/sensta.me/goapi/
+
+// 실제 OAuth client ID는 선택 include인 각 구성의 .local.xcconfig에만 둔다.
+GOOGLE_IOS_CLIENT_ID =
+GOOGLE_SERVER_CLIENT_ID =
+GOOGLE_REVERSED_CLIENT_ID =

@@ -1,4 +1,5 @@
 #include "Base.xcconfig"
+#include? "Release.local.xcconfig"
 
 PRODUCT_BUNDLE_IDENTIFIER = me.sensta.ios
 SWIFT_COMPILATION_MODE = wholemodule

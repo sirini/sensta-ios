@@ -41,12 +41,19 @@ Apple Developer 계정이 활성화되면 다음을 준비한다.
 
 ## Google 로그인
 
-- Google Cloud/Firebase에서 iOS OAuth client를 만들고 bundle ID를 연결한다. 이 ID는 iOS 앱 자체를
-  식별한다.
-- URL scheme과 `GoogleService-Info.plist` 구성을 Xcode에 반영한다.
+- Google Cloud/Firebase에서 `me.sensta.ios.debug`와 `me.sensta.ios` 각각의 iOS OAuth client를 만들고
+  bundle ID를 정확히 연결한다. 이 ID는 iOS 앱 자체를 식별한다.
+- `Config/Debug.local.xcconfig.example`을 `Config/Debug.local.xcconfig`로,
+  `Config/Release.local.xcconfig.example`을 `Config/Release.local.xcconfig`로 복사하고 각 환경의
+  `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_REVERSED_CLIENT_ID`를 채운다. 두 로컬 파일은 Git이 무시한다.
 - GOAPI 인증용 ID token을 받기 위해 기존 Android와 같은 Google Cloud 프로젝트의 Web 유형 server client
-  ID를 `GIDServerClientID`로 설정한다. GOAPI가 검증할 audience는 iOS client ID가 아니라 이 server client
-  ID다.
+  ID를 두 파일의 `GOOGLE_SERVER_CLIENT_ID`로 설정한다. 현재 Android 값은
+  `sensta.git/app/src/main/res/values/strings.xml`의 `google_web_client_id`이며, 운영 GOAPI의
+  `OAUTH_GOOGLE_ANDROID_CLIENT_ID`와도 같아야 한다. GOAPI가 검증할 audience는 iOS client ID가 아니라
+  이 server client ID다.
+- 앱은 GoogleSignIn-iOS 9.2.0의 공식 버튼과 인증 흐름을 사용한다. 설정값이 없으면 Google 버튼을
+  숨기고 이메일 로그인을 유지한다. `GoogleService-Info.plist`는 향후 Firebase Messaging 연결에
+  사용하며 Google 로그인 client ID는 위 로컬 xcconfig가 구성한다.
 - Google 로그인과 이메일 로그인이 같은 기존 계정을 안전하게 사용할 수 있는지 테스트한다.
 - 앱 로그, crash report와 네트워크 진단에 ID token이 포함되지 않게 한다.
 
@@ -58,6 +65,10 @@ Apple Developer 계정이 활성화되면 다음을 준비한다.
 - 사용자의 이름은 최초 승인 때만 받을 수 있으므로 안전하게 전달·저장한다.
 - Apple 비공개 이메일과 기존 계정 연결 여부를 사용자에게 명확히 보여준다.
 - 계정 삭제와 Apple 자격 증명 취소 시 서버 token 폐기까지 수행한다.
+
+Apple은 이메일이 아니라 Apple의 provider subject를 영구 식별자로 저장한다. 기존 이메일 계정과는
+이메일이 같다는 이유만으로 자동 병합하지 않고 로그인된 사용자의 명시적 연결 또는 소유 확인 절차를
+사용한다. 이 서버 저장 구조와 연결 API를 먼저 추가한 뒤 앱 버튼을 활성화한다.
 
 ## 저장 금지 항목
 

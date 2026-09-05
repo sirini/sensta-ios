@@ -6,7 +6,8 @@
   개발한다.
 - 승인된 공개 피드·탐색·상세·사진가 화면을 유지하며 로그인 기반 참여 기능을 추가한다.
 - 이메일 로그인·Keychain 세션 복원·토큰 갱신·로그아웃, 게시글·댓글 좋아요와 댓글 작성·답글·본인
-  댓글 수정·삭제를 구현했다. 다음은 Google·Apple 로그인 계약과 설정을 준비한다.
+  댓글 수정·삭제를 구현했다. Google 로그인 클라이언트와 서버 검증 강화를 구현했으며 실제 OAuth
+  설정과 실기기 QA 뒤 Apple 로그인 계정 연결 계약으로 진행한다.
 
 ## 현재 단계
 
@@ -134,12 +135,12 @@
 
 ## 다음 작업
 
-1. 제품 소유자가 운영 계정으로 본인 댓글 수정과 삭제, 답글이 있는 원댓글의 자리 보존과 댓글 수 반영을
-   실기기에서 확인한다.
-2. Google 로그인용 iOS OAuth client와 Apple 로그인을 준비한다. 설정이 필요하면 제품 소유자에게
-   브라우저 작업을 구체적으로 안내한다. 기존 Android 호환성을 유지한다.
-3. GOAPI 변경이 필요하면 로컬 Colima를 시작하고 `./scripts/build-ubuntu22.sh`로 교체용 파일을 만든다.
-   SFTP 업로드·운영 교체·재시작은 제품 소유자가 수행한다.
+1. 제품 소유자가 Firebase/Google Cloud에서 개발·운영 iOS OAuth client를 만들고 두 로컬 xcconfig에
+   값을 넣은 뒤 실제 Google 계정 로그인과 세션 복원을 확인한다.
+2. 준비한 GOAPI 교체용 바이너리를 제품 소유자가 SFTP로 운영 서버에 반영하고 Android Google 로그인도
+   회귀 확인한다.
+3. Apple provider subject 저장, nonce 검증과 기존 계정의 명시적 연결 계약을 GOAPI에 추가한 뒤
+   Sign in with Apple을 앱에 연결한다.
 
 ## 탐색과 다중 검색 (2026-09-05)
 
@@ -289,3 +290,22 @@
 - 단위 88개와 UI 15개를 통과했다. 댓글 작성→수정→답글→원댓글 자리 보존 삭제→답글 삭제→피드 수치
   반영을 한 흐름으로 검증했고 캡처에서 자리표시자와 답글 배치를 확인했다. Debug/Release 빌드도
   통과했다. 최종 Swift `-O` 자동 서명 Debug 앱을 연결된 iPhone 17에 설치·실행했다.
+
+## Google 로그인 준비 (2026-09-05)
+
+- GoogleSignIn-iOS 9.2.0 공식 SDK와 버튼을 추가했다. iOS client ID로 인증 화면을 열고 Android와 같은
+  Web server client ID를 audience로 하는 ID token을 기존 `POST /auth/android/google` form 계약에
+  전달한다. 성공한 access/refresh 쌍은 이메일 로그인과 같은 순서로 Keychain에 저장한다.
+- client ID는 Git이 무시하는 `Config/Debug.local.xcconfig`와 `Config/Release.local.xcconfig`에서만
+  주입한다. 설정이 없으면 Google 버튼을 숨겨 기존 이메일 로그인과 공개 감상을 유지한다. 로그인 취소는
+  오류로 표시하지 않으며 Google 공식 버튼의 바깥 터치 영역은 48pt로 확보했다.
+- GOAPI의 기존 경로·응답과 Android 호환성은 유지하면서 ID token 검증을 Google 공개키 기반 공식
+  validator로 강화했다. audience, 서명·만료와 boolean `email_verified`를 검증하고 차단 계정 정책 및
+  기존 이메일 기반 계정 조회는 유지한다. DB migration은 없다.
+- iOS 전체 단위 테스트 91개와 이메일 로그인·다크/큰 글자·Google 로그인의 관련 UI 테스트 3개,
+  Debug/Release 빌드가 통과했다. GOAPI 전체 test·vet 및 Ubuntu 22.04·24.04, x86-64 호환 Docker 빌드도
+  통과했으며 교체용 바이너리 SHA-256은
+  `c1653d19ccdce515f3eef5e647e80a9624f911556a35317443bdc2e81dc05788`이다.
+- 실제 Google OAuth 화면과 운영 로그인의 실기기 QA는 개발·운영 iOS OAuth client 생성 및 로컬 설정,
+  새 GOAPI 운영 반영 뒤 수행한다. Apple 로그인은 provider subject 저장과 명시적 기존 계정 연결 계약을
+  다음 독립 작업으로 진행한다.

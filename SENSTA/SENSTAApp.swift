@@ -52,6 +52,7 @@ struct SENSTAApp: App {
         .accountSession(account)
         .environment(\.accountSession, account)
         .task { await account.restore() }
+        .onOpenURL { _ = GoogleSignInClient.handle($0) }
         #if DEBUG
           .preferredColorScheme(
             ProcessInfo.processInfo.arguments.contains("--ui-test-dark")
@@ -227,6 +228,13 @@ extension ContentView {
       return (
         AccountUser(uid: 1, name: "테스트 사진가", id: email, blocked: false),
         AccountTokens(token: "ui-access", refresh: "ui-refresh")
+      )
+    }
+    func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
+      guard idToken == "ui-test-google-id-token" else { throw NuboAPIError.httpStatus(401) }
+      return (
+        AccountUser(uid: 1, name: "Google 사진가", id: "google@example.com", blocked: false),
+        AccountTokens(token: "ui-google-access", refresh: "ui-google-refresh")
       )
     }
     func load(token: String) async throws -> AccountUser { throw NuboAPIError.httpStatus(401) }
