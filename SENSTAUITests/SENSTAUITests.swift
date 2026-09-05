@@ -206,14 +206,16 @@ final class SENSTAUITests: XCTestCase {
     account.tap()
     let email = app.textFields["account-email"]
     XCTAssertTrue(email.waitForExistence(timeout: 5))
-    let login = app.buttons["account-signin"]
-    XCTAssertFalse(login.isEnabled)
-    XCTAssertTrue(login.isHittable)
     XCTAssertGreaterThan(app.buttons["account-close"].frame.minY, app.frame.height * 0.4)
     let loginCapture = XCTAttachment(screenshot: app.screenshot())
     loginCapture.name = "Compact login material"
     loginCapture.lifetime = .keepAlways
     add(loginCapture)
+    let login = app.buttons["account-signin"]
+    for _ in 0..<3 where !login.exists { app.swipeUp() }
+    XCTAssertTrue(login.exists)
+    XCTAssertFalse(login.isEnabled)
+    XCTAssertTrue(login.isHittable)
     email.tap()
     email.typeText("photo@example.com")
     let password = app.secureTextFields["account-password"]
@@ -257,8 +259,16 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertTrue(account.waitForExistence(timeout: 10))
     account.tap()
     let signup = app.buttons["account-email-signup"]
-    for _ in 0..<3 where !signup.exists { app.swipeUp() }
-    XCTAssertTrue(signup.waitForExistence(timeout: 5))
+    for _ in 0..<3 where !signup.isHittable { app.swipeUp() }
+    XCTAssertTrue(signup.isHittable)
+    let signin = app.buttons["account-signin"]
+    XCTAssertTrue(signin.exists)
+    XCTAssertGreaterThanOrEqual(signin.frame.height, 48)
+    XCTAssertGreaterThan(signin.frame.width, 300)
+    let loginCapture = XCTAttachment(screenshot: app.screenshot())
+    loginCapture.name = "Email login and signup actions"
+    loginCapture.lifetime = .keepAlways
+    add(loginCapture)
     signup.tap()
 
     let email = app.textFields["signup-email"]

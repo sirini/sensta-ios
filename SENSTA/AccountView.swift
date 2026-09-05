@@ -117,9 +117,27 @@ struct AccountView: View {
             SecureField("비밀번호", text: $password)
               .textContentType(.password).focused($field, equals: .password).submitLabel(.go)
               .onSubmit { signin() }.accessibilityIdentifier("account-password")
+          }
+          .disabled(session.isBusy)
+          .listRowBackground(rowBackground)
+          Section {
             Button(action: signin) {
-              Text("로그인").frame(maxWidth: .infinity)
-            }.disabled(!canSignin).accessibilityIdentifier("account-signin")
+              Text("로그인")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(Color.accentColor, in: Capsule())
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSignin)
+            .opacity(canSignin ? 1 : 0.45)
+            .accessibilityIdentifier("account-signin")
+          }
+          .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+          .listRowBackground(Color.clear)
+          .listRowSeparator(.hidden)
+          Section {
             NavigationLink {
               EmailSignupView(session: session, loginEmail: $email)
                 .onAppear { detent = .large }
@@ -127,7 +145,9 @@ struct AccountView: View {
               Label("이메일로 회원가입", systemImage: "person.badge.plus")
             }
             .accessibilityIdentifier("account-email-signup")
-          }.disabled(session.isBusy).listRowBackground(rowBackground)
+          }
+          .disabled(session.isBusy)
+          .listRowBackground(rowBackground)
         }
         if session.isBusy {
           Section { ProgressView("로그인 정보를 확인하는 중…") }.listRowBackground(rowBackground)
