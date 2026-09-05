@@ -14,6 +14,7 @@ struct PhotoFeedContractTests {
 
     #expect(response.result?.config.id == "photo")
     #expect(response.result?.config.rowCount == 32)
+    #expect(page.boardID == response.result?.config.uid)
     #expect(page.totalPostCount == 2)
     #expect(page.posts.count == 1)
     #expect(page.posts[0].id == 101)
@@ -106,6 +107,50 @@ struct PhotoFeedContractTests {
     #expect(!encoded.contains("+"))
     #expect(components.queryItems?.first { $0.name == "option" }?.value == "0")
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+  }
+
+  @Test
+  func searchOptionsMatchSharedAndroidContract() throws {
+    let base = try #require(URL(string: "https://sensta.me/goapi/"))
+    for (option, value) in [
+      (PhotoSearchOption.aiDescription, "12"), (.title, "0"), (.content, "1"), (.writer, "2"),
+      (.hashtag, "3"),
+    ] {
+      let request = try PhotoFeedEndpoint.makeRequest(
+        apiBaseURL: base, page: 2, keyword: "#빛 + 100%", option: option)
+      let url = try #require(request.url)
+      let components = try #require(
+        URLComponents(url: url, resolvingAgainstBaseURL: false))
+      #expect(components.queryItems?.first { $0.name == "option" }?.value == value)
+      #expect(
+        components.queryItems?.first { $0.name == "keyword" }?.value?.removingPercentEncoding
+          == "#빛 + 100%")
+    }
+  }
+
+  @Test
+  func recentTagsUseResponseBoardIDAndPreserveOrder() throws {
+    let base = try #require(URL(string: "https://sensta.me/goapi/"))
+    let request = try PhotoRecentTagsEndpoint.makeRequest(apiBaseURL: base, boardID: 42)
+    let url = try #require(request.url)
+    let components = try #require(
+      URLComponents(url: url, resolvingAgainstBaseURL: false))
+    #expect(components.path == "/goapi/board/tag/recent")
+    #expect(components.queryItems?.first { $0.name == "boardUid" }?.value == "42")
+    #expect(request.httpMethod == "GET")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(throws: NuboAPIError.invalidRequest) {
+      try PhotoRecentTagsEndpoint.makeRequest(apiBaseURL: base, boardID: 0)
+    }
+    let data = Data(
+      #"{"success":true,"error":"","code":0,"result":[{"uid":9,"name":"빛","postUid":100},{"uid":3,"name":"풍경","postUid":90},{"uid":9,"name":"빛"},{"uid":0,"name":"제외"},{"uid":4,"name":" "}]}"#
+        .utf8)
+    let tags = try JSONDecoder().decode(PhotoRecentTagsResponseDTO.self, from: data).makeTags()
+    #expect(tags.map(\.id) == [9, 3])
+    #expect(tags.map(\.name) == ["빛", "풍경"])
+    let invalid = Data(#"{"success":false,"error":"denied","code":3,"result":[]}"#.utf8)
+    let response = try JSONDecoder().decode(PhotoRecentTagsResponseDTO.self, from: invalid)
+    #expect(throws: NuboAPIError.server(code: 3, message: "denied")) { try response.makeTags() }
   }
 
   private func fixtureData(named name: String) throws -> Data {

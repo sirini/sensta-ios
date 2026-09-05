@@ -17,6 +17,7 @@ final class PhotoFeedViewModel {
   private var fetchTask: Task<PhotoFeedPage, Error>?
   private var nextPage = 1
   private(set) var state: State = .idle
+  private(set) var boardID: Int?
   private(set) var refreshError: String?
   private(set) var loadMoreError: String?
   private(set) var isLoadingMore = false
@@ -67,6 +68,7 @@ final class PhotoFeedViewModel {
         if posts.count > previousPosts.count || !page.hasMorePages {
           nextPage = pageNumber
           hasMorePages = page.hasMorePages
+          boardID = page.boardID
           state = .loaded(posts)
           return
         }
@@ -97,6 +99,7 @@ final class PhotoFeedViewModel {
         if !posts.isEmpty || !page.hasMorePages {
           nextPage = pageNumber
           hasMorePages = page.hasMorePages
+          boardID = page.boardID
           loadMoreError = nil
           state = posts.isEmpty ? .empty : .loaded(posts)
           return

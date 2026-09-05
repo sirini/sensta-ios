@@ -134,6 +134,7 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertTrue(field.waitForExistence(timeout: 5))
     field.tap()
     field.typeText("photo\n")
+    XCTAssertTrue(app.staticTexts["AI 설명 검색 결과"].waitForExistence(timeout: 5))
     let result = app.buttons.matching(identifier: "photo-search-result").firstMatch
     XCTAssertTrue(result.waitForExistence(timeout: 5))
     let screenshot = XCTAttachment(screenshot: app.screenshot())
@@ -141,6 +142,32 @@ final class SENSTAUITests: XCTestCase {
     screenshot.lifetime = .keepAlways
     add(screenshot)
     result.tap()
+    XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
+  }
+
+  @MainActor
+  func testExploreLatestGridAndRecentTagSearch() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    XCTAssertTrue(app.buttons["photo-feed-search"].waitForExistence(timeout: 10))
+    app.buttons["photo-feed-search"].tap()
+    XCTAssertTrue(app.staticTexts["최근 사진"].waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      app.buttons.matching(identifier: "photo-search-result").firstMatch.waitForExistence(
+        timeout: 5))
+    let tag = app.buttons["explore-tag-10"]
+    XCTAssertTrue(tag.waitForExistence(timeout: 5))
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Explore latest photos"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    tag.tap()
+    XCTAssertTrue(app.staticTexts["해시태그 검색 결과"].waitForExistence(timeout: 5))
+    XCTAssertEqual(app.searchFields.firstMatch.value as? String, "풍경")
+    app.buttons["explore-option-0"].tap()
+    XCTAssertTrue(app.staticTexts["제목 검색 결과"].waitForExistence(timeout: 5))
+    app.buttons.matching(identifier: "photo-search-result").firstMatch.tap()
     XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
   }
 

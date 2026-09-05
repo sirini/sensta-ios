@@ -274,3 +274,53 @@ private actor SuspendedFeedService: PhotoFeedServing {
     continuation = nil
   }
 }
+
+@MainActor
+struct PhotoExploreModelTests {
+  @Test
+  func emptyQueryLoadsLatestAndSearchPreservesModeAndPage() async throws {
+    let service = ExploreRecordingService()
+    _ = try await PhotoSearchResultsService(source: service, keyword: "", option: .aiDescription)
+      .fetchPage(2)
+    _ = try await PhotoSearchResultsService(source: service, keyword: "빛", option: .aiDescription)
+      .fetchPage(3)
+    #expect(await service.calls == ["latest:2", "12:빛:3"])
+  }
+
+  @Test
+  func recentTagsFailureRetriesAndCachesSuccessfulBoard() async {
+    let service = ExploreRecordingService()
+    let model = PhotoRecentTagsModel(service: service)
+    await model.load(boardID: nil)
+    #expect(await service.tagCalls == 0)
+    await model.load(boardID: 42)
+    #expect(model.error != nil)
+    #expect(!model.isLoading)
+    await model.load(boardID: 42)
+    #expect(model.tags.map(\.id) == [42])
+    #expect(model.error == nil)
+    await model.load(boardID: 42)
+    #expect(await service.tagCalls == 2)
+    await model.load(boardID: 42, force: true)
+    #expect(await service.tagCalls == 3)
+  }
+}
+
+private actor ExploreRecordingService: PhotoFeedServing {
+  private(set) var calls: [String] = []
+  private(set) var tagCalls = 0
+  func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
+    calls.append("latest:\(page)")
+    return PhotoFeedPage(totalPostCount: 0, posts: [], boardID: 42)
+  }
+  func search(_ keyword: String, page: Int, option: PhotoSearchOption) async throws -> PhotoFeedPage
+  {
+    calls.append("\(option.rawValue):\(keyword):\(page)")
+    return PhotoFeedPage(totalPostCount: 0, posts: [], boardID: 42)
+  }
+  func recentTags(boardID: Int) async throws -> [PhotoPostTag] {
+    tagCalls += 1
+    if tagCalls == 1 { throw NuboAPIError.networkUnavailable }
+    return [PhotoPostTag(id: boardID, name: "빛")]
+  }
+}

@@ -4,6 +4,7 @@ struct PhotoFeedPage: Equatable, Sendable {
   let totalPostCount: Int
   let posts: [PhotoPost]
   var hasMorePages: Bool = false
+  var boardID: Int? = nil
 }
 
 struct PhotoPost: Identifiable, Equatable, Sendable {
@@ -54,7 +55,8 @@ struct BoardListResponseDTO: Decodable, Sendable {
     return PhotoFeedPage(
       totalPostCount: result.totalPostCount,
       posts: posts,
-      hasMorePages: pageSize > 0 && result.posts.count >= pageSize && requestedPage < pageCount
+      hasMorePages: pageSize > 0 && result.posts.count >= pageSize && requestedPage < pageCount,
+      boardID: result.config.uid
     )
   }
 }

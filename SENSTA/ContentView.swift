@@ -67,7 +67,7 @@ struct ContentView: View {
                 .frame(width: 44, height: 44)
                 .background(.black.opacity(0.25), in: Circle())
             }
-            .accessibilityLabel("사진 찾기")
+            .accessibilityLabel("탐색")
             .accessibilityIdentifier("photo-feed-search")
             .padding(.trailing, 16)
             .padding(.top, 8)

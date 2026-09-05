@@ -52,10 +52,16 @@ struct SENSTAApp: App {
   // 운영 데이터에 의존하지 않고 페이지 경계와 재시도 UI를 검증하는 전용 시나리오다.
   private actor PaginationUITestService: PhotoFeedServing {
     private var failedSecondPage = false
-    func search(_ keyword: String, page: Int) async throws -> PhotoFeedPage {
+    func recentTags(boardID: Int) async throws -> [PhotoPostTag] {
+      [PhotoPostTag(id: 10, name: "풍경"), PhotoPostTag(id: 11, name: "빛")]
+    }
+
+    func search(_ keyword: String, page: Int, option: PhotoSearchOption) async throws
+      -> PhotoFeedPage
+    {
       if keyword == "empty" { return PhotoFeedPage(totalPostCount: 0, posts: []) }
       let result = try await fetchPage(1)
-      return PhotoFeedPage(totalPostCount: result.posts.count, posts: result.posts)
+      return PhotoFeedPage(totalPostCount: result.posts.count, posts: result.posts, boardID: 2)
     }
 
     func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
@@ -73,7 +79,7 @@ struct SENSTAApp: App {
             writer: PhotoPostWriter(id: 1, name: "테스트 사진가", profileURL: nil, badgeKeys: [])
           )
         },
-        hasMorePages: page == 1
+        hasMorePages: page == 1, boardID: 2
       )
     }
   }
