@@ -1,5 +1,11 @@
 # Third-party licenses
 
+## Google Sign-In branding asset
+
+`GoogleSignInMark` contains the unmodified multicolor Google G supplied on Google's Sign in with Google
+branding guidelines page. Its use is subject to those branding guidelines:
+https://developers.google.com/identity/branding-guidelines
+
 ## Oleo Script
 
 The `SenstaWordmark` vector asset uses glyph outlines from the same Oleo Script Bold font as the

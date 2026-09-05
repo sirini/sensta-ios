@@ -59,10 +59,8 @@ struct AccountView: View {
           if googleSignIn.isAvailable {
             Section {
               SENSTAGoogleSignInButton(isEnabled: !session.isBusy) { signinWithGoogle() }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .accessibilityLabel("Google로 로그인")
             }
-            .listRowBackground(rowBackground)
+            .listRowBackground(Color.clear)
 
             HStack {
               Rectangle().frame(height: 1).foregroundStyle(.separator)

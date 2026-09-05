@@ -9,7 +9,8 @@
 접근성 큰 글자에서는 전체 높이를 사용하며, 투명도 줄이기 설정이면 불투명 배경으로 전환한다. 공개 사진 감상은 로그인 없이 유지한다.
 게시글 상세에서 좋아요·취소를 제공하고 피드에 수치를 공유한다. 본문 아래에서 댓글 작성·답글과
 댓글 좋아요·취소와 본인 댓글 수정·삭제를 제공한다. Google 로그인은 설정이 준비된 빌드에서 공식
-Google 버튼으로 제공한다. Apple 로그인, 회원가입·비밀번호 재설정은 후속 기능이다.
+다색 G 자산과 현지화 문구를 사용한 단일 버튼으로 제공한다. Apple 로그인, 회원가입·비밀번호 재설정은
+후속 기능이다.
 
 ## 기존 Android/GOAPI 계약
 
@@ -29,7 +30,9 @@ Google 공식 iOS SDK가 iOS client ID로 인증 화면을 열고 Web 유형 ser
 ID token을 GOAPI에 전달한다. server client ID는 Android의 `google_web_client_id` 및 운영
 `OAUTH_GOOGLE_ANDROID_CLIENT_ID`와 같아야 한다. 앱은 access/refresh 쌍을 Keychain에 저장하기 전에는
 로그인 계정을 화면에 공개하지 않는다. client ID 설정이 없는 빌드에서는 Google 버튼을 숨기며 이메일
-로그인에는 영향을 주지 않는다. ID token은 로그나 저장소에 기록하지 않는다.
+로그인에는 영향을 주지 않는다. ID token은 로그나 저장소에 기록하지 않는다. Google 버튼은 공식 원본
+로고의 색상·비율과 지정 여백을 유지하고, 라이트 모드의 neutral 및 다크 모드의 dark 브랜드 색상을
+사용한다.
 
 ## 저장과 오류 복구
 

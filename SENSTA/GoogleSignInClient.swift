@@ -77,54 +77,55 @@ struct GoogleSignInClient {
   }
 }
 
-struct SENSTAGoogleSignInButton: UIViewRepresentable {
+struct SENSTAGoogleSignInButton: View {
   let isEnabled: Bool
   let action: @MainActor () -> Void
+  @Environment(\.colorScheme) private var colorScheme
 
-  func makeCoordinator() -> Coordinator { Coordinator(action: action) }
-
-  func makeUIView(context: Context) -> SENSTAGoogleButtonControl {
-    let control = SENSTAGoogleButtonControl()
-    control.accessibilityIdentifier = "account-google-signin"
-    control.addTarget(context.coordinator, action: #selector(Coordinator.invoke), for: .touchUpInside)
-    return control
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 0) {
+        // Google 원본 로고의 크기와 iOS용 앞 16pt, 뒤 12pt 여백을 유지한다.
+        Image("GoogleSignInMark")
+          .resizable()
+          .scaledToFit()
+          .frame(width: 20, height: 20)
+          .accessibilityHidden(true)
+        Spacer().frame(width: 12)
+        Text("Google로 로그인")
+          .font(.system(size: 14, weight: .medium))
+          .foregroundStyle(textColor)
+        Spacer(minLength: 16)
+      }
+      .padding(.leading, 16)
+      .frame(maxWidth: .infinity, minHeight: 48)
+      .background(fillColor, in: Capsule())
+      .overlay {
+        Capsule().strokeBorder(strokeColor, lineWidth: colorScheme == .dark ? 1 : 0)
+      }
+      .contentShape(Capsule())
+    }
+    .buttonStyle(.plain)
+    .frame(maxWidth: .infinity)
+    .disabled(!isEnabled)
+    .opacity(isEnabled ? 1 : 0.45)
+    .accessibilityIdentifier("account-google-signin")
+    .accessibilityLabel("Google로 로그인")
   }
 
-  func updateUIView(_ control: SENSTAGoogleButtonControl, context: Context) {
-    control.isEnabled = isEnabled
-    control.signInButton.isEnabled = isEnabled
+  private var fillColor: Color {
+    colorScheme == .dark
+      ? Color(red: 19 / 255, green: 19 / 255, blue: 20 / 255)
+      : Color(red: 242 / 255, green: 242 / 255, blue: 242 / 255)
   }
 
-  @MainActor
-  final class Coordinator: NSObject {
-    let action: @MainActor () -> Void
-    init(action: @escaping @MainActor () -> Void) { self.action = action }
-    @objc func invoke() { action() }
-  }
-}
-
-final class SENSTAGoogleButtonControl: UIControl {
-  let signInButton = GIDSignInButton()
-
-  override init(frame: CGRect) {
-    super.init(frame: frame)
-    isAccessibilityElement = true
-    accessibilityTraits = .button
-    accessibilityLabel = "Google로 로그인"
-    signInButton.style = .wide
-    signInButton.isUserInteractionEnabled = false
-    signInButton.translatesAutoresizingMaskIntoConstraints = false
-    addSubview(signInButton)
-    NSLayoutConstraint.activate([
-      signInButton.centerXAnchor.constraint(equalTo: centerXAnchor),
-      signInButton.centerYAnchor.constraint(equalTo: centerYAnchor),
-      signInButton.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
-      signInButton.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
-    ])
+  private var strokeColor: Color {
+    Color(red: 142 / 255, green: 145 / 255, blue: 143 / 255)
   }
 
-  required init?(coder: NSCoder) { nil }
-  override var intrinsicContentSize: CGSize {
-    CGSize(width: signInButton.intrinsicContentSize.width, height: 48)
+  private var textColor: Color {
+    colorScheme == .dark
+      ? Color(red: 227 / 255, green: 227 / 255, blue: 227 / 255)
+      : Color(red: 31 / 255, green: 31 / 255, blue: 31 / 255)
   }
 }

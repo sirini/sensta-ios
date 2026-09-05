@@ -6,8 +6,8 @@
   개발한다.
 - 승인된 공개 피드·탐색·상세·사진가 화면을 유지하며 로그인 기반 참여 기능을 추가한다.
 - 이메일 로그인·Keychain 세션 복원·토큰 갱신·로그아웃, 게시글·댓글 좋아요와 댓글 작성·답글·본인
-  댓글 수정·삭제를 구현했다. Google 로그인 클라이언트와 서버 검증 강화를 구현했으며 실제 OAuth
-  설정과 실기기 QA 뒤 Apple 로그인 계정 연결 계약으로 진행한다.
+  댓글 수정·삭제를 구현했다. Google 로그인 클라이언트와 서버 검증 강화를 구현하고 실제 OAuth 로그인을
+  확인했다. 다음 인증 기능은 Apple 로그인 계정 연결 계약이다.
 
 ## 현재 단계
 
@@ -135,10 +135,9 @@
 
 ## 다음 작업
 
-1. 제품 소유자가 Firebase/Google Cloud에서 개발·운영 iOS OAuth client를 만들고 두 로컬 xcconfig에
-   값을 넣은 뒤 실제 Google 계정 로그인과 세션 복원을 확인한다.
-2. 준비한 GOAPI 교체용 바이너리를 제품 소유자가 SFTP로 운영 서버에 반영하고 Android Google 로그인도
+1. 준비한 GOAPI 교체용 바이너리를 제품 소유자가 SFTP로 운영 서버에 반영하고 Android Google 로그인도
    회귀 확인한다.
+2. Google 계정으로 로그인한 세션도 앱 종료·재실행 뒤 복원되는지 실기기에서 확인한다.
 3. Apple provider subject 저장, nonce 검증과 기존 계정의 명시적 연결 계약을 GOAPI에 추가한 뒤
    Sign in with Apple을 앱에 연결한다.
 
@@ -291,7 +290,7 @@
   반영을 한 흐름으로 검증했고 캡처에서 자리표시자와 답글 배치를 확인했다. Debug/Release 빌드도
   통과했다. 최종 Swift `-O` 자동 서명 Debug 앱을 연결된 iPhone 17에 설치·실행했다.
 
-## Google 로그인 준비 (2026-09-05)
+## Google 로그인 (2026-09-05)
 
 - GoogleSignIn-iOS 9.2.0 공식 SDK와 버튼을 추가했다. iOS client ID로 인증 화면을 열고 Android와 같은
   Web server client ID를 audience로 하는 ID token을 기존 `POST /auth/android/google` form 계약에
@@ -306,6 +305,11 @@
   Debug/Release 빌드가 통과했다. GOAPI 전체 test·vet 및 Ubuntu 22.04·24.04, x86-64 호환 Docker 빌드도
   통과했으며 교체용 바이너리 SHA-256은
   `c1653d19ccdce515f3eef5e647e80a9624f911556a35317443bdc2e81dc05788`이다.
-- 실제 Google OAuth 화면과 운영 로그인의 실기기 QA는 개발·운영 iOS OAuth client 생성 및 로컬 설정,
-  새 GOAPI 운영 반영 뒤 수행한다. Apple 로그인은 provider subject 저장과 명시적 기존 계정 연결 계약을
-  다음 독립 작업으로 진행한다.
+- 제품 소유자가 개발·운영 OAuth client를 로컬 설정에 넣고 실제 iPhone에서 Google 로그인이 정상
+  동작함을 확인했다. SDK 기본 버튼이 반투명 Form 행 안에 겹쳐 보이던 화면은 Google 공식 다색 G와
+  `Google로 로그인` 문구를 사용한 단일 48pt 캡슐 버튼으로 교체했다. 라이트 neutral·다크 브랜드 색과
+  iOS용 로고 여백을 적용하고 바깥 Form 행 배경을 제거했다.
+- 최종 커스텀 버튼은 전체 단위 91개, Google 로그인 및 라이트·다크·큰 글자 UI 2개를 통과했다. 캡처에서
+  내부 사각형이 사라지고 큰 글자에서도 잘리지 않음을 확인했으며 Release build와 정적 분석을 통과했다.
+  서명 Debug 앱은 iPhone 17에 설치했고 기기 잠금으로 자동 실행만 되지 않았다. Apple 로그인은 provider
+  subject 저장과 명시적 기존 계정 연결 계약을 다음 독립 작업으로 진행한다.

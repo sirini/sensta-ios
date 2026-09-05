@@ -259,6 +259,11 @@ final class SENSTAUITests: XCTestCase {
     let google = app.buttons["account-google-signin"]
     XCTAssertTrue(google.waitForExistence(timeout: 5))
     XCTAssertGreaterThanOrEqual(google.frame.height, 44)
+    XCTAssertGreaterThan(google.frame.width, app.frame.width * 0.7)
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "Custom Google sign in button"
+    capture.lifetime = .keepAlways
+    add(capture)
     google.tap()
     XCTAssertTrue(app.staticTexts["Google 사진가"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.buttons["account-logout"].exists)
@@ -270,12 +275,13 @@ final class SENSTAUITests: XCTestCase {
   func testAccountSheetDarkAndLargeText() throws {
     for mode in ["--ui-test-dark", "--ui-test-large-text"] {
       let app = XCUIApplication()
-      app.launchArguments = ["--ui-test-viewer", mode]
+      app.launchArguments = ["--ui-test-viewer", "--ui-test-google", mode]
       app.launch()
       let account = app.buttons["photo-feed-account"]
       XCTAssertTrue(account.waitForExistence(timeout: 10))
       account.tap()
       XCTAssertTrue(app.textFields["account-email"].waitForExistence(timeout: 5))
+      XCTAssertGreaterThanOrEqual(app.buttons["account-google-signin"].frame.height, 44)
       let close = app.buttons["account-close"]
       if mode == "--ui-test-large-text" {
         XCTAssertLessThan(close.frame.minY, app.frame.height * 0.3)
