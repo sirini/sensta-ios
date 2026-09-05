@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
   @State private var model: PhotoFeedViewModel
   @State private var showAccount = false
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   var account: AccountSession? = nil
   private let detailService: any PhotoPostDetailServing
   private let feedService: any PhotoFeedServing
@@ -65,13 +66,18 @@ struct ContentView: View {
                 Button {
                   showAccount = true
                 } label: {
-                  Image(
-                    systemName: account.user == nil
-                      ? "person.crop.circle" : "person.crop.circle.fill"
-                  )
-                  .font(.body.weight(.medium)).foregroundStyle(.white)
-                  .frame(width: 44, height: 44).background(.black.opacity(0.25), in: Circle())
-                }.accessibilityLabel("내 계정").accessibilityIdentifier("photo-feed-account")
+                  if account.user != nil {
+                    AccountAvatar(url: account.profileURL, size: 36)
+                      .frame(width: 44, height: 44)
+                      .background(.black.opacity(0.25), in: Circle())
+                  } else {
+                    Image(systemName: "arrow.right.to.line")
+                      .font(.body.weight(.medium)).foregroundStyle(.white)
+                      .frame(width: 44, height: 44).background(.black.opacity(0.25), in: Circle())
+                  }
+                }.accessibilityLabel(account.user == nil ? "로그인" : "내 계정")
+                  .accessibilityValue(account.user == nil ? "로그아웃 상태" : "로그인 상태")
+                  .accessibilityIdentifier("photo-feed-account")
               }
               NavigationLink {
                 PhotoSearchView(service: feedService, detailService: detailService)
@@ -108,6 +114,7 @@ struct ContentView: View {
     .sheet(isPresented: $showAccount) {
       if let account {
         AccountView(session: account, detailService: detailService)
+          .environment(\.dynamicTypeSize, dynamicTypeSize)
           .presentationDragIndicator(.visible)
       }
     }

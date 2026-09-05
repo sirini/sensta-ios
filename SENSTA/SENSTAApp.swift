@@ -16,7 +16,7 @@ struct SENSTAApp: App {
         service: AccountService(baseURL: baseURL),
         store: KeychainAccountStore(
           service: (Bundle.main.bundleIdentifier ?? "me.sensta.ios") + ".account."
-            + baseURL.absoluteString)))
+            + baseURL.absoluteString), apiBaseURL: baseURL))
     #if DEBUG
       if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--ui-test-") }) {
         _account = State(

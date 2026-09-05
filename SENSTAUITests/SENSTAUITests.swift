@@ -8,11 +8,18 @@ final class SENSTAUITests: XCTestCase {
     app.launch()
     let account = app.buttons["photo-feed-account"]
     XCTAssertTrue(account.waitForExistence(timeout: 10))
+    XCTAssertEqual(account.value as? String, "로그아웃 상태")
     account.tap()
     let email = app.textFields["account-email"]
     XCTAssertTrue(email.waitForExistence(timeout: 5))
     let login = app.buttons["account-signin"]
     XCTAssertFalse(login.isEnabled)
+    XCTAssertTrue(login.isHittable)
+    XCTAssertGreaterThan(app.buttons["account-close"].frame.minY, app.frame.height * 0.4)
+    let loginCapture = XCTAttachment(screenshot: app.screenshot())
+    loginCapture.name = "Compact login material"
+    loginCapture.lifetime = .keepAlways
+    add(loginCapture)
     email.tap()
     email.typeText("photo@example.com")
     let password = app.secureTextFields["account-password"]
@@ -30,6 +37,14 @@ final class SENSTAUITests: XCTestCase {
     screenshot.name = "Account signed in"
     screenshot.lifetime = .keepAlways
     add(screenshot)
+    app.buttons["account-close"].tap()
+    XCTAssertTrue(account.waitForExistence(timeout: 5))
+    XCTAssertEqual(account.value as? String, "로그인 상태")
+    account.tap()
+    app.buttons["내 공개 프로필"].tap()
+    XCTAssertTrue(app.navigationBars["사진가"].waitForExistence(timeout: 5))
+    XCTAssertLessThan(app.navigationBars["사진가"].frame.minY, app.frame.height * 0.3)
+    app.navigationBars.buttons.firstMatch.tap()
     app.buttons["account-logout"].tap()
     app.buttons.matching(
       NSPredicate(format: "label == %@ AND identifier != %@", "로그아웃", "account-logout")
@@ -37,6 +52,31 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertTrue(email.waitForExistence(timeout: 5))
     app.buttons["account-close"].tap()
     XCTAssertTrue(account.waitForExistence(timeout: 5))
+  }
+
+  @MainActor
+  func testAccountSheetDarkAndLargeText() throws {
+    for mode in ["--ui-test-dark", "--ui-test-large-text"] {
+      let app = XCUIApplication()
+      app.launchArguments = ["--ui-test-viewer", mode]
+      app.launch()
+      let account = app.buttons["photo-feed-account"]
+      XCTAssertTrue(account.waitForExistence(timeout: 10))
+      account.tap()
+      XCTAssertTrue(app.textFields["account-email"].waitForExistence(timeout: 5))
+      let close = app.buttons["account-close"]
+      if mode == "--ui-test-large-text" {
+        XCTAssertLessThan(close.frame.minY, app.frame.height * 0.3)
+      } else {
+        XCTAssertGreaterThan(close.frame.minY, app.frame.height * 0.4)
+      }
+      let capture = XCTAttachment(screenshot: app.screenshot())
+      capture.name = "Account sheet " + mode
+      capture.lifetime = .keepAlways
+      add(capture)
+      close.tap()
+      XCTAssertTrue(account.waitForExistence(timeout: 5))
+    }
   }
 
   @MainActor

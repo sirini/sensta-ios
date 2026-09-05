@@ -7,6 +7,7 @@ struct AccountUser: Codable, Equatable, Sendable {
   let name: String
   let id: String
   let blocked: Bool
+  var profile: String? = nil
 }
 
 struct AccountTokens: Codable, Equatable, Sendable {
@@ -39,6 +40,7 @@ struct AccountSigninResult: Decodable {
   let blocked: Bool
   let token: String
   let refresh: String
+  let profile: String?
 }
 
 enum AccountEndpoint {
@@ -106,7 +108,8 @@ struct AccountService: AccountServing {
     let result = try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: data)
       .checked()
     let user = AccountUser(
-      uid: result.uid, name: result.name, id: result.id, blocked: result.blocked)
+      uid: result.uid, name: result.name, id: result.id, blocked: result.blocked,
+      profile: result.profile)
     guard user.uid > 0, !user.blocked else { throw NuboAPIError.invalidResponse }
     return (user, try AccountTokens(token: result.token, refresh: result.refresh).checked())
   }
@@ -192,9 +195,15 @@ final class AccountSession {
   private(set) var needsRestoration = true
   private let service: any AccountServing
   private let store: any AccountTokenStoring
+  private let apiBaseURL: URL?
+  var profileURL: URL? {
+    guard let apiBaseURL else { return nil }
+    return MediaURLResolver.url(for: user?.profile ?? "", apiBaseURL: apiBaseURL)
+  }
   private var tokens: AccountTokens?
 
-  init(service: any AccountServing, store: any AccountTokenStoring) {
+  init(service: any AccountServing, store: any AccountTokenStoring, apiBaseURL: URL? = nil) {
+    self.apiBaseURL = apiBaseURL
     self.service = service
     self.store = store
   }

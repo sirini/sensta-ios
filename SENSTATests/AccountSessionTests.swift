@@ -5,7 +5,8 @@ import Testing
 
 private let testTokens = AccountTokens(token: "access-one", refresh: "refresh-one")
 private let rotatedTokens = AccountTokens(token: "access-two", refresh: "refresh-two")
-private let testUser = AccountUser(uid: 7, name: "사진가", id: "photo@example.com", blocked: false)
+private let testUser = AccountUser(
+  uid: 7, name: "사진가", id: "photo@example.com", blocked: false, profile: "/upload/profile/7.webp")
 
 @MainActor
 private final class MemoryTokenStore: AccountTokenStoring {
@@ -97,11 +98,12 @@ struct AccountContractTests {
 
   @Test func decodesAndroidSigninAndRejectsErrorEnvelope() throws {
     let data = Data(
-      #"{"success":true,"code":0,"error":"","result":{"uid":7,"name":"사진가","id":"photo@example.com","blocked":false,"token":"access-one","refresh":"refresh-one","admin":false,"level":2,"signup":123}}"#
+      #"{"success":true,"code":0,"error":"","result":{"uid":7,"name":"사진가","id":"photo@example.com","blocked":false,"token":"access-one","refresh":"refresh-one","profile":"/upload/profile/7.webp","admin":false,"level":2,"signup":123}}"#
         .utf8)
     let result = try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: data)
       .checked()
     #expect(result.uid == 7)
+    #expect(result.profile == "/upload/profile/7.webp")
     #expect(result.refresh == testTokens.refresh)
     let failure = Data(#"{"success":false,"code":4,"error":"internal detail","result":null}"#.utf8)
     #expect(throws: NuboAPIError.server(code: 4, message: "")) {
@@ -114,9 +116,11 @@ struct AccountContractTests {
 struct AccountSessionTests {
   @Test func signinPersistsPairBeforePublishingUser() async {
     let store = MemoryTokenStore()
-    let session = AccountSession(service: AccountStub(), store: store)
+    let session = AccountSession(
+      service: AccountStub(), store: store, apiBaseURL: URL(string: "https://example.com/goapi/")!)
     await session.signin(email: testUser.id, password: "secret")
     #expect(store.value == testTokens)
+    #expect(session.profileURL?.absoluteString == "https://example.com/upload/profile/7.webp")
     #expect(session.user == testUser)
     #expect(!session.needsRestoration)
   }
