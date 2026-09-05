@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct AccountView: View {
@@ -7,6 +8,8 @@ struct AccountView: View {
   @State private var password = ""
   @State private var confirmLogout = false
   @State private var detent: PresentationDetent = .medium
+  @State private var appleNonce: String?
+  @State private var isPreparingApple = false
   private let googleSignIn = GoogleSignInClient()
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -36,6 +39,22 @@ struct AccountView: View {
               .onAppear { detent = .large }
             }
           }.listRowBackground(rowBackground)
+          Section("Apple 계정") {
+            if session.appleLinked == true {
+              Label("Apple ID 연결됨", systemImage: "checkmark.seal.fill")
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("account-apple-linked")
+            } else if session.appleLinked == false, let appleNonce {
+              SENSTAAppleSignInButton(
+                nonce: appleNonce, linking: true, isEnabled: !session.isBusy,
+                completion: handleAppleAuthorization)
+            } else if isPreparingApple {
+              ProgressView("연결 상태 확인 중…")
+            } else {
+              Button("Apple 연결 다시 시도") { Task { await prepareAppleAuthorization() } }
+                .accessibilityIdentifier("account-apple-retry")
+            }
+          }.listRowBackground(rowBackground)
           Section {
             Button("로그아웃", role: .destructive) { confirmLogout = true }
               .disabled(session.isBusy).accessibilityIdentifier("account-logout")
@@ -50,26 +69,35 @@ struct AccountView: View {
           }
         } else {
           Section {
-            VStack(alignment: .leading, spacing: 10) {
-              Text("다시 만나 반가워요").font(.title2.weight(.semibold))
-              Text("SENSTA에서 사용하던 계정으로 로그인하세요.")
-                .font(.subheadline).foregroundStyle(.secondary)
-            }.padding(.vertical, 4)
-          }.listRowBackground(Color.clear)
-          if googleSignIn.isAvailable {
-            Section {
-              SENSTAGoogleSignInButton(isEnabled: !session.isBusy) { signinWithGoogle() }
+            VStack(spacing: 12) {
+              if let appleNonce {
+                SENSTAAppleSignInButton(
+                  nonce: appleNonce, linking: false, isEnabled: !session.isBusy,
+                  completion: handleAppleAuthorization)
+              } else if isPreparingApple {
+                ProgressView("Apple 로그인 준비 중…")
+                  .frame(maxWidth: .infinity, minHeight: 48)
+              } else {
+                Button("Apple 로그인 다시 시도") { Task { await prepareAppleAuthorization() } }
+                  .frame(maxWidth: .infinity, minHeight: 48)
+                  .accessibilityIdentifier("account-apple-retry")
+              }
+              if googleSignIn.isAvailable {
+                SENSTAGoogleSignInButton(isEnabled: !session.isBusy) { signinWithGoogle() }
+              }
+              Text("Apple로 처음 로그인하면 새 계정이 만들어져요. 기존 계정은 먼저 로그인한 뒤 Apple ID를 연결하세요.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+              HStack {
+                Rectangle().frame(height: 1).foregroundStyle(.separator)
+                Text("또는").font(.caption).foregroundStyle(.secondary)
+                Rectangle().frame(height: 1).foregroundStyle(.separator)
+              }
+              .accessibilityHidden(true)
             }
-            .listRowBackground(Color.clear)
-
-            HStack {
-              Rectangle().frame(height: 1).foregroundStyle(.separator)
-              Text("또는").font(.caption).foregroundStyle(.secondary)
-              Rectangle().frame(height: 1).foregroundStyle(.separator)
-            }
-            .listRowBackground(Color.clear)
-            .accessibilityHidden(true)
           }
+          .listRowBackground(Color.clear)
           Section("이메일로 로그인") {
             TextField("이메일", text: $email)
               .textContentType(.username).keyboardType(.emailAddress)
@@ -106,6 +134,7 @@ struct AccountView: View {
         Button("로그아웃", role: .destructive) { Task { await session.logout() } }
       }
       .onDisappear { password = "" }
+      .task(id: session.sessionIdentity) { await prepareAppleAuthorization() }
     }
     .presentationDetents(
       dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large], selection: $detent
@@ -153,6 +182,51 @@ struct AccountView: View {
       }
     }
   }
+
+  private func prepareAppleAuthorization() async {
+    isPreparingApple = true
+    appleNonce = nil
+    let expectedIdentity = session.sessionIdentity
+    let preparedNonce: String?
+    if session.user != nil {
+      await session.loadAppleStatus()
+      guard expectedIdentity == session.sessionIdentity, !Task.isCancelled else { return }
+      if session.appleLinked == false {
+        preparedNonce = await session.prepareAppleAuthorization(linking: true)
+      } else {
+        preparedNonce = nil
+      }
+    } else {
+      preparedNonce = await session.prepareAppleAuthorization(linking: false)
+    }
+    guard expectedIdentity == session.sessionIdentity, !Task.isCancelled else { return }
+    appleNonce = preparedNonce
+    isPreparingApple = false
+  }
+
+  private func handleAppleAuthorization(_ result: Result<AppleSignInPayload, Error>) {
+    guard let nonce = appleNonce else { return }
+    appleNonce = nil
+    switch result {
+    case .success(let payload):
+      let linking = session.user != nil
+      Task {
+        if linking {
+          await session.linkApple(
+            identityToken: payload.identityToken, nonce: nonce, name: payload.name)
+        } else {
+          await session.signinWithApple(
+            identityToken: payload.identityToken, nonce: nonce, name: payload.name)
+        }
+        if session.appleLinked != true { await prepareAppleAuthorization() }
+      }
+    case .failure(let error):
+      if !SENSTAAppleSignInButton.isCancellation(error) {
+        session.reportAppleSignInFailure()
+      }
+      Task { await prepareAppleAuthorization() }
+    }
+  }
 }
 
 struct AccountAvatar: View {
@@ -171,5 +245,89 @@ struct AccountAvatar: View {
     }
     .frame(width: size, height: size).clipShape(Circle())
     .accessibilityLabel("내 프로필 사진")
+  }
+}
+
+struct AppleSignInPayload: Equatable, Sendable {
+  let identityToken: String
+  let name: String
+}
+
+struct SENSTAAppleSignInButton: View {
+  let nonce: String
+  let linking: Bool
+  let isEnabled: Bool
+  let completion: @MainActor (Result<AppleSignInPayload, Error>) -> Void
+  @Environment(\.colorScheme) private var colorScheme
+
+  var body: some View {
+    #if DEBUG
+      if ProcessInfo.processInfo.arguments.contains("--ui-test-apple") {
+        Button {
+          completion(
+            .success(
+              AppleSignInPayload(
+                identityToken: "ui-test-apple-id-token", name: "Apple 사진가")))
+        } label: {
+          Label(linking ? "Apple로 계속하기" : "Apple로 로그인", systemImage: "apple.logo")
+            .font(.headline)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .foregroundStyle(colorScheme == .dark ? .black : .white)
+            .background(
+              colorScheme == .dark ? .white : .black, in: RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityIdentifier("account-apple-signin")
+      } else {
+        nativeButton
+      }
+    #else
+      nativeButton
+    #endif
+  }
+
+  private var nativeButton: some View {
+    SignInWithAppleButton(
+      linking ? .continue : .signIn,
+      onRequest: { request in
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = nonce
+      },
+      onCompletion: { result in
+        switch result {
+        case .success(let authorization):
+          do { completion(.success(try Self.payload(from: authorization))) } catch {
+            completion(.failure(error))
+          }
+        case .failure(let error):
+          completion(.failure(error))
+        }
+      }
+    )
+    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+    .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48)
+    .clipShape(RoundedRectangle(cornerRadius: 10))
+    .disabled(!isEnabled)
+    .opacity(isEnabled ? 1 : 0.45)
+    .accessibilityIdentifier("account-apple-signin")
+  }
+
+  static func isCancellation(_ error: Error) -> Bool {
+    let error = error as NSError
+    return error.domain == ASAuthorizationError.errorDomain
+      && error.code == ASAuthorizationError.Code.canceled.rawValue
+  }
+
+  private static func payload(from authorization: ASAuthorization) throws -> AppleSignInPayload {
+    guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+      let tokenData = credential.identityToken,
+      let identityToken = String(data: tokenData, encoding: .utf8), !identityToken.isEmpty
+    else { throw NuboAPIError.invalidResponse }
+    let name =
+      credential.fullName.map {
+        PersonNameComponentsFormatter.localizedString(from: $0, style: .default)
+      } ?? ""
+    return AppleSignInPayload(identityToken: identityToken, name: name)
   }
 }

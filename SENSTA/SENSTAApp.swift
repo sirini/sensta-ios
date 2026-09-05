@@ -169,7 +169,25 @@ extension ContentView {
     private var liked = false
     private var commentLiked = false
     private var commentID = 100
+    private var appleLinked = false
     func data(for request: URLRequest) async throws -> Data {
+      if request.url?.path.hasSuffix("/auth/apple/status") == true {
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "result": ["linked": appleLinked],
+        ])
+      }
+      if request.url?.path.hasSuffix("/auth/apple/link/nonce") == true {
+        return Data(
+          #"{"success":true,"code":0,"result":{"nonce":"ui-test-apple-link-nonce"}}"#.utf8)
+      }
+      if request.url?.path.hasSuffix("/auth/apple/link") == true {
+        let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+        guard body["identityToken"] as? String == "ui-test-apple-id-token",
+          body["nonce"] as? String == "ui-test-apple-link-nonce"
+        else { throw NuboAPIError.httpStatus(401) }
+        appleLinked = true
+        return Data(#"{"success":true,"code":0,"result":{"linked":true}}"#.utf8)
+      }
       if request.httpMethod == "POST", request.url?.path.contains("/comment/") == true {
         if String(data: request.httpBody ?? Data(), encoding: .utf8)?.contains("reject") == true {
           return Data(#"{"success":false,"code":3,"result":null}"#.utf8)
@@ -235,6 +253,19 @@ extension ContentView {
       return (
         AccountUser(uid: 1, name: "Google 사진가", id: "google@example.com", blocked: false),
         AccountTokens(token: "ui-google-access", refresh: "ui-google-refresh")
+      )
+    }
+    func appleNonce() async throws -> String { "ui-test-apple-nonce" }
+    func signinWithApple(identityToken: String, nonce: String, name: String) async throws
+      -> (AccountUser, AccountTokens)
+    {
+      guard identityToken == "ui-test-apple-id-token", nonce == "ui-test-apple-nonce" else {
+        throw NuboAPIError.httpStatus(401)
+      }
+      appleLinked = true
+      return (
+        AccountUser(uid: 1, name: name, id: "apple@example.com", blocked: false),
+        AccountTokens(token: "ui-apple-access", refresh: "ui-apple-refresh")
       )
     }
     func load(token: String) async throws -> AccountUser { throw NuboAPIError.httpStatus(401) }

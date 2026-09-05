@@ -26,11 +26,12 @@ private final class MemoryTokenStore: AccountTokenStoring {
 }
 
 private actor AccountStub: AccountServing {
-  enum Mode { case normal, expired, rejected, offline, paused }
+  enum Mode { case normal, expired, rejected, offline, paused, appleLinkRequired }
   let mode: Mode
   var refreshCount = 0
   var signinCount = 0
   var googleSigninCount = 0
+  var appleSigninCount = 0
   private var continuation: CheckedContinuation<Void, Never>?
   init(_ mode: Mode = .normal) { self.mode = mode }
   func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
@@ -40,6 +41,14 @@ private actor AccountStub: AccountServing {
   }
   func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
     googleSigninCount += 1
+    return (testUser, testTokens)
+  }
+  func appleNonce() async throws -> String { "server-apple-nonce" }
+  func signinWithApple(identityToken: String, nonce: String, name: String) async throws
+    -> (AccountUser, AccountTokens)
+  {
+    appleSigninCount += 1
+    if mode == .appleLinkRequired { throw NuboAPIError.server(code: 13, message: "private") }
     return (testUser, testTokens)
   }
   func resume() {
@@ -58,6 +67,39 @@ private actor AccountStub: AccountServing {
     if mode == .rejected { throw NuboAPIError.server(code: 4, message: "private server error") }
     return rotatedTokens
   }
+  func logout(token: String) async throws {}
+}
+
+private actor AppleLinkStub: AccountServing {
+  var linked = false
+  var authorizationHeaders: [String] = []
+
+  func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
+    (testUser, testTokens)
+  }
+
+  func data(for request: URLRequest) async throws -> Data {
+    authorizationHeaders.append(request.value(forHTTPHeaderField: "Authorization") ?? "")
+    switch request.url?.path {
+    case "/goapi/auth/apple/status":
+      return Data(
+        "{\"success\":true,\"code\":0,\"result\":{\"linked\":\(linked)}}".utf8)
+    case "/goapi/auth/apple/link/nonce":
+      return Data(#"{"success":true,"code":0,"result":{"nonce":"bound-link-nonce"}}"#.utf8)
+    case "/goapi/auth/apple/link":
+      let body = try JSONDecoder().decode([String: String].self, from: request.httpBody!)
+      guard body["identityToken"] == "apple.jwt", body["nonce"] == "bound-link-nonce" else {
+        throw NuboAPIError.invalidRequest
+      }
+      linked = true
+      return Data(#"{"success":true,"code":0,"result":{"linked":true}}"#.utf8)
+    default:
+      throw NuboAPIError.invalidRequest
+    }
+  }
+
+  func load(token: String) async throws -> AccountUser { testUser }
+  func refresh(_ refresh: String) async throws -> AccountTokens { rotatedTokens }
   func logout(token: String) async throws {}
 }
 
@@ -100,7 +142,27 @@ struct AccountContractTests {
     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
     #expect(
       request.value(forHTTPHeaderField: "Content-Type") == "application/x-www-form-urlencoded")
-    #expect(String(decoding: request.httpBody!, as: UTF8.self) == "id_token=header.payload%2Bsignature")
+    #expect(
+      String(decoding: request.httpBody!, as: UTF8.self) == "id_token=header.payload%2Bsignature")
+  }
+
+  @Test func appleSigninUsesServerNonceAndJSONWithoutAuthorization() throws {
+    let request = try AccountEndpoint.appleSignin(
+      baseURL: URL(string: "https://example.com/goapi/")!, identityToken: "apple.jwt",
+      nonce: "server-nonce", name: "사진가")
+    #expect(request.url?.path == "/goapi/auth/apple")
+    #expect(request.httpMethod == "POST")
+    #expect(request.httpShouldHandleCookies == false)
+    #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    let body = try JSONDecoder().decode([String: String].self, from: request.httpBody!)
+    #expect(body == ["identityToken": "apple.jwt", "nonce": "server-nonce", "name": "사진가"])
+
+    let link = try AccountEndpoint.appleLink(
+      baseURL: URL(string: "https://example.com/goapi/")!, identityToken: "apple.jwt",
+      nonce: "link-nonce", name: "")
+    #expect(link.url?.path == "/goapi/auth/apple/link")
+    #expect(link.value(forHTTPHeaderField: "Authorization") == nil)
   }
 
   @Test func rejectsInsecureBaseAndEmptyTokens() {
@@ -151,6 +213,46 @@ struct AccountSessionTests {
     #expect(store.value == testTokens)
     #expect(session.user == testUser)
     #expect(!session.needsRestoration)
+  }
+
+  @Test func appleSigninPersistsPairAndMarksProviderLinked() async {
+    let service = AccountStub()
+    let store = MemoryTokenStore()
+    let session = AccountSession(service: service, store: store)
+    await session.signinWithApple(
+      identityToken: "apple-id-token", nonce: "server-apple-nonce", name: "사진가")
+    #expect(await service.appleSigninCount == 1)
+    #expect(store.value == testTokens)
+    #expect(session.user == testUser)
+    #expect(session.appleLinked == true)
+  }
+
+  @Test func appleSigninDoesNotAutoMergeAnExistingEmailAccount() async {
+    let store = MemoryTokenStore()
+    let session = AccountSession(service: AccountStub(.appleLinkRequired), store: store)
+    await session.signinWithApple(
+      identityToken: "apple-id-token", nonce: "server-apple-nonce", name: "사진가")
+    #expect(store.value == nil)
+    #expect(session.user == nil)
+    #expect(session.error?.contains("로그인한 뒤") == true)
+  }
+
+  @Test func existingSessionExplicitlyLinksAppleWithAuthenticatedNonce() async {
+    let service = AppleLinkStub()
+    let session = AccountSession(
+      service: service, store: MemoryTokenStore(),
+      apiBaseURL: URL(string: "https://example.com/goapi/")!)
+    await session.signin(email: testUser.id, password: "secret")
+    await session.loadAppleStatus()
+    #expect(session.appleLinked == false)
+    let nonce = await session.prepareAppleAuthorization(linking: true)
+    #expect(nonce == "bound-link-nonce")
+    await session.linkApple(identityToken: "apple.jwt", nonce: nonce!, name: "")
+    #expect(session.appleLinked == true)
+    #expect(
+      await service.authorizationHeaders == [
+        "Bearer access-one", "Bearer access-one", "Bearer access-one",
+      ])
   }
 
   @Test func googleButtonRequiresBothClientIDs() {

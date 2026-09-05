@@ -272,6 +272,48 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testAppleLoginUsesNativeFlowContract() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-apple"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let apple = app.buttons["account-apple-signin"]
+    XCTAssertTrue(apple.waitForExistence(timeout: 5))
+    XCTAssertGreaterThanOrEqual(apple.frame.height, 44)
+    apple.tap()
+    XCTAssertTrue(app.staticTexts["Apple 사진가"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.descendants(matching: .any)["account-apple-linked"].exists)
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "Apple account linked"
+    capture.lifetime = .keepAlways
+    add(capture)
+  }
+
+  @MainActor
+  func testExistingAccountCanExplicitlyLinkAppleID() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-apple"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+    let apple = app.buttons["account-apple-signin"]
+    XCTAssertTrue(apple.waitForExistence(timeout: 5))
+    apple.tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["account-apple-linked"].waitForExistence(timeout: 5))
+  }
+
+  @MainActor
   func testAccountSheetDarkAndLargeText() throws {
     for mode in ["--ui-test-dark", "--ui-test-large-text"] {
       let app = XCUIApplication()

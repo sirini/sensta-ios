@@ -313,3 +313,23 @@
   내부 사각형이 사라지고 큰 글자에서도 잘리지 않음을 확인했으며 Release build와 정적 분석을 통과했다.
   서명 Debug 앱은 iPhone 17에 설치했고 기기 잠금으로 자동 실행만 되지 않았다. Apple 로그인은 provider
   subject 저장과 명시적 기존 계정 연결 계약을 다음 독립 작업으로 진행한다.
+
+## Apple 로그인과 기존 계정 연결 (2026-09-05)
+
+- 비로그인 계정 시트에 Apple 기본 로그인 버튼을 추가했다. 서버가 발급한 5분짜리 일회성 nonce를
+  Apple 요청과 GOAPI 검증에 함께 사용하며 ID token이나 nonce는 로컬 저장소에 남기지 않는다. 로그인
+  성공 뒤 access/refresh 쌍은 이메일·Google 로그인과 같은 Keychain 경로로 저장한다.
+- GOAPI `f37b088`은 Apple 공개 키의 `kid`와 RS256 서명, issuer, Debug·Release bundle audience,
+  만료·발급 시각, nonce와 이메일 검증 상태를 확인한다. 계정 연결은 Apple의 안정적인 provider subject로
+  저장하며 같은 이메일만으로 기존 계정을 자동 병합하지 않는다. 기존 사용자는 이메일 또는 Google로
+  로그인한 뒤 내 계정에서 Apple ID를 명시적으로 연결한다.
+- 계정 시트의 불필요한 환영 문구를 덜고 Apple·Google 버튼은 각각 48pt 전체 폭으로 유지했다. 일반
+  크기의 절반 높이 시트에서 이메일 입력란까지 보이며, 다크 모드와 접근성 큰 글자에서는 시스템 버튼
+  색상과 전체 높이·스크롤을 따른다. 로그인 후에는 Apple ID 연결 여부를 별도 섹션에서 보여 준다.
+- 전체 단위 테스트 95개와 Apple 신규 로그인·기존 계정 연결·Google 로그인·다크/큰 글자 핵심 UI
+  테스트 4개가 통과했다. Debug/Release 빌드, 정적 분석과 캡처 검증을 마쳤고 최종 Swift `-O` 자동 서명
+  Debug 앱을 연결된 iPhone 17에 설치·실행했다.
+- 운영 반영 전 GOAPI 환경에 `OAUTH_APPLE_CLIENT_IDS=me.sensta.ios.debug,me.sensta.ios`를 설정하고
+  새 runtime으로 `./bin/goapi install`을 한 번 실행해 OAuth identity·nonce 테이블을 만들어야 한다.
+  교체용 바이너리 SHA-256은 `b84075a8f135fb86a310232da3719cd7768c48d0a3d3140bdd28b6db21668025`다.
+  실제 Apple ID 로그인·기존 계정 연결·재실행 세션 복원은 운영 반영 뒤 제품 소유자가 확인한다.

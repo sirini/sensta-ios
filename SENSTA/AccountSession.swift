@@ -43,6 +43,20 @@ struct AccountSigninResult: Decodable {
   let profile: String?
 }
 
+struct AppleNonceResult: Decodable, Equatable, Sendable {
+  let nonce: String
+}
+
+struct OAuthIdentityStatus: Decodable, Equatable, Sendable {
+  let linked: Bool
+}
+
+private struct AppleAuthBody: Encodable {
+  let identityToken: String
+  let nonce: String
+  let name: String
+}
+
 enum AccountEndpoint {
   static func request(baseURL: URL, path: String, method: String = "GET", token: String? = nil)
     throws -> URLRequest
@@ -86,12 +100,56 @@ enum AccountEndpoint {
     request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
     return request
   }
+
+  static func appleNonce(baseURL: URL) throws -> URLRequest {
+    try request(baseURL: baseURL, path: "auth/apple/nonce", method: "POST")
+  }
+
+  static func appleSignin(baseURL: URL, identityToken: String, nonce: String, name: String)
+    throws -> URLRequest
+  {
+    try appleRequest(
+      baseURL: baseURL, path: "auth/apple", identityToken: identityToken, nonce: nonce,
+      name: name)
+  }
+
+  static func appleStatus(baseURL: URL) throws -> URLRequest {
+    try request(baseURL: baseURL, path: "auth/apple/status")
+  }
+
+  static func appleLinkNonce(baseURL: URL) throws -> URLRequest {
+    try request(baseURL: baseURL, path: "auth/apple/link/nonce", method: "POST")
+  }
+
+  static func appleLink(baseURL: URL, identityToken: String, nonce: String, name: String)
+    throws -> URLRequest
+  {
+    try appleRequest(
+      baseURL: baseURL, path: "auth/apple/link", identityToken: identityToken, nonce: nonce,
+      name: name)
+  }
+
+  private static func appleRequest(
+    baseURL: URL, path: String, identityToken: String, nonce: String, name: String
+  ) throws -> URLRequest {
+    let identityToken = identityToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    let nonce = nonce.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !identityToken.isEmpty, !nonce.isEmpty else { throw NuboAPIError.invalidRequest }
+    var request = try request(baseURL: baseURL, path: path, method: "POST")
+    request.httpBody = try JSONEncoder().encode(
+      AppleAuthBody(identityToken: identityToken, nonce: nonce, name: name))
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    return request
+  }
 }
 
 protocol AccountServing: Sendable {
   func data(for request: URLRequest) async throws -> Data
   func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens)
   func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens)
+  func appleNonce() async throws -> String
+  func signinWithApple(identityToken: String, nonce: String, name: String) async throws
+    -> (AccountUser, AccountTokens)
   func load(token: String) async throws -> AccountUser
   func refresh(_ refresh: String) async throws -> AccountTokens
   func logout(token: String) async throws
@@ -100,6 +158,12 @@ protocol AccountServing: Sendable {
 extension AccountServing {
   func data(for request: URLRequest) async throws -> Data { throw NuboAPIError.configuration }
   func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
+    throw NuboAPIError.configuration
+  }
+  func appleNonce() async throws -> String { throw NuboAPIError.configuration }
+  func signinWithApple(identityToken: String, nonce: String, name: String) async throws
+    -> (AccountUser, AccountTokens)
+  {
     throw NuboAPIError.configuration
   }
 }
@@ -134,6 +198,25 @@ struct AccountService: AccountServing {
   func signinWithGoogle(idToken: String) async throws -> (AccountUser, AccountTokens) {
     let data = try await client.data(
       for: AccountEndpoint.googleSignin(baseURL: baseURL, idToken: idToken))
+    let result = try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: data)
+      .checked()
+    return try checkedSignin(result)
+  }
+
+  func appleNonce() async throws -> String {
+    let data = try await client.data(for: AccountEndpoint.appleNonce(baseURL: baseURL))
+    let result = try JSONDecoder().decode(AccountEnvelope<AppleNonceResult>.self, from: data)
+      .checked()
+    guard !result.nonce.isEmpty else { throw NuboAPIError.malformedResponse }
+    return result.nonce
+  }
+
+  func signinWithApple(identityToken: String, nonce: String, name: String) async throws
+    -> (AccountUser, AccountTokens)
+  {
+    let data = try await client.data(
+      for: AccountEndpoint.appleSignin(
+        baseURL: baseURL, identityToken: identityToken, nonce: nonce, name: name))
     let result = try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: data)
       .checked()
     return try checkedSignin(result)
@@ -226,6 +309,7 @@ final class AccountSession {
   private(set) var isBusy = false
   private(set) var error: String?
   private(set) var needsRestoration = true
+  private(set) var appleLinked: Bool?
   private let service: any AccountServing
   private let store: any AccountTokenStoring
   let apiBaseURL: URL?
@@ -294,6 +378,93 @@ final class AccountSession {
     error = "Google로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
   }
 
+  func prepareAppleAuthorization(linking: Bool) async -> String? {
+    do {
+      if linking {
+        guard let apiBaseURL else { throw NuboAPIError.configuration }
+        let data = try await sendAuthenticated(AccountEndpoint.appleLinkNonce(baseURL: apiBaseURL))
+        let result = try JSONDecoder().decode(AccountEnvelope<AppleNonceResult>.self, from: data)
+          .checked()
+        guard !result.nonce.isEmpty else { throw NuboAPIError.malformedResponse }
+        return result.nonce
+      }
+      return try await service.appleNonce()
+    } catch is CancellationError {
+      return nil
+    } catch {
+      self.error = "Apple 로그인을 준비하지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요."
+      return nil
+    }
+  }
+
+  func signinWithApple(identityToken: String, nonce: String, name: String) async {
+    guard !isBusy else { return }
+    isBusy = true
+    error = nil
+    defer { isBusy = false }
+    do {
+      let response = try await service.signinWithApple(
+        identityToken: identityToken, nonce: nonce, name: name)
+      try finishSignin(response)
+      appleLinked = true
+    } catch is CancellationError {
+      return
+    } catch NuboAPIError.server(let code, _) where code == 13 {
+      self.error = "같은 이메일의 SENSTA 계정이 있어요. 이메일 또는 Google로 로그인한 뒤 내 계정에서 Apple ID를 연결해 주세요."
+    } catch {
+      self.error =
+        error is AccountStorageError
+        ? "로그인 정보를 안전하게 저장하지 못했어요. 기기 잠금을 해제한 뒤 다시 시도해 주세요."
+        : "Apple로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    }
+  }
+
+  func reportAppleSignInFailure() {
+    guard !isBusy else { return }
+    error = "Apple로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+  }
+
+  func loadAppleStatus() async {
+    guard user != nil, let apiBaseURL else {
+      appleLinked = nil
+      return
+    }
+    let sessionIdentity = identity
+    do {
+      let data = try await sendAuthenticated(AccountEndpoint.appleStatus(baseURL: apiBaseURL))
+      let status = try JSONDecoder().decode(AccountEnvelope<OAuthIdentityStatus>.self, from: data)
+        .checked()
+      guard sessionIdentity == identity else { return }
+      appleLinked = status.linked
+    } catch is CancellationError {
+    } catch {
+      guard sessionIdentity == identity else { return }
+      appleLinked = nil
+      self.error = "Apple 계정 연결 상태를 확인하지 못했어요."
+    }
+  }
+
+  func linkApple(identityToken: String, nonce: String, name: String) async {
+    guard !isBusy, user != nil, let apiBaseURL else { return }
+    isBusy = true
+    error = nil
+    defer { isBusy = false }
+    do {
+      let request = try AccountEndpoint.appleLink(
+        baseURL: apiBaseURL, identityToken: identityToken, nonce: nonce, name: name)
+      let data = try await sendAuthenticated(request)
+      let status = try JSONDecoder().decode(AccountEnvelope<OAuthIdentityStatus>.self, from: data)
+        .checked()
+      guard status.linked else { throw NuboAPIError.malformedResponse }
+      appleLinked = true
+    } catch is CancellationError {
+    } catch NuboAPIError.server(let code, _) where code == 5 {
+      self.error = "이 Apple ID는 이미 다른 SENSTA 계정에 연결되어 있어요."
+    } catch {
+      self.error = "Apple ID를 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    }
+  }
+
   private func finishSignin(_ response: (AccountUser, AccountTokens)) throws {
     try Task.checkCancellation()
     try store.save(response.1)
@@ -301,6 +472,7 @@ final class AccountSession {
     postLikes.reset()
     tokens = response.1
     user = response.0
+    appleLinked = nil
     needsRestoration = false
   }
 
@@ -335,6 +507,7 @@ final class AccountSession {
       postLikes.reset()
       tokens = saved
       user = loaded
+      appleLinked = nil
       needsRestoration = false
     } catch is CancellationError { return } catch NuboAPIError.httpStatus(401) {
       do {
@@ -406,6 +579,7 @@ final class AccountSession {
     refreshTask = nil
     tokens = nil
     user = nil
+    appleLinked = nil
     postLikes.reset()
     do {
       try store.clear()
@@ -432,6 +606,7 @@ final class AccountSession {
       let oldToken = tokens?.token
       tokens = nil
       user = nil
+      appleLinked = nil
       needsRestoration = false
       if let oldToken { try? await service.logout(token: oldToken) }
     } catch {

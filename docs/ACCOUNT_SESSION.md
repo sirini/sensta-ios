@@ -9,8 +9,9 @@
 접근성 큰 글자에서는 전체 높이를 사용하며, 투명도 줄이기 설정이면 불투명 배경으로 전환한다. 공개 사진 감상은 로그인 없이 유지한다.
 게시글 상세에서 좋아요·취소를 제공하고 피드에 수치를 공유한다. 본문 아래에서 댓글 작성·답글과
 댓글 좋아요·취소와 본인 댓글 수정·삭제를 제공한다. Google 로그인은 설정이 준비된 빌드에서 공식
-다색 G 자산과 현지화 문구를 사용한 단일 버튼으로 제공한다. Apple 로그인, 회원가입·비밀번호 재설정은
-후속 기능이다.
+다색 G 자산과 현지화 문구를 사용한 단일 버튼으로 제공한다. Apple 로그인은 Apple 기본 버튼과 서버
+발급 일회성 nonce를 사용하며, 기존 계정에는 로그인 후 명시적으로 Apple ID를 연결한다.
+회원가입·비밀번호 재설정은 후속 기능이다.
 
 ## 기존 Android/GOAPI 계약
 
@@ -18,6 +19,10 @@
 | --- | --- | --- |
 | 로그인 | `POST /auth/signin`, form `id`, `password` | `uid`, `name`, `id`, `blocked`, `token`, `refresh` |
 | Google 로그인 | `POST /auth/android/google`, form `id_token` | Android와 같은 Web client audience를 검증하고 같은 token 쌍 반환 |
+| Apple nonce | `POST /auth/apple/nonce` | 5분 안에 한 번만 쓸 로그인 nonce 반환 |
+| Apple 로그인 | `POST /auth/apple`, JSON `identityToken`, `nonce`, `name` | Apple subject에 연결된 계정의 token 쌍 반환 또는 새 계정 생성 |
+| Apple 연결 상태 | `GET /auth/apple/status`, Bearer access token | 현재 계정의 Apple ID 연결 여부 반환 |
+| Apple 계정 연결 | `POST /auth/apple/link/nonce`, `POST /auth/apple/link`, Bearer access token | 현재 계정과 Apple ID를 모두 증명한 뒤 연결 |
 | 세션 확인 | `GET /auth/load`, Bearer access token | 존재하는 비차단 계정만 로그인 상태로 표시 |
 | 토큰 갱신 | `POST /auth/android/refresh`, JSON `refresh` | access/refresh 쌍을 교체한 뒤 세션 확인 재시도 |
 | 로그아웃 | `POST /auth/logout`, Bearer access token | 로컬 삭제 성공 후 서버에도 폐기를 요청 |
@@ -33,6 +38,15 @@ ID token을 GOAPI에 전달한다. server client ID는 Android의 `google_web_cl
 로그인에는 영향을 주지 않는다. ID token은 로그나 저장소에 기록하지 않는다. Google 버튼은 공식 원본
 로고의 색상·비율과 지정 여백을 유지하고, 라이트 모드의 neutral 및 다크 모드의 dark 브랜드 색상을
 사용한다.
+
+Apple의 안정적인 `sub`를 계정 식별자로 저장하고 이메일을 식별자로 사용하지 않는다. GOAPI는 Apple
+공개 키의 `kid`와 RS256 서명, issuer, 허용 audience, 만료·발급 시각, nonce, 이메일 검증 상태를
+확인한다. nonce 원문은 DB에 저장하지 않으며 digest만 짧게 보관하고 성공한 검증에서 원자적으로
+소비한다. 기존 SENSTA 이메일과 일치해도 자동 병합하지 않는다. 사용자가 이메일 또는 Google로 기존
+계정에 먼저 로그인한 뒤 계정 화면의 Apple 기본 버튼으로 연결한다. Apple로 처음 인증한 새 이메일은
+서버 가입 정책이 `verified_email`일 때만 새 계정으로 만든다. Apple이 이름을 주는 첫 인증에서만
+닉네임 후보로 사용하며 서버가 길이와 HTML 문자를 다시 정리한다. ID token과 nonce는 로그나 로컬
+저장소에 남기지 않는다.
 
 ## 저장과 오류 복구
 
@@ -97,6 +111,13 @@ ID token을 GOAPI에 전달한다. server client ID는 Android의 `google_web_cl
 Google QA: 비로그인 계정 시트 → Google 버튼 → 계정 선택 → 기존 Android Google 계정으로 로그인 →
 피드 프로필 사진 확인 → 앱 종료·재실행 후 세션 복원 → 로그아웃을 확인한다. 취소했을 때 오류 문구가
 남지 않는지, 다른 audience의 token과 미인증 이메일이 거부되는지도 확인한다.
+
+Apple QA: 비로그인 계정 시트 → Apple 기본 로그인 버튼 → 실제 Apple ID 인증 → 피드 프로필 사진 →
+앱 종료·재실행 후 세션 복원을 확인한다. 기존 이메일 계정과 같은 이메일이면 자동 병합 안내가 나오는지,
+이메일 또는 Google로 로그인한 뒤 내 계정의 Apple 계정 섹션에서 연결할 수 있는지도 확인한다. 연결된
+Apple ID로 로그아웃 후 다시 로그인하고, 인증 취소 시 오류 문구가 남지 않는지 확인한다. GOAPI에는
+Debug·Release bundle ID를 `OAUTH_APPLE_CLIENT_IDS`로 설정하고, 최초 반영 전에 `./bin/goapi install`로
+OAuth identity·nonce 테이블을 생성해야 한다.
 
 댓글 QA: 사진 상세 → 댓글 영역 → 10자 이상 입력 시 길이 안내가 사라지는지 확인 → 등록 → 목록·피드
 댓글 수 확인 → 댓글의 답글 버튼 → 대상 이름 확인 → 답글 등록 → 댓글 좋아요·취소를 확인한다. 본인
