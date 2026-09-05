@@ -3,11 +3,26 @@ import SwiftUI
 
 @main
 struct SENSTAApp: App {
+  @State private var account: AccountSession
   private let photoFeedService: any PhotoFeedServing
   private let photoPostDetailService: any PhotoPostDetailServing
 
   init() {
+    let baseURL =
+      (try? AppConfiguration.load(from: Bundle.main.infoDictionary ?? [:]))?.apiBaseURL
+      ?? URL(string: "about:blank")!
+    _account = State(
+      initialValue: AccountSession(
+        service: AccountService(baseURL: baseURL),
+        store: KeychainAccountStore(
+          service: (Bundle.main.bundleIdentifier ?? "me.sensta.ios") + ".account."
+            + baseURL.absoluteString)))
     #if DEBUG
+      if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--ui-test-") }) {
+        _account = State(
+          initialValue: AccountSession(service: AccountUITestService(), store: AccountUITestStore())
+        )
+      }
       if ProcessInfo.processInfo.arguments.contains("--ui-test-viewer") {
         photoFeedService = PaginationUITestService()
         photoPostDetailService = PhotoViewerUITestService()
@@ -33,6 +48,8 @@ struct SENSTAApp: App {
   var body: some Scene {
     WindowGroup {
       ContentView(service: photoFeedService, detailService: photoPostDetailService)
+        .accountSession(account)
+        .task { await account.restore() }
         #if DEBUG
           .preferredColorScheme(
             ProcessInfo.processInfo.arguments.contains("--ui-test-dark")
@@ -133,5 +150,37 @@ struct SENSTAApp: App {
         },
         tags: [], attachments: [], previousPostID: nil, nextPostID: nil, shareURL: nil, boardID: 2)
     }
+  }
+#endif
+
+extension ContentView {
+  func accountSession(_ account: AccountSession) -> Self {
+    var view = self
+    view.account = account
+    return view
+  }
+}
+
+#if DEBUG
+  private struct AccountUITestService: AccountServing {
+    func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
+      guard password == "test-password" else { throw NuboAPIError.httpStatus(401) }
+      return (
+        AccountUser(uid: 1, name: "테스트 사진가", id: email, blocked: false),
+        AccountTokens(token: "ui-access", refresh: "ui-refresh")
+      )
+    }
+    func load(token: String) async throws -> AccountUser { throw NuboAPIError.httpStatus(401) }
+    func refresh(_ refresh: String) async throws -> AccountTokens {
+      throw NuboAPIError.httpStatus(401)
+    }
+    func logout(token: String) async throws {}
+  }
+
+  @MainActor private final class AccountUITestStore: AccountTokenStoring {
+    private var tokens: AccountTokens?
+    func read() throws -> AccountTokens? { tokens }
+    func save(_ tokens: AccountTokens) throws { self.tokens = tokens }
+    func clear() throws { tokens = nil }
   }
 #endif

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
   @State private var model: PhotoFeedViewModel
+  @State private var showAccount = false
+  var account: AccountSession? = nil
   private let detailService: any PhotoPostDetailServing
   private let feedService: any PhotoFeedServing
 
@@ -58,17 +60,31 @@ struct ContentView: View {
             }
           }
           .overlay(alignment: .topTrailing) {
-            NavigationLink {
-              PhotoSearchView(service: feedService, detailService: detailService)
-            } label: {
-              Image(systemName: "magnifyingglass")
-                .font(.body.weight(.medium))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(.black.opacity(0.25), in: Circle())
+            HStack(spacing: 10) {
+              if let account {
+                Button {
+                  showAccount = true
+                } label: {
+                  Image(
+                    systemName: account.user == nil
+                      ? "person.crop.circle" : "person.crop.circle.fill"
+                  )
+                  .font(.body.weight(.medium)).foregroundStyle(.white)
+                  .frame(width: 44, height: 44).background(.black.opacity(0.25), in: Circle())
+                }.accessibilityLabel("내 계정").accessibilityIdentifier("photo-feed-account")
+              }
+              NavigationLink {
+                PhotoSearchView(service: feedService, detailService: detailService)
+              } label: {
+                Image(systemName: "magnifyingglass")
+                  .font(.body.weight(.medium))
+                  .foregroundStyle(.white)
+                  .frame(width: 44, height: 44)
+                  .background(.black.opacity(0.25), in: Circle())
+              }
+              .accessibilityLabel("탐색")
+              .accessibilityIdentifier("photo-feed-search")
             }
-            .accessibilityLabel("탐색")
-            .accessibilityIdentifier("photo-feed-search")
             .padding(.trailing, 16)
             .padding(.top, 8)
           }
@@ -78,10 +94,21 @@ struct ContentView: View {
       .navigationTitle("SENSTA")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
+        ToolbarItem(placement: .topBarTrailing) {
+          if account != nil {
+            Button("내 계정", systemImage: "person.crop.circle") { showAccount = true }
+          }
+        }
         ToolbarItem(placement: .topBarLeading) {
           Image(systemName: "camera.aperture")
             .accessibilityHidden(true)
         }
+      }
+    }
+    .sheet(isPresented: $showAccount) {
+      if let account {
+        AccountView(session: account, detailService: detailService)
+          .presentationDragIndicator(.visible)
       }
     }
     .task {

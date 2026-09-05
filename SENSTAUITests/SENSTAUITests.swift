@@ -2,6 +2,44 @@ import XCTest
 
 final class SENSTAUITests: XCTestCase {
   @MainActor
+  func testAccountLoginFailureSuccessProfileAndLogout() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    let login = app.buttons["account-signin"]
+    XCTAssertFalse(login.isEnabled)
+    email.tap()
+    email.typeText("photo@example.com")
+    let password = app.secureTextFields["account-password"]
+    password.tap()
+    password.typeText("wrong-password")
+    login.tap()
+    XCTAssertTrue(
+      app.staticTexts["로그인하지 못했어요. 이메일·비밀번호와 네트워크 연결을 확인해 주세요."].waitForExistence(timeout: 5))
+    password.tap()
+    password.typeText("test-password")
+    login.tap()
+    XCTAssertTrue(app.staticTexts["테스트 사진가"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["account-logout"].exists)
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Account signed in"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    app.buttons["account-logout"].tap()
+    app.buttons.matching(
+      NSPredicate(format: "label == %@ AND identifier != %@", "로그아웃", "account-logout")
+    ).firstMatch.tap()
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    app.buttons["account-close"].tap()
+    XCTAssertTrue(account.waitForExistence(timeout: 5))
+  }
+
+  @MainActor
   func testPaginationFailureRetryPreservesFullScreenPages() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-pagination"]
