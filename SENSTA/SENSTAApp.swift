@@ -100,7 +100,10 @@ struct SENSTAApp: App {
         badges: [
           BoardBadgeDTO(
             key: "sensta-app", name: "SENSTA 앱 포토그래퍼", description: "SENSTA 앱으로 사진을 공유한 사용자입니다.",
-            iconKey: "aperture", earnedAt: 1_788_410_731_496)
+            iconKey: "aperture", earnedAt: 1_788_410_731_496),
+          BoardBadgeDTO(
+            key: "first-post", name: "첫 발자국", description: "첫 게시글을 작성했습니다.",
+            iconKey: "notebook-pen", earnedAt: 1_788_410_731_496),
         ], summary: PhotographerSummary(postCount: 24, photoCount: 58, likeCount: 132))
     }
     func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {

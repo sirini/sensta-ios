@@ -130,6 +130,7 @@ struct PhotographerView: View {
   let service: any PhotoPostDetailServing
   @State private var model = PhotographerModel()
   @State private var selectedBadge: BoardBadgeDTO?
+  @ScaledMetric(relativeTo: .title2) private var badgeIconHeight = 28
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
   var body: some View {
@@ -209,7 +210,7 @@ struct PhotographerView: View {
     VStack(alignment: .leading, spacing: 12) {
       let columns = dynamicTypeSize.isAccessibilitySize ? 1 : 3
       LazyVGrid(
-        columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: columns),
+        columns: Array(repeating: GridItem(.flexible(), alignment: .center), count: columns),
         alignment: .leading, spacing: 16
       ) {
         metric("작품", value: profile.summary?.postCount)
@@ -228,10 +229,12 @@ struct PhotographerView: View {
   }
 
   private func metric(_ name: String, value: Int?) -> some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .center, spacing: 6) {
       Text(value.map { $0.formatted() } ?? "—").font(.title2.weight(.semibold)).monospacedDigit()
       Text(name).font(.caption).foregroundStyle(.secondary)
-    }.accessibilityElement(children: .ignore)
+    }.frame(maxWidth: .infinity)
+      .multilineTextAlignment(.center)
+      .accessibilityElement(children: .ignore)
       .accessibilityLabel(name).accessibilityValue(value.map(String.init) ?? "불러오지 못함")
       .accessibilityIdentifier("photographer-stat-\(name)")
   }
@@ -254,8 +257,9 @@ struct PhotographerView: View {
               } label: {
                 VStack(alignment: .leading, spacing: 10) {
                   Image(systemName: badge.symbol).font(.title2.weight(.light))
-                  Text(badge.name).font(.subheadline.weight(.medium)).fixedSize(
-                    horizontal: false, vertical: true)
+                    .frame(height: badgeIconHeight)
+                  Text(badge.name).font(.subheadline.weight(.medium))
+                    .lineLimit(2, reservesSpace: true)
                 }.frame(width: dynamicTypeSize.isAccessibilitySize ? 220 : 140, alignment: .leading)
                   .padding(16).background(
                     Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16)
