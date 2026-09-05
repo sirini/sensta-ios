@@ -26,7 +26,9 @@ private final class MemoryTokenStore: AccountTokenStoring {
 }
 
 private actor AccountStub: AccountServing {
-  enum Mode { case normal, expired, rejected, offline, paused, appleLinkRequired }
+  enum Mode {
+    case normal, expired, rejected, offline, paused, appleLinkRequired, appleAudienceMismatch
+  }
   let mode: Mode
   var refreshCount = 0
   var signinCount = 0
@@ -48,7 +50,13 @@ private actor AccountStub: AccountServing {
     -> (AccountUser, AccountTokens)
   {
     appleSigninCount += 1
-    if mode == .appleLinkRequired { throw NuboAPIError.server(code: 13, message: "private") }
+    if mode == .appleLinkRequired {
+      throw NuboAPIError.server(
+        code: 13, message: "sign in to the existing account and link Apple ID")
+    }
+    if mode == .appleAudienceMismatch {
+      throw NuboAPIError.server(code: 2, message: "Apple token audience is not allowed")
+    }
     return (testUser, testTokens)
   }
   func resume() {
@@ -188,6 +196,10 @@ struct AccountContractTests {
     #expect(throws: NuboAPIError.server(code: 4, message: "")) {
       try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: failure).checked()
     }
+    #expect(throws: NuboAPIError.server(code: 4, message: "internal detail")) {
+      try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: failure)
+        .checked(includeServerMessage: true)
+    }
   }
 }
 
@@ -235,6 +247,15 @@ struct AccountSessionTests {
     #expect(store.value == nil)
     #expect(session.user == nil)
     #expect(session.error?.contains("로그인한 뒤") == true)
+  }
+
+  @Test func appleSigninExplainsAnAudienceConfigurationMismatch() async {
+    let session = AccountSession(
+      service: AccountStub(.appleAudienceMismatch), store: MemoryTokenStore())
+    await session.signinWithApple(
+      identityToken: "apple-id-token", nonce: "server-apple-nonce", name: "사진가")
+    #expect(session.user == nil)
+    #expect(session.error?.contains("앱 식별자") == true)
   }
 
   @Test func existingSessionExplicitlyLinksAppleWithAuthenticatedNonce() async {

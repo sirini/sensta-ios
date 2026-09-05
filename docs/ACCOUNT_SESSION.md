@@ -46,7 +46,9 @@ Apple의 안정적인 `sub`를 계정 식별자로 저장하고 이메일을 식
 계정에 먼저 로그인한 뒤 계정 화면의 Apple 기본 버튼으로 연결한다. Apple로 처음 인증한 새 이메일은
 서버 가입 정책이 `verified_email`일 때만 새 계정으로 만든다. Apple이 이름을 주는 첫 인증에서만
 닉네임 후보로 사용하며 서버가 길이와 HTML 문자를 다시 정리한다. ID token과 nonce는 로그나 로컬
-저장소에 남기지 않는다.
+저장소에 남기지 않는다. Apple 인증 실패는 소셜 버튼 바로 아래에서 안내한다. 같은 이메일의 기존 계정,
+허용되지 않은 audience, 만료된 nonce, 이메일 검증 실패는 사용자가 다음 조치를 알 수 있는 문구로
+구분하되 토큰과 내부 서버 오류는 표시하지 않는다.
 
 ## 저장과 오류 복구
 
@@ -117,7 +119,9 @@ Apple QA: 비로그인 계정 시트 → Apple 기본 로그인 버튼 → 실�
 이메일 또는 Google로 로그인한 뒤 내 계정의 Apple 계정 섹션에서 연결할 수 있는지도 확인한다. 연결된
 Apple ID로 로그아웃 후 다시 로그인하고, 인증 취소 시 오류 문구가 남지 않는지 확인한다. GOAPI에는
 Debug·Release bundle ID를 `OAUTH_APPLE_CLIENT_IDS`로 설정하고, 최초 반영 전에 `./bin/goapi install`로
-OAuth identity·nonce 테이블을 생성해야 한다.
+OAuth identity·nonce 테이블을 생성해야 한다. migration을 이미 적용한 뒤 진단용 runtime만 교체할 때는
+`install`을 다시 실행하지 않는다. 실패 시 버튼 아래 안내와 서버의 `apple oauth: identity token
+verification failed` 로그를 함께 확인한다.
 
 댓글 QA: 사진 상세 → 댓글 영역 → 10자 이상 입력 시 길이 안내가 사라지는지 확인 → 등록 → 목록·피드
 댓글 수 확인 → 댓글의 답글 버튼 → 대상 이름 확인 → 답글 등록 → 댓글 좋아요·취소를 확인한다. 본인

@@ -85,6 +85,16 @@ struct AccountView: View {
               if googleSignIn.isAvailable {
                 SENSTAGoogleSignInButton(isEnabled: !session.isBusy) { signinWithGoogle() }
               }
+              if let error = session.error {
+                Label(error, systemImage: "exclamationmark.circle")
+                  .font(.footnote)
+                  .foregroundStyle(.secondary)
+                  .fixedSize(horizontal: false, vertical: true)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                  .accessibilityElement(children: .combine)
+                  .accessibilityLabel(error)
+                  .accessibilityIdentifier("account-error")
+              }
               Text("Apple로 처음 로그인하면 새 계정이 만들어져요. 기존 계정은 먼저 로그인한 뒤 Apple ID를 연결하세요.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -115,7 +125,7 @@ struct AccountView: View {
         if session.isBusy {
           Section { ProgressView("로그인 정보를 확인하는 중…") }.listRowBackground(rowBackground)
         }
-        if let error = session.error {
+        if let error = session.error, session.user != nil || session.needsRestoration {
           Section { Text(error).font(.subheadline).foregroundStyle(.secondary) }
             .accessibilityIdentifier("account-error").listRowBackground(rowBackground)
         }
@@ -273,8 +283,7 @@ struct SENSTAAppleSignInButton: View {
             .font(.headline)
             .frame(maxWidth: .infinity, minHeight: 48)
             .foregroundStyle(colorScheme == .dark ? .black : .white)
-            .background(
-              colorScheme == .dark ? .white : .black, in: RoundedRectangle(cornerRadius: 10))
+            .background(colorScheme == .dark ? .white : .black, in: Capsule())
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
@@ -307,7 +316,7 @@ struct SENSTAAppleSignInButton: View {
     )
     .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
     .frame(maxWidth: .infinity, minHeight: 48, maxHeight: 48)
-    .clipShape(RoundedRectangle(cornerRadius: 10))
+    .clipShape(Capsule())
     .disabled(!isEnabled)
     .opacity(isEnabled ? 1 : 0.45)
     .accessibilityIdentifier("account-apple-signin")

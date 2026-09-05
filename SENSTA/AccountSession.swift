@@ -22,12 +22,16 @@ struct AccountTokens: Codable, Equatable, Sendable {
 
 struct AccountEnvelope<Result: Decodable>: Decodable {
   let success: Bool
+  let error: String?
   let code: Int
   let result: Result?
 
-  func checked() throws -> Result {
-    // 서버의 내부 오류 문자열이나 토큰을 사용자 화면에 노출하지 않는다.
-    guard success, code == 0 else { throw NuboAPIError.server(code: code, message: "") }
+  func checked(includeServerMessage: Bool = false) throws -> Result {
+    // 일반 API의 내부 오류 문자열은 숨기고, 인증 UI가 분류하는 Apple 오류만 호출부에 전달한다.
+    guard success, code == 0 else {
+      throw NuboAPIError.server(
+        code: code, message: includeServerMessage ? error ?? "" : "")
+    }
     guard let result else { throw NuboAPIError.malformedResponse }
     return result
   }
@@ -218,7 +222,7 @@ struct AccountService: AccountServing {
       for: AccountEndpoint.appleSignin(
         baseURL: baseURL, identityToken: identityToken, nonce: nonce, name: name))
     let result = try JSONDecoder().decode(AccountEnvelope<AccountSigninResult>.self, from: data)
-      .checked()
+      .checked(includeServerMessage: true)
     return try checkedSignin(result)
   }
 
@@ -409,19 +413,46 @@ final class AccountSession {
       appleLinked = true
     } catch is CancellationError {
       return
-    } catch NuboAPIError.server(let code, _) where code == 13 {
-      self.error = "같은 이메일의 SENSTA 계정이 있어요. 이메일 또는 Google로 로그인한 뒤 내 계정에서 Apple ID를 연결해 주세요."
     } catch {
+      #if DEBUG
+        print("Apple sign in failed: \(error)")
+      #endif
       self.error =
         error is AccountStorageError
         ? "로그인 정보를 안전하게 저장하지 못했어요. 기기 잠금을 해제한 뒤 다시 시도해 주세요."
-        : "Apple로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+        : appleSignInErrorMessage(error)
     }
   }
 
   func reportAppleSignInFailure() {
     guard !isBusy else { return }
     error = "Apple로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+  }
+
+  private func appleSignInErrorMessage(_ error: Error) -> String {
+    guard let apiError = error as? NuboAPIError,
+      case NuboAPIError.server(let code, let message) = apiError
+    else {
+      return "Apple로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    }
+    switch code {
+    case 2 where message.contains("audience"):
+      return "Apple 인증의 앱 식별자가 서버 설정과 맞지 않아요."
+    case 2 where message.contains("nonce"):
+      return "Apple 로그인 요청이 만료됐어요. 버튼을 눌러 다시 시도해 주세요."
+    case 2 where message.contains("email"):
+      return "Apple에서 가입에 필요한 이메일을 전달하지 않았어요. Apple ID 설정을 확인해 주세요."
+    case 2:
+      return "Apple 인증 정보를 서버에서 검증하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    case 4:
+      return "서버에서 Apple 로그인을 처리하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    case 11:
+      return "현재 새 계정 가입이 닫혀 있어요. 기존 계정으로 로그인한 뒤 Apple ID를 연결해 주세요."
+    case 13:
+      return "같은 이메일의 SENSTA 계정이 있어요. 이메일 또는 Google로 로그인한 뒤 내 계정에서 Apple ID를 연결해 주세요."
+    default:
+      return "Apple로 로그인하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    }
   }
 
   func loadAppleStatus() async {

@@ -292,6 +292,25 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testAppleLoginShowsExistingAccountLinkGuidanceBesideButtons() throws {
+    let app = XCUIApplication()
+    app.launchArguments = [
+      "--ui-test-viewer", "--ui-test-apple", "--ui-test-apple-link-required",
+    ]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let apple = app.buttons["account-apple-signin"]
+    XCTAssertTrue(apple.waitForExistence(timeout: 5))
+    apple.tap()
+    let guidance = app.descendants(matching: .any)["account-error"]
+    XCTAssertTrue(guidance.waitForExistence(timeout: 5))
+    XCTAssertTrue(guidance.label.contains("로그인한 뒤"))
+    XCTAssertLessThan(guidance.frame.minY, app.frame.height * 0.85)
+  }
+
+  @MainActor
   func testExistingAccountCanExplicitlyLinkAppleID() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer", "--ui-test-apple"]

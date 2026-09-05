@@ -262,6 +262,10 @@ extension ContentView {
       guard identityToken == "ui-test-apple-id-token", nonce == "ui-test-apple-nonce" else {
         throw NuboAPIError.httpStatus(401)
       }
+      if ProcessInfo.processInfo.arguments.contains("--ui-test-apple-link-required") {
+        throw NuboAPIError.server(
+          code: 13, message: "sign in to the existing account and link Apple ID")
+      }
       appleLinked = true
       return (
         AccountUser(uid: 1, name: name, id: "apple@example.com", blocked: false),
