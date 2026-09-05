@@ -204,6 +204,13 @@ final class AccountSession {
   let apiBaseURL: URL?
   let postLikes = PhotoPostLikes()
   private var identity = UUID()
+  var sessionIdentity: UUID { identity }
+  private(set) var commentCounts: [Int: Int] = [:]
+  private var writtenCommentIDs = Set<Int>()
+  func recordComment(id: Int, postID: Int, baseline: Int) {
+    guard writtenCommentIDs.insert(id).inserted else { return }
+    commentCounts[postID] = max(0, commentCounts[postID] ?? baseline) + 1
+  }
   private var refreshTask: Task<AccountTokens, Error>?
 
   var profileURL: URL? {

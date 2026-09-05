@@ -339,7 +339,10 @@ private struct PhotoFeedCard: View {
         count: account?.postLikes.counts[post.id] ?? post.likeCount, name: "좋아요"
       )
       .accessibilityIdentifier("photo-feed-like-\(post.id)")
-      countLabel("bubble.right", count: post.commentCount, name: "댓글")
+      countLabel(
+        "bubble.right", count: account?.commentCounts[post.id] ?? post.commentCount, name: "댓글"
+      )
+      .accessibilityIdentifier("photo-feed-comments-\(post.id)")
       countLabel("eye", count: post.viewCount, name: "조회")
     }
   }

@@ -9,6 +9,7 @@ struct PhotoComment: Identifiable, Equatable, Sendable {
   let content: String
   let submitted: Date
   let likeCount: Int
+  var canReply = true
 
   var isReply: Bool { replyID > 0 && replyID != id }
 }
@@ -16,6 +17,7 @@ struct PhotoComment: Identifiable, Equatable, Sendable {
 struct PhotoCommentsPage: Equatable, Sendable {
   let comments: [PhotoComment]
   let hasMore: Bool
+  var totalCount: Int? = nil
 }
 
 protocol PhotoCommentsServing: Sendable {
@@ -81,14 +83,16 @@ struct PhotoCommentsResponseDTO: Decodable {
       PhotoComment(
         id: $0.uid, replyID: $0.replyUid, writer: $0.writer.name,
         content: $0.content == "(deleted)" ? "삭제된 댓글입니다." : $0.content.nuboPlainText,
-        submitted: Date(timeIntervalSince1970: Double($0.submitted) / 1_000), likeCount: $0.like)
+        submitted: Date(timeIntervalSince1970: Double($0.submitted) / 1_000), likeCount: $0.like,
+        canReply: $0.uid > 0 && $0.content != "(deleted)")
     }
     let limit = PhotoCommentsEndpoint.pageSize
     let lastPage =
       result.totalCommentCount / limit + (result.totalCommentCount % limit == 0 ? 0 : 1)
     return PhotoCommentsPage(
       comments: comments,
-      hasMore: result.comments.count >= limit && page < lastPage)
+      hasMore: result.comments.count >= limit && page < lastPage,
+      totalCount: result.totalCommentCount)
   }
 }
 
@@ -99,6 +103,22 @@ final class PhotoCommentsViewModel {
   private let boardID: Int
   private let postID: Int
   private var nextPage = 1
+  private var serverComments: [PhotoComment] = []
+  private var localComments: [Int: PhotoComment] = [:]
+  private var refreshRequested = false
+  private(set) var totalCount: Int?
+
+  func appendConfirmed(_ comment: PhotoComment) {
+    localComments[comment.id] = comment
+    comments = merged(serverComments)
+  }
+
+  private func merged(_ serverComments: [PhotoComment]) -> [PhotoComment] {
+    var result = Dictionary(
+      serverComments.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
+    for (id, comment) in localComments where result[id] == nil { result[id] = comment }
+    return result.values.sorted { ($0.replyID, $0.id) < ($1.replyID, $1.id) }
+  }
   private var retryResetsPage = true
   private(set) var comments: [PhotoComment] = []
   private(set) var isLoading = false
@@ -117,7 +137,13 @@ final class PhotoCommentsViewModel {
     await load(reset: true)
   }
 
-  func refresh() async { await load(reset: true) }
+  func refresh() async {
+    if isLoading {
+      refreshRequested = true
+      return
+    }
+    await load(reset: true)
+  }
   func retry() async { await load(reset: retryResetsPage) }
   func loadMore() async {
     guard hasMore else { return }
@@ -129,10 +155,16 @@ final class PhotoCommentsViewModel {
     isLoading = true
     retryResetsPage = reset
     error = nil
-    defer { isLoading = false }
+    defer {
+      isLoading = false
+      if refreshRequested {
+        refreshRequested = false
+        Task { await self.refresh() }
+      }
+    }
     do {
       var pageNumber = reset ? 1 : nextPage
-      var updated = reset ? [] : comments
+      var updated = reset ? [] : serverComments
       var seen = Set(updated.map(\.id))
       let initialCount = updated.count
       while true {
@@ -142,7 +174,10 @@ final class PhotoCommentsViewModel {
         updated += page.comments.filter { seen.insert($0.id).inserted }
         pageNumber += 1
         if updated.count > initialCount || !page.hasMore {
-          comments = updated
+          for comment in updated { localComments.removeValue(forKey: comment.id) }
+          serverComments = updated
+          comments = merged(updated)
+          totalCount = page.totalCount
           hasLoaded = true
           hasMore = page.hasMore
           nextPage = pageNumber
@@ -159,69 +194,125 @@ final class PhotoCommentsViewModel {
 
 struct PhotoCommentsSection: View {
   @State private var model: PhotoCommentsViewModel
+  @State private var composer = PhotoCommentComposerModel()
+  @State private var showsLogin = false
+  @Environment(\.accountSession) private var account
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  let boardID: Int
+  let postID: Int
+  let initialCount: Int
+  let detailService: (any PhotoPostDetailServing)?
 
-  init(boardID: Int, postID: Int, service: any PhotoCommentsServing) {
+  init(boardID: Int, postID: Int, service: any PhotoCommentsServing, initialCount: Int = 0) {
+    self.boardID = boardID
+    self.postID = postID
+    self.initialCount = initialCount
+    self.detailService = service as? any PhotoPostDetailServing
     _model = State(
       initialValue: PhotoCommentsViewModel(boardID: boardID, postID: postID, service: service))
   }
 
   var body: some View {
-    LazyVStack(alignment: .leading, spacing: 24) {
-      HStack {
-        Text("댓글").font(.headline)
-          .accessibilityAddTraits(.isHeader)
-        Spacer()
-        Button("댓글 새로고침", systemImage: "arrow.clockwise") { Task { await model.refresh() } }
-          .labelStyle(.iconOnly)
-          .foregroundStyle(.secondary)
-          .disabled(model.isLoading)
-      }
-      if model.hasLoaded && model.comments.isEmpty {
-        ContentUnavailableView("아직 공개 댓글이 없어요", systemImage: "bubble.left.and.bubble.right")
-      }
-      ForEach(model.comments) { comment in
-        VStack(alignment: .leading, spacing: 10) {
-          HStack(alignment: .firstTextBaseline) {
-            if comment.isReply {
-              Image(systemName: "arrow.turn.down.right")
-                .foregroundStyle(.tertiary)
-                .accessibilityLabel("답글")
+    ScrollViewReader { proxy in
+      LazyVStack(alignment: .leading, spacing: 24) {
+        HStack {
+          Text("댓글").font(.headline)
+            .accessibilityAddTraits(.isHeader)
+          Spacer()
+          Button("댓글 새로고침", systemImage: "arrow.clockwise") { Task { await model.refresh() } }
+            .labelStyle(.iconOnly)
+            .foregroundStyle(.secondary)
+            .disabled(model.isLoading)
+        }
+        if let account {
+          if account.user != nil {
+            PhotoCommentComposer(model: composer) { retry in
+              Task {
+                if let comment = await composer.send(
+                  account: account, boardID: boardID, postID: postID, allowRetry: retry)
+                {
+                  account.recordComment(
+                    id: comment.id, postID: postID, baseline: model.totalCount ?? initialCount)
+                  model.appendConfirmed(comment)
+                  await model.refresh()
+                }
+              }
+            }.id("comment-composer")
+          } else {
+            Button("로그인하고 댓글 남기기", systemImage: "square.and.pencil") { showsLogin = true }
+              .accessibilityIdentifier("comment-login")
+          }
+        }
+        if model.hasLoaded && model.comments.isEmpty {
+          ContentUnavailableView("아직 공개 댓글이 없어요", systemImage: "bubble.left.and.bubble.right")
+        }
+        ForEach(model.comments) { comment in
+          VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+              if comment.isReply {
+                Image(systemName: "arrow.turn.down.right")
+                  .foregroundStyle(.tertiary)
+                  .accessibilityLabel("답글")
+              }
+              Text(comment.writer).font(.subheadline.weight(.semibold))
+              Spacer(minLength: 8)
+              Text(comment.submitted, format: .dateTime.month().day())
+                .font(.caption).foregroundStyle(.secondary)
             }
-            Text(comment.writer).font(.subheadline.weight(.semibold))
-            Spacer(minLength: 8)
-            Text(comment.submitted, format: .dateTime.month().day())
-              .font(.caption).foregroundStyle(.secondary)
+            Text(comment.content)
+              .font(.body)
+              .textSelection(.enabled)
+              .fixedSize(horizontal: false, vertical: true)
+            if comment.canReply && account != nil {
+              Button("답글", systemImage: "arrowshape.turn.up.left") {
+                guard account?.user != nil else {
+                  showsLogin = true
+                  return
+                }
+                composer.reply = comment
+                if reduceMotion {
+                  proxy.scrollTo("comment-composer", anchor: .center)
+                } else {
+                  withAnimation { proxy.scrollTo("comment-composer", anchor: .center) }
+                }
+              }.font(.caption).disabled(composer.isSending).accessibilityIdentifier(
+                "comment-reply-\(comment.id)")
+            }
+            if comment.likeCount > 0 {
+              Label("\(comment.likeCount)", systemImage: "heart")
+                .font(.caption).foregroundStyle(.secondary)
+                .accessibilityLabel("좋아요 \(comment.likeCount)개")
+            }
           }
-          Text(comment.content)
-            .font(.body)
-            .textSelection(.enabled)
-            .fixedSize(horizontal: false, vertical: true)
-          if comment.likeCount > 0 {
-            Label("\(comment.likeCount)", systemImage: "heart")
-              .font(.caption).foregroundStyle(.secondary)
-              .accessibilityLabel("좋아요 \(comment.likeCount)개")
-          }
+          .padding(.leading, comment.isReply ? 20 : 0)
+          Divider()
         }
-        .padding(.leading, comment.isReply ? 20 : 0)
-        Divider()
-      }
-      if model.isLoading {
-        ProgressView().frame(maxWidth: .infinity)
-      } else if let error = model.error {
-        VStack(spacing: 12) {
-          Text(error).foregroundStyle(.secondary)
-          Button("다시 시도") {
-            Task { await model.retry() }
+        if model.isLoading {
+          ProgressView().frame(maxWidth: .infinity)
+        } else if let error = model.error {
+          VStack(spacing: 12) {
+            Text(error).foregroundStyle(.secondary)
+            Button("다시 시도") {
+              Task { await model.retry() }
+            }
+            .accessibilityIdentifier("photo-comments-retry")
           }
-          .accessibilityIdentifier("photo-comments-retry")
-        }
-        .frame(maxWidth: .infinity)
-      } else if model.hasMore {
-        Button("댓글 더 보기") { Task { await model.loadMore() } }
           .frame(maxWidth: .infinity)
+        } else if model.hasMore {
+          Button("댓글 더 보기") { Task { await model.loadMore() } }
+            .frame(maxWidth: .infinity)
+        }
+      }
+      .task { await model.loadIfNeeded() }
+      .accessibilityIdentifier("photo-comments-section")
+      .onChange(of: account?.sessionIdentity) { _, _ in composer.reset() }
+      .sheet(isPresented: $showsLogin) {
+        if let account, let detailService {
+          AccountView(session: account, detailService: detailService)
+            .environment(\.dynamicTypeSize, dynamicTypeSize).presentationDragIndicator(.visible)
+        }
       }
     }
-    .task { await model.loadIfNeeded() }
-    .accessibilityIdentifier("photo-comments-section")
   }
 }

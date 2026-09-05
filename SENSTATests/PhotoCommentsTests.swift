@@ -153,6 +153,46 @@ struct PhotoCommentsViewModelTests {
     #expect(await service.pages == [1, 1])
   }
 
+  @Test func confirmedCommentSurvivesStaleRefreshAndPaginationThenUsesServerContent() async {
+    let first = makeComment(1)
+    let local = makeComment(3)
+    let canonical = PhotoComment(
+      id: 3, replyID: 1, writer: "사진가", content: "서버 정제 내용", submitted: .distantPast, likeCount: 0)
+    let service = CommentsScript([
+      .success(PhotoCommentsPage(comments: [first], hasMore: true)),
+      .success(PhotoCommentsPage(comments: [makeComment(2)], hasMore: false)),
+      .failure(.networkUnavailable),
+      .success(PhotoCommentsPage(comments: [first], hasMore: true)),
+      .success(PhotoCommentsPage(comments: [canonical], hasMore: false)),
+    ])
+    let model = PhotoCommentsViewModel(boardID: 2, postID: 7520, service: service)
+    await model.loadIfNeeded()
+    model.appendConfirmed(local)
+    await model.loadMore()
+    #expect(model.comments.map(\.id) == [1, 2, 3])
+    await model.refresh()
+    #expect(model.comments.contains(local))
+    await model.retry()
+    #expect(model.comments.map(\.id) == [1, 3])
+    await model.loadMore()
+    #expect(model.comments == [first, canonical])
+  }
+
+  @Test func writeDuringInitialLoadQueuesRefreshAndKeepsConfirmedComment() async {
+    let service = PausedCommentsScript()
+    let model = PhotoCommentsViewModel(boardID: 2, postID: 7520, service: service)
+    let pending = Task { await model.loadIfNeeded() }
+    while await service.calls == 0 { await Task.yield() }
+    let local = makeComment(3)
+    model.appendConfirmed(local)
+    await model.refresh()
+    await service.resume()
+    await pending.value
+    while await service.calls < 2 || model.isLoading { await Task.yield() }
+    #expect(model.comments == [local])
+    #expect(await service.calls == 2)
+  }
+
   private func makeComment(_ id: Int) -> PhotoComment {
     PhotoComment(
       id: id, replyID: 1, writer: "사진가", content: "사진 이야기", submitted: .distantPast, likeCount: 0)
@@ -167,5 +207,19 @@ private actor CommentsScript: PhotoCommentsServing {
     pages.append(page)
     guard !responses.isEmpty else { throw NuboAPIError.invalidRequest }
     return try responses.removeFirst().get()
+  }
+}
+
+private actor PausedCommentsScript: PhotoCommentsServing {
+  var calls = 0
+  var continuation: CheckedContinuation<Void, Never>?
+  func resume() {
+    continuation?.resume()
+    continuation = nil
+  }
+  func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {
+    calls += 1
+    if calls == 1 { await withCheckedContinuation { continuation = $0 } }
+    return PhotoCommentsPage(comments: [], hasMore: false)
   }
 }

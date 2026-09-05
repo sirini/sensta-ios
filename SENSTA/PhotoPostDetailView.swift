@@ -108,8 +108,11 @@ struct PhotoPostDetailView: View {
 
           if let boardID = detail.boardID {
             Divider()
-            PhotoCommentsSection(boardID: boardID, postID: detail.post.id, service: commentsService)
-              .id("photo-comments")
+            PhotoCommentsSection(
+              boardID: boardID, postID: detail.post.id, service: commentsService,
+              initialCount: detail.post.commentCount
+            )
+            .id("photo-comments")
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -191,7 +194,9 @@ struct PhotoPostDetailView: View {
         } else {
           metric("heart", value: detail.post.likeCount, name: "좋아요")
         }
-        metric("bubble.right", value: detail.post.commentCount, name: "댓글")
+        metric(
+          "bubble.right", value: account?.commentCounts[detail.post.id] ?? detail.post.commentCount,
+          name: "댓글")
         metric("eye", value: detail.post.viewCount, name: "조회")
       }
 

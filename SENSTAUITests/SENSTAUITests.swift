@@ -2,6 +2,63 @@ import XCTest
 
 final class SENSTAUITests: XCTestCase {
   @MainActor
+  func testCommentLoginWriteReplyAndFailurePreservesDraft() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+    XCTAssertTrue(card.waitForExistence(timeout: 10))
+    card.tap()
+    let login = app.buttons["comment-login"]
+    for _ in 0..<6 where !login.isHittable { app.swipeUp() }
+    XCTAssertTrue(login.isHittable)
+    login.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+    XCTAssertTrue(app.buttons["account-logout"].waitForExistence(timeout: 5))
+    app.buttons["account-close"].tap()
+    let draft = app.descendants(matching: .any).matching(identifier: "comment-draft").firstMatch
+    XCTAssertTrue(draft.waitForExistence(timeout: 5))
+    for _ in 0..<3 where !draft.isHittable { app.swipeUp() }
+    draft.tap()
+    draft.typeText("Beautiful")
+    let send = app.buttons["comment-send"]
+    XCTAssertFalse(send.isEnabled)
+    draft.typeText(" photograph")
+    XCTAssertTrue(send.isEnabled)
+    send.tap()
+    for _ in 0..<4 where !app.staticTexts["Beautiful photograph"].exists { app.swipeUp() }
+    XCTAssertTrue(app.staticTexts["Beautiful photograph"].waitForExistence(timeout: 5))
+    XCTAssertFalse(send.isEnabled)
+    let reply = app.buttons["comment-reply-101"]
+    for _ in 0..<4 where !reply.isHittable { app.swipeUp() }
+    reply.tap()
+    XCTAssertTrue(app.staticTexts["테스트 사진가님에게 답글"].waitForExistence(timeout: 5))
+    draft.tap()
+    draft.typeText("Thank you for sharing")
+    send.tap()
+    XCTAssertTrue(app.staticTexts["Thank you for sharing"].waitForExistence(timeout: 5))
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Inline comment and reply"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    for _ in 0..<4 where !draft.isHittable { app.swipeDown() }
+    draft.tap()
+    draft.typeText("reject this comment")
+    send.tap()
+    XCTAssertTrue(app.staticTexts["comment-write-error"].waitForExistence(timeout: 5))
+    XCTAssertEqual(draft.value as? String, "reject this comment")
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(card.waitForExistence(timeout: 5))
+    XCTAssertEqual(app.staticTexts["photo-feed-comments-1"].label, "댓글 2개")
+  }
+
+  @MainActor
   func testLikeRequiresLoginAndSynchronizesAcrossDetailAndFeed() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]

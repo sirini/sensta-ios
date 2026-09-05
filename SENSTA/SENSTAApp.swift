@@ -166,7 +166,17 @@ extension ContentView {
 #if DEBUG
   private actor AccountUITestService: AccountServing {
     private var liked = false
+    private var commentID = 100
     func data(for request: URLRequest) async throws -> Data {
+      if request.httpMethod == "POST", request.url?.path.contains("/comment/") == true {
+        if String(data: request.httpBody ?? Data(), encoding: .utf8)?.contains("reject") == true {
+          return Data(#"{"success":false,"code":3,"result":null}"#.utf8)
+        }
+        commentID += 1
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "result": commentID,
+        ])
+      }
       if request.httpMethod == "PATCH" {
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
         liked = body["liked"] as! Bool
