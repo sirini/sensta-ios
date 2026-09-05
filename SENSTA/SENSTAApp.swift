@@ -166,6 +166,7 @@ extension ContentView {
 #if DEBUG
   private actor AccountUITestService: AccountServing {
     private var liked = false
+    private var commentLiked = false
     private var commentID = 100
     func data(for request: URLRequest) async throws -> Data {
       if request.httpMethod == "POST", request.url?.path.contains("/comment/") == true {
@@ -179,8 +180,25 @@ extension ContentView {
       }
       if request.httpMethod == "PATCH" {
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
-        liked = body["liked"] as! Bool
+        if request.url?.path.hasSuffix("/comment/like") == true {
+          commentLiked = body["liked"] as! Bool
+        } else {
+          liked = body["liked"] as! Bool
+        }
         return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+      }
+      if request.url?.path.hasSuffix("/comment/list") == true {
+        let comment: [String: Any] = [
+          "uid": 1, "replyUid": 1, "postUid": 1,
+          "writer": ["uid": 2, "name": "사진가", "profile": "", "signature": ""],
+          "like": commentLiked ? 3 : 2, "liked": commentLiked,
+          "submitted": 1_788_600_000_000 as Int64, "modified": 0, "status": 0,
+          "content": "여백이 아름다운 사진입니다.",
+        ]
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "error": "",
+          "result": ["boardUid": 2, "totalCommentCount": 1, "comments": [comment]],
+        ])
       }
       let result: [String: Any] = [
         "config": ["uid": 2, "id": "photo", "name": "사진", "rowCount": 32],

@@ -76,8 +76,10 @@ private actor CommentWriteStub: AccountServing {
     let model = PhotoCommentComposerModel()
     model.text = "  123456789  "
     #expect(!model.canSend)
+    #expect(!model.hasMinimumLength)
     model.text = "🌅🌅🌅🌅🌅"
     #expect(model.canSend)
+    #expect(model.hasMinimumLength)
     #expect(throws: NuboAPIError.invalidRequest) {
       try PhotoCommentWriteEndpoint.request(
         baseURL: commentBaseURL, boardID: 2, postID: 10, content: "too short", replyID: nil)

@@ -30,6 +30,8 @@ struct PhotoCommentsContractTests {
     #expect(page.comments[0].id == 231)
     #expect(page.comments[0].content == "멋진 사진들이네요!")
     #expect(page.comments[0].submitted == Date(timeIntervalSince1970: 1778822019.491))
+    #expect(page.comments[0].writerID == 1)
+    #expect(!page.comments[0].isLiked)
     #expect(!page.comments[0].isReply)
     #expect(!page.hasMore)
     #expect(throws: NuboAPIError.malformedResponse) {
@@ -221,5 +223,149 @@ private actor PausedCommentsScript: PhotoCommentsServing {
     calls += 1
     if calls == 1 { await withCheckedContinuation { continuation = $0 } }
     return PhotoCommentsPage(comments: [], hasMore: false)
+  }
+}
+
+private let commentLikeBaseURL = URL(string: "https://example.com/goapi/")!
+
+@MainActor private final class CommentLikeTokenStore: AccountTokenStoring {
+  var value: AccountTokens? = AccountTokens(token: "access", refresh: "refresh")
+  func read() throws -> AccountTokens? { value }
+  func save(_ tokens: AccountTokens) throws { value = tokens }
+  func clear() throws { value = nil }
+}
+
+private actor CommentLikeServiceStub: AccountServing {
+  enum Mode { case normal, uncertain, paused }
+  let mode: Mode
+  var liked = false
+  var mutationCount = 0
+  var requests: [URLRequest] = []
+  var continuation: CheckedContinuation<Void, Never>?
+  init(_ mode: Mode = .normal) { self.mode = mode }
+  func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
+    (try await load(token: ""), AccountTokens(token: "access", refresh: "refresh"))
+  }
+  func load(token: String) async throws -> AccountUser {
+    AccountUser(uid: 7, name: "사진가", id: "photo@example.com", blocked: false)
+  }
+  func refresh(_ refresh: String) async throws -> AccountTokens {
+    throw NuboAPIError.httpStatus(401)
+  }
+  func logout(token: String) async throws {}
+  func resume() {
+    continuation?.resume()
+    continuation = nil
+  }
+  func data(for request: URLRequest) async throws -> Data {
+    requests.append(request)
+    if request.httpMethod == "PATCH" {
+      mutationCount += 1
+      if mode == .paused { await withCheckedContinuation { continuation = $0 } }
+      if mode == .uncertain { throw NuboAPIError.networkFailure }
+      let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+      liked = body["liked"] as! Bool
+      return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+    }
+    let comment: [String: Any] = [
+      "uid": 31, "replyUid": 31, "postUid": 10,
+      "writer": ["uid": 8, "name": "다른 사진가", "profile": "", "signature": ""],
+      "like": liked ? 3 : 2, "liked": liked, "submitted": 1_778_000_000_000 as Int64,
+      "modified": 0, "status": 0, "content": "빛이 참 아름답습니다.",
+    ]
+    return try JSONSerialization.data(withJSONObject: [
+      "success": true, "error": "", "code": 0,
+      "result": ["boardUid": 2, "totalCommentCount": 1, "comments": [comment]],
+    ])
+  }
+}
+
+@MainActor struct PhotoCommentLikeTests {
+  private func setup(_ service: CommentLikeServiceStub) async -> AccountSession {
+    let account = AccountSession(
+      service: service, store: CommentLikeTokenStore(), apiBaseURL: commentLikeBaseURL)
+    await account.restore()
+    return account
+  }
+
+  @Test func requestMatchesAndroidJSONContract() throws {
+    let request = try PhotoCommentLikeEndpoint.request(
+      baseURL: commentLikeBaseURL, boardID: 2, commentID: 31, liked: true)
+    let data = try #require(request.httpBody)
+    let body = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(request.url?.path == "/goapi/comment/like")
+    #expect(request.httpMethod == "PATCH")
+    #expect(body.count == 3)
+    #expect(body["boardUid"] as? Int == 2)
+    #expect(body["commentUid"] as? Int == 31)
+    #expect(body["liked"] as? Bool == true)
+    #expect(body["userUid"] == nil)
+    #expect(throws: NuboAPIError.invalidRequest) {
+      try PhotoCommentLikeEndpoint.request(
+        baseURL: commentLikeBaseURL, boardID: 2, commentID: 0, liked: true)
+    }
+  }
+
+  @Test func authenticatedListDrivesLikeAndUnlike() async {
+    let service = CommentLikeServiceStub()
+    let account = await setup(service)
+    let model = PhotoCommentsViewModel(
+      boardID: 2, postID: 10, service: CommentsScript([]))
+    model.accountChanged()
+    await model.refresh(account: account)
+    #expect(model.hasPersonalizedState(for: account))
+    #expect(model.comments.first?.likeCount == 2)
+    #expect(model.comments.first?.isLiked == false)
+    await model.toggleLike(commentID: 31, account: account)
+    #expect(model.comments.first?.likeCount == 3)
+    #expect(model.comments.first?.isLiked == true)
+    model.accountChanged()
+    #expect(!model.hasPersonalizedState(for: account))
+    #expect(model.comments.first?.isLiked == false)
+    await model.refresh(account: account)
+    #expect(model.comments.first?.isLiked == true)
+    await model.toggleLike(commentID: 31, account: account)
+    #expect(model.comments.first?.likeCount == 2)
+    #expect(model.comments.first?.isLiked == false)
+    #expect(await service.mutationCount == 2)
+    #expect(
+      await service.requests.allSatisfy {
+        $0.value(forHTTPHeaderField: "Authorization") == "Bearer access"
+      })
+  }
+
+  @Test func uncertainResultBlocksAnotherToggleUntilReload() async {
+    let service = CommentLikeServiceStub(.uncertain)
+    let account = await setup(service)
+    let model = PhotoCommentsViewModel(
+      boardID: 2, postID: 10, service: CommentsScript([]))
+    await model.refresh(account: account)
+    await model.toggleLike(commentID: 31, account: account)
+    #expect(model.comments.first?.likeCount == 2)
+    #expect(model.likeErrors[31] != nil)
+    await model.toggleLike(commentID: 31, account: account)
+    #expect(await service.mutationCount == 1)
+    await model.refresh(account: account)
+    #expect(model.likeErrors[31] == nil)
+    await model.toggleLike(commentID: 31, account: account)
+    #expect(await service.mutationCount == 2)
+  }
+
+  @Test func duplicateTapAndLateLogoutResponseDoNotChangeComment() async {
+    let service = CommentLikeServiceStub(.paused)
+    let account = await setup(service)
+    let model = PhotoCommentsViewModel(
+      boardID: 2, postID: 10, service: CommentsScript([]))
+    await model.refresh(account: account)
+    let pending = Task { await model.toggleLike(commentID: 31, account: account) }
+    while await service.mutationCount == 0 { await Task.yield() }
+    await model.toggleLike(commentID: 31, account: account)
+    #expect(await service.mutationCount == 1)
+    await account.logout()
+    model.accountChanged()
+    await service.resume()
+    await pending.value
+    #expect(model.comments.first?.likeCount == 2)
+    #expect(model.comments.first?.isLiked == false)
   }
 }

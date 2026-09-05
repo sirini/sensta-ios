@@ -22,6 +22,14 @@ final class SENSTAUITests: XCTestCase {
     app.buttons["account-signin"].tap()
     XCTAssertTrue(app.buttons["account-logout"].waitForExistence(timeout: 5))
     app.buttons["account-close"].tap()
+    let commentLike = app.buttons["comment-like-1"]
+    for _ in 0..<4 where !commentLike.isHittable { app.swipeUp() }
+    XCTAssertEqual(commentLike.value as? String, "2개")
+    commentLike.tap()
+    expectation(
+      for: NSPredicate(format: "label == %@ AND value == %@", "댓글 좋아요 취소", "3개"),
+      evaluatedWith: commentLike)
+    waitForExpectations(timeout: 5)
     let draft = app.descendants(matching: .any).matching(identifier: "comment-draft").firstMatch
     XCTAssertTrue(draft.waitForExistence(timeout: 5))
     for _ in 0..<3 where !draft.isHittable { app.swipeUp() }
@@ -29,8 +37,10 @@ final class SENSTAUITests: XCTestCase {
     draft.typeText("Beautiful")
     let send = app.buttons["comment-send"]
     XCTAssertFalse(send.isEnabled)
+    XCTAssertTrue(app.staticTexts["comment-minimum-length"].exists)
     draft.typeText(" photograph")
     XCTAssertTrue(send.isEnabled)
+    XCTAssertFalse(app.staticTexts["comment-minimum-length"].exists)
     send.tap()
     for _ in 0..<4 where !app.staticTexts["Beautiful photograph"].exists { app.swipeUp() }
     XCTAssertTrue(app.staticTexts["Beautiful photograph"].waitForExistence(timeout: 5))
@@ -55,7 +65,7 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertEqual(draft.value as? String, "reject this comment")
     app.navigationBars.buttons.firstMatch.tap()
     XCTAssertTrue(card.waitForExistence(timeout: 5))
-    XCTAssertEqual(app.staticTexts["photo-feed-comments-1"].label, "댓글 2개")
+    XCTAssertEqual(app.staticTexts["photo-feed-comments-1"].label, "댓글 3개")
   }
 
   @MainActor

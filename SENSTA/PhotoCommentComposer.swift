@@ -32,8 +32,11 @@ final class PhotoCommentComposerModel {
   private(set) var error: String?
   private(set) var needsRetryConfirmation = false
   private var generation = UUID()
+  var hasMinimumLength: Bool {
+    text.trimmingCharacters(in: .whitespacesAndNewlines).utf16.count >= 10
+  }
   var canSend: Bool {
-    !isSending && text.trimmingCharacters(in: .whitespacesAndNewlines).utf16.count >= 10
+    !isSending && hasMinimumLength
   }
 
   func reset() {
@@ -70,7 +73,7 @@ final class PhotoCommentComposerModel {
       needsRetryConfirmation = false
       return PhotoComment(
         id: id, replyID: replyID ?? id, writer: user.name.nuboPlainText,
-        content: submitted.nuboPlainText, submitted: .now, likeCount: 0)
+        content: submitted.nuboPlainText, submitted: .now, likeCount: 0, writerID: user.uid)
     } catch {
       guard generation == self.generation, identity == account.sessionIdentity else { return nil }
       if case NuboAPIError.server = error {
@@ -112,7 +115,10 @@ struct PhotoCommentComposer: View {
       .padding(12).background(
         Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
       HStack {
-        Text("10자 이상 입력해 주세요").font(.caption).foregroundStyle(.secondary)
+        if !model.hasMinimumLength {
+          Text("10자 이상 입력해 주세요").font(.caption).foregroundStyle(.secondary)
+            .accessibilityIdentifier("comment-minimum-length")
+        }
         Spacer()
         if model.isSending { ProgressView().accessibilityLabel("댓글 전송 중") }
         Button(model.reply == nil ? "댓글 등록" : "답글 등록", systemImage: "arrow.up.circle.fill") {

@@ -8,7 +8,9 @@ struct PhotoComment: Identifiable, Equatable, Sendable {
   let writer: String
   let content: String
   let submitted: Date
-  let likeCount: Int
+  var likeCount: Int
+  var writerID = 0
+  var isLiked = false
   var canReply = true
 
   var isReply: Bool { replyID > 0 && replyID != id }
@@ -50,6 +52,33 @@ enum PhotoCommentsEndpoint {
   }
 }
 
+enum PhotoCommentLikeEndpoint {
+  static func request(baseURL: URL, boardID: Int, commentID: Int, liked: Bool) throws
+    -> URLRequest
+  {
+    guard boardID > 0, commentID > 0 else { throw NuboAPIError.invalidRequest }
+    struct Body: Encodable {
+      let boardUid: Int
+      let commentUid: Int
+      let liked: Bool
+    }
+    var request = try AccountEndpoint.request(
+      baseURL: baseURL, path: "comment/like", method: "PATCH")
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = try JSONEncoder().encode(
+      Body(boardUid: boardID, commentUid: commentID, liked: liked))
+    return request
+  }
+
+  struct Response: Decodable {
+    let success: Bool
+    let code: Int
+    func check() throws {
+      guard success, code == 0 else { throw NuboAPIError.server(code: code, message: "") }
+    }
+  }
+}
+
 struct PhotoCommentsResponseDTO: Decodable {
   let success: Bool
   let error: String
@@ -68,6 +97,7 @@ struct PhotoCommentsResponseDTO: Decodable {
     let postUid: Int
     let writer: BoardWriterDTO
     let like: Int
+    let liked: Bool
     let submitted: Int64
     let status: Int
     let content: String
@@ -84,6 +114,7 @@ struct PhotoCommentsResponseDTO: Decodable {
         id: $0.uid, replyID: $0.replyUid, writer: $0.writer.name,
         content: $0.content == "(deleted)" ? "삭제된 댓글입니다." : $0.content.nuboPlainText,
         submitted: Date(timeIntervalSince1970: Double($0.submitted) / 1_000), likeCount: $0.like,
+        writerID: $0.writer.uid, isLiked: $0.liked,
         canReply: $0.uid > 0 && $0.content != "(deleted)")
     }
     let limit = PhotoCommentsEndpoint.pageSize
@@ -106,7 +137,28 @@ final class PhotoCommentsViewModel {
   private var serverComments: [PhotoComment] = []
   private var localComments: [Int: PhotoComment] = [:]
   private var refreshRequested = false
+  private var personalizedIdentity: UUID?
+  private(set) var pendingLikeIDs: Set<Int> = []
+  private(set) var likeErrors: [Int: String] = [:]
+  private var uncertainLikeIDs: Set<Int> = []
   private(set) var totalCount: Int?
+
+  func accountChanged() {
+    personalizedIdentity = nil
+    pendingLikeIDs = []
+    likeErrors = [:]
+    uncertainLikeIDs = []
+    for index in serverComments.indices { serverComments[index].isLiked = false }
+    for (id, var comment) in localComments {
+      comment.isLiked = false
+      localComments[id] = comment
+    }
+    comments = merged(serverComments)
+  }
+
+  func hasPersonalizedState(for account: AccountSession) -> Bool {
+    account.user != nil && personalizedIdentity == account.sessionIdentity
+  }
 
   func appendConfirmed(_ comment: PhotoComment) {
     localComments[comment.id] = comment
@@ -132,25 +184,77 @@ final class PhotoCommentsViewModel {
     self.service = service
   }
 
-  func loadIfNeeded() async {
+  func loadIfNeeded(account: AccountSession? = nil) async {
     guard !hasLoaded else { return }
-    await load(reset: true)
+    await load(reset: true, account: account)
   }
 
-  func refresh() async {
+  func refresh(account: AccountSession? = nil) async {
     if isLoading {
       refreshRequested = true
       return
     }
-    await load(reset: true)
+    await load(reset: true, account: account)
   }
-  func retry() async { await load(reset: retryResetsPage) }
-  func loadMore() async {
+  func retry(account: AccountSession? = nil) async {
+    await load(reset: retryResetsPage, account: account)
+  }
+  func loadMore(account: AccountSession? = nil) async {
     guard hasMore else { return }
-    await load(reset: false)
+    await load(reset: false, account: account)
   }
 
-  private func load(reset: Bool) async {
+  func toggleLike(commentID: Int, account: AccountSession) async {
+    guard hasPersonalizedState(for: account), let baseURL = account.apiBaseURL,
+      !pendingLikeIDs.contains(commentID), !uncertainLikeIDs.contains(commentID),
+      let comment = comments.first(where: { $0.id == commentID })
+    else { return }
+    let identity = account.sessionIdentity
+    let desired = !comment.isLiked
+    pendingLikeIDs.insert(commentID)
+    likeErrors[commentID] = nil
+    defer { if identity == account.sessionIdentity { pendingLikeIDs.remove(commentID) } }
+    do {
+      let request = try PhotoCommentLikeEndpoint.request(
+        baseURL: baseURL, boardID: boardID, commentID: commentID, liked: desired)
+      let data = try await account.sendAuthenticated(request)
+      try JSONDecoder().decode(PhotoCommentLikeEndpoint.Response.self, from: data).check()
+      guard identity == account.sessionIdentity else { return }
+      updateComment(id: commentID) {
+        $0.isLiked = desired
+        $0.likeCount = max(0, $0.likeCount + (desired ? 1 : -1))
+      }
+    } catch {
+      guard identity == account.sessionIdentity else { return }
+      // 응답 유실 시 서버 반영 여부를 알 수 없으므로 다시 읽기 전에는 재전송하지 않는다.
+      uncertainLikeIDs.insert(commentID)
+      likeErrors[commentID] = "좋아요 상태를 확인하지 못했어요."
+    }
+  }
+
+  private func updateComment(id: Int, mutate: (inout PhotoComment) -> Void) {
+    if let index = serverComments.firstIndex(where: { $0.id == id }) {
+      mutate(&serverComments[index])
+    }
+    if var comment = localComments[id] {
+      mutate(&comment)
+      localComments[id] = comment
+    }
+    comments = merged(serverComments)
+  }
+
+  private func fetchPage(page: Int, account: AccountSession?) async throws -> PhotoCommentsPage {
+    guard let account, account.user != nil, let baseURL = account.apiBaseURL else {
+      return try await service.fetchComments(boardID: boardID, postID: postID, page: page)
+    }
+    let request = try PhotoCommentsEndpoint.makeRequest(
+      apiBaseURL: baseURL, boardID: boardID, postID: postID, page: page)
+    let data = try await account.sendAuthenticated(request)
+    return try JSONDecoder().decode(PhotoCommentsResponseDTO.self, from: data)
+      .makePage(boardID: boardID, postID: postID, page: page)
+  }
+
+  private func load(reset: Bool, account: AccountSession?) async {
     guard !isLoading else { return }
     isLoading = true
     retryResetsPage = reset
@@ -159,7 +263,7 @@ final class PhotoCommentsViewModel {
       isLoading = false
       if refreshRequested {
         refreshRequested = false
-        Task { await self.refresh() }
+        Task { await self.refresh(account: account) }
       }
     }
     do {
@@ -168,8 +272,7 @@ final class PhotoCommentsViewModel {
       var seen = Set(updated.map(\.id))
       let initialCount = updated.count
       while true {
-        let page = try await service.fetchComments(
-          boardID: boardID, postID: postID, page: pageNumber)
+        let page = try await fetchPage(page: pageNumber, account: account)
         try Task.checkCancellation()
         updated += page.comments.filter { seen.insert($0.id).inserted }
         pageNumber += 1
@@ -178,6 +281,9 @@ final class PhotoCommentsViewModel {
           serverComments = updated
           comments = merged(updated)
           totalCount = page.totalCount
+          personalizedIdentity = account?.user == nil ? nil : account?.sessionIdentity
+          uncertainLikeIDs = []
+          likeErrors = [:]
           hasLoaded = true
           hasMore = page.hasMore
           nextPage = pageNumber
@@ -220,10 +326,12 @@ struct PhotoCommentsSection: View {
           Text("댓글").font(.headline)
             .accessibilityAddTraits(.isHeader)
           Spacer()
-          Button("댓글 새로고침", systemImage: "arrow.clockwise") { Task { await model.refresh() } }
-            .labelStyle(.iconOnly)
-            .foregroundStyle(.secondary)
-            .disabled(model.isLoading)
+          Button("댓글 새로고침", systemImage: "arrow.clockwise") {
+            Task { await model.refresh(account: account) }
+          }
+          .labelStyle(.iconOnly)
+          .foregroundStyle(.secondary)
+          .disabled(model.isLoading)
         }
         if let account {
           if account.user != nil {
@@ -235,7 +343,7 @@ struct PhotoCommentsSection: View {
                   account.recordComment(
                     id: comment.id, postID: postID, baseline: model.totalCount ?? initialCount)
                   model.appendConfirmed(comment)
-                  await model.refresh()
+                  await model.refresh(account: account)
                 }
               }
             }.id("comment-composer")
@@ -264,25 +372,64 @@ struct PhotoCommentsSection: View {
               .font(.body)
               .textSelection(.enabled)
               .fixedSize(horizontal: false, vertical: true)
-            if comment.canReply && account != nil {
-              Button("답글", systemImage: "arrowshape.turn.up.left") {
-                guard account?.user != nil else {
-                  showsLogin = true
-                  return
+            HStack(spacing: 18) {
+              if comment.canReply && account != nil {
+                Button("답글", systemImage: "arrowshape.turn.up.left") {
+                  guard account?.user != nil else {
+                    showsLogin = true
+                    return
+                  }
+                  composer.reply = comment
+                  if reduceMotion {
+                    proxy.scrollTo("comment-composer", anchor: .center)
+                  } else {
+                    withAnimation { proxy.scrollTo("comment-composer", anchor: .center) }
+                  }
                 }
-                composer.reply = comment
-                if reduceMotion {
-                  proxy.scrollTo("comment-composer", anchor: .center)
-                } else {
-                  withAnimation { proxy.scrollTo("comment-composer", anchor: .center) }
+                .font(.caption)
+                .disabled(composer.isSending)
+                .accessibilityIdentifier("comment-reply-\(comment.id)")
+              }
+              if let account {
+                Button {
+                  guard account.user != nil else {
+                    showsLogin = true
+                    return
+                  }
+                  Task {
+                    if model.hasPersonalizedState(for: account) {
+                      await model.toggleLike(commentID: comment.id, account: account)
+                    } else {
+                      await model.refresh(account: account)
+                    }
+                  }
+                } label: {
+                  Label(
+                    comment.likeCount > 0 ? comment.likeCount.formatted() : "좋아요",
+                    systemImage: comment.isLiked ? "heart.fill" : "heart")
                 }
-              }.font(.caption).disabled(composer.isSending).accessibilityIdentifier(
-                "comment-reply-\(comment.id)")
+                .font(.caption)
+                .foregroundStyle(comment.isLiked ? Color.red : Color.secondary)
+                .disabled(model.pendingLikeIDs.contains(comment.id) || model.isLoading)
+                .accessibilityLabel(comment.isLiked ? "댓글 좋아요 취소" : "댓글 좋아요")
+                .accessibilityValue("\(comment.likeCount)개")
+                .accessibilityIdentifier("comment-like-\(comment.id)")
+              } else if comment.likeCount > 0 {
+                Label("\(comment.likeCount)", systemImage: "heart")
+                  .font(.caption).foregroundStyle(.secondary)
+                  .accessibilityLabel("좋아요 \(comment.likeCount)개")
+              }
+              if model.pendingLikeIDs.contains(comment.id) {
+                ProgressView().controlSize(.small).accessibilityLabel("댓글 좋아요 처리 중")
+              }
             }
-            if comment.likeCount > 0 {
-              Label("\(comment.likeCount)", systemImage: "heart")
-                .font(.caption).foregroundStyle(.secondary)
-                .accessibilityLabel("좋아요 \(comment.likeCount)개")
+            if let error = model.likeErrors[comment.id] {
+              HStack {
+                Text(error).font(.caption).foregroundStyle(.secondary)
+                Button("상태 다시 확인") { Task { await model.refresh(account: account) } }
+                  .font(.caption)
+                  .accessibilityIdentifier("comment-like-retry-\(comment.id)")
+              }
             }
           }
           .padding(.leading, comment.isReply ? 20 : 0)
@@ -294,19 +441,22 @@ struct PhotoCommentsSection: View {
           VStack(spacing: 12) {
             Text(error).foregroundStyle(.secondary)
             Button("다시 시도") {
-              Task { await model.retry() }
+              Task { await model.retry(account: account) }
             }
             .accessibilityIdentifier("photo-comments-retry")
           }
           .frame(maxWidth: .infinity)
         } else if model.hasMore {
-          Button("댓글 더 보기") { Task { await model.loadMore() } }
+          Button("댓글 더 보기") { Task { await model.loadMore(account: account) } }
             .frame(maxWidth: .infinity)
         }
       }
-      .task { await model.loadIfNeeded() }
+      .task(id: account?.sessionIdentity) {
+        composer.reset()
+        model.accountChanged()
+        await model.refresh(account: account)
+      }
       .accessibilityIdentifier("photo-comments-section")
-      .onChange(of: account?.sessionIdentity) { _, _ in composer.reset() }
       .sheet(isPresented: $showsLogin) {
         if let account, let detailService {
           AccountView(session: account, detailService: detailService)
