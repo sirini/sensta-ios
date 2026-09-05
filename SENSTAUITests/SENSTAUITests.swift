@@ -99,11 +99,16 @@ final class SENSTAUITests: XCTestCase {
     for _ in 0..<4 where !originalComment.exists { app.swipeUp() }
     XCTAssertTrue(originalComment.waitForExistence(timeout: 5))
 
-    let rootMenu = app.buttons["comment-manage-101"]
-    for _ in 0..<4 where !rootMenu.isHittable { app.swipeUp() }
-    rootMenu.tap()
     let edit = app.buttons["comment-edit-101"]
+    for _ in 0..<4 where !edit.isHittable { app.swipeUp() }
     XCTAssertTrue(edit.waitForExistence(timeout: 5))
+    let rootDelete = app.buttons["comment-delete-101"]
+    XCTAssertTrue(rootDelete.waitForExistence(timeout: 5))
+    XCTAssertGreaterThanOrEqual(edit.frame.width, 44)
+    XCTAssertGreaterThanOrEqual(edit.frame.height, 44)
+    XCTAssertGreaterThanOrEqual(rootDelete.frame.width, 44)
+    XCTAssertGreaterThanOrEqual(rootDelete.frame.height, 44)
+    XCTAssertFalse(app.buttons["comment-manage-101"].exists)
     edit.tap()
     let editDraft = app.descendants(matching: .any).matching(identifier: "comment-edit-draft")
       .firstMatch
@@ -122,9 +127,8 @@ final class SENSTAUITests: XCTestCase {
     app.buttons["comment-send"].tap()
     XCTAssertTrue(app.staticTexts["Reply that must remain"].waitForExistence(timeout: 5))
 
-    for _ in 0..<4 where !rootMenu.isHittable { app.swipeUp() }
-    rootMenu.tap()
-    app.buttons["comment-delete-101"].tap()
+    for _ in 0..<4 where !rootDelete.isHittable { app.swipeUp() }
+    rootDelete.tap()
     XCTAssertTrue(app.buttons["삭제하기"].waitForExistence(timeout: 5))
     app.buttons["삭제하기"].tap()
     XCTAssertTrue(app.staticTexts["삭제된 댓글입니다."].waitForExistence(timeout: 5))
@@ -134,10 +138,9 @@ final class SENSTAUITests: XCTestCase {
     screenshot.lifetime = .keepAlways
     add(screenshot)
 
-    let replyMenu = app.buttons["comment-manage-102"]
-    for _ in 0..<4 where !replyMenu.isHittable { app.swipeUp() }
-    replyMenu.tap()
-    app.buttons["comment-delete-102"].tap()
+    let replyDelete = app.buttons["comment-delete-102"]
+    for _ in 0..<4 where !replyDelete.isHittable { app.swipeUp() }
+    replyDelete.tap()
     app.buttons["삭제하기"].tap()
     expectation(
       for: NSPredicate(format: "exists == false"),

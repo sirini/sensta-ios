@@ -456,20 +456,6 @@ struct PhotoCommentsSection: View {
               Spacer(minLength: 8)
               Text(comment.submitted, format: .dateTime.month().day())
                 .font(.caption).foregroundStyle(.secondary)
-              if let account, model.canManage(comment, account: account) {
-                Menu("댓글 관리", systemImage: "ellipsis") {
-                  Button("수정", systemImage: "pencil") { editingComment = comment }
-                    .accessibilityIdentifier("comment-edit-\(comment.id)")
-                  Button("삭제", systemImage: "trash", role: .destructive) {
-                    deletingComment = comment
-                    showsDeleteConfirmation = true
-                  }
-                  .accessibilityIdentifier("comment-delete-\(comment.id)")
-                }
-                .labelStyle(.iconOnly)
-                .disabled(model.pendingManagementIDs.contains(comment.id))
-                .accessibilityIdentifier("comment-manage-\(comment.id)")
-              }
             }
             Text(comment.content)
               .font(.body)
@@ -521,6 +507,30 @@ struct PhotoCommentsSection: View {
                 Label("\(comment.likeCount)", systemImage: "heart")
                   .font(.caption).foregroundStyle(.secondary)
                   .accessibilityLabel("좋아요 \(comment.likeCount)개")
+              }
+              if let account, model.canManage(comment, account: account) {
+                Button {
+                  editingComment = comment
+                } label: {
+                  Label("수정", systemImage: "pencil")
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .disabled(model.pendingManagementIDs.contains(comment.id))
+                .accessibilityIdentifier("comment-edit-\(comment.id)")
+                Button(role: .destructive) {
+                  deletingComment = comment
+                  showsDeleteConfirmation = true
+                } label: {
+                  Label("삭제", systemImage: "trash")
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .font(.caption)
+                .disabled(model.pendingManagementIDs.contains(comment.id))
+                .accessibilityIdentifier("comment-delete-\(comment.id)")
               }
               if model.pendingLikeIDs.contains(comment.id) {
                 ProgressView().controlSize(.small).accessibilityLabel("댓글 좋아요 처리 중")
