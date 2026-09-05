@@ -3,6 +3,7 @@ import SwiftUI
 struct PhotoPostDetailView: View {
   @State private var model: PhotoPostDetailViewModel
   @State private var selectedImageID: PhotoPostImage.ID?
+  @State private var showsPhotoViewer = false
 
   init(postID: Int, service: any PhotoPostDetailServing) {
     _model = State(initialValue: PhotoPostDetailViewModel(postID: postID, service: service))
@@ -37,18 +38,28 @@ struct PhotoPostDetailView: View {
         .accessibilityLabel("게시물 공유")
       }
     }
+    .fullScreenCover(isPresented: $showsPhotoViewer) {
+      if case .loaded(let detail) = model.state {
+        PhotoViewer(
+          images: detail.images, selectedImageID: $selectedImageID, title: detail.post.title)
+      }
+    }
     .task { await model.loadIfNeeded() }
   }
 
   private func loadedContent(_ detail: PhotoPostDetail) -> some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 20) {
+      VStack(alignment: .leading, spacing: 28) {
         titleSection(detail.post)
 
         PhotoDetailImagePager(
           images: detail.images,
           selectedImageID: $selectedImageID,
-          fallbackTitle: detail.post.title
+          fallbackTitle: detail.post.title,
+          onOpen: { imageID in
+            selectedImageID = imageID
+            showsPhotoViewer = true
+          }
         )
 
         if let image = selectedImage(in: detail.images) {
@@ -83,7 +94,7 @@ struct PhotoPostDetailView: View {
       .padding(.horizontal, 16)
       .padding(.vertical, 20)
     }
-    .background(Color.secondary.opacity(0.04))
+    .background(Color(.systemBackground))
   }
 
   private func titleSection(_ post: PhotoPost) -> some View {
@@ -174,6 +185,7 @@ private struct PhotoDetailImagePager: View {
   let images: [PhotoPostImage]
   @Binding var selectedImageID: PhotoPostImage.ID?
   let fallbackTitle: String
+  let onOpen: (Int) -> Void
   @Environment(\.displayScale) private var displayScale
 
   var body: some View {
@@ -185,9 +197,16 @@ private struct PhotoDetailImagePager: View {
           ScrollView(.horizontal) {
             LazyHStack(spacing: 0) {
               ForEach(Array(images.enumerated()), id: \.element.id) { index, image in
-                detailImage(image, index: index, size: geometry.size)
-                  .frame(width: geometry.size.width, height: geometry.size.height)
-                  .id(image.id)
+                Button {
+                  onOpen(image.id)
+                } label: {
+                  detailImage(image, index: index, size: geometry.size)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("사진을 전체 화면으로 감상합니다.")
+                .accessibilityIdentifier("photo-detail-open-viewer")
+                .id(image.id)
               }
             }
             .scrollTargetLayout()
@@ -218,7 +237,7 @@ private struct PhotoDetailImagePager: View {
       }
       .frame(width: geometry.size.width, height: geometry.size.height)
       .background(Color.secondary.opacity(0.12))
-      .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+      .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
       .task(id: selectedImageID ?? images.first?.id, priority: .utility) {
         if selectedImageID == nil {
           selectedImageID = images.first?.id
@@ -242,7 +261,7 @@ private struct PhotoDetailImagePager: View {
         case .success(let loadedImage):
           loadedImage
             .resizable()
-            .scaledToFill()
+            .scaledToFit()
             .frame(width: size.width, height: size.height)
             .clipped()
         case .failure:
@@ -317,8 +336,7 @@ private struct PhotoMetadataSection: View {
             }
           }
         }
-        .padding(14)
-        .background(.background, in: RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, 8)
       }
 
       if !image.description.isEmpty {
@@ -328,9 +346,8 @@ private struct PhotoMetadataSection: View {
           Image(systemName: "sparkles").foregroundStyle(.tint)
         }
         .font(.subheadline)
-        .padding(14)
+        .foregroundStyle(.secondary)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.tint.opacity(0.08), in: RoundedRectangle(cornerRadius: 14))
         .accessibilityLabel("사진 설명: \(image.description)")
       }
     }

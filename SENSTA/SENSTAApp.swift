@@ -8,6 +8,11 @@ struct SENSTAApp: App {
 
   init() {
     #if DEBUG
+      if ProcessInfo.processInfo.arguments.contains("--ui-test-viewer") {
+        photoFeedService = PaginationUITestService()
+        photoPostDetailService = PhotoViewerUITestService()
+        return
+      }
       if ProcessInfo.processInfo.arguments.contains("--ui-test-pagination") {
         photoFeedService = PaginationUITestService()
         photoPostDetailService = UnavailablePhotoPostDetailService()
@@ -53,6 +58,28 @@ struct SENSTAApp: App {
         },
         hasMorePages: page == 1
       )
+    }
+  }
+#endif
+
+#if DEBUG
+  private struct PhotoViewerUITestService: PhotoPostDetailServing {
+    func fetchPost(id: Int) async throws -> PhotoPostDetail {
+      let post = PhotoPost(
+        id: id, title: "빛과 여백", content: "사진의 전체 구도를 감상하세요.",
+        submitted: .now, viewCount: 3, coverURL: nil, commentCount: 0, likeCount: 1,
+        isLiked: false, writer: PhotoPostWriter(id: 1, name: "사진가", profileURL: nil, badgeKeys: []))
+      let exif = PhotoExif(
+        make: "", model: "", aperture: nil, iso: nil, focalLength: nil,
+        exposure: nil, width: 900, height: 600, date: nil)
+      return PhotoPostDetail(
+        post: post,
+        images: [1, 2].map {
+          PhotoPostImage(
+            id: $0, largeURL: nil, smallURL: nil,
+            description: "테스트 사진 \($0)", exif: exif)
+        },
+        tags: [], attachments: [], previousPostID: nil, nextPostID: nil, shareURL: nil)
     }
   }
 #endif

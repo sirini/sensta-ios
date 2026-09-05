@@ -103,6 +103,25 @@ struct PhotoImagePipelineTests {
     session.invalidateAndCancel()
   }
 
+  @Test
+  func photoViewerFitsWholeImageAndResetsZoomForNewPhoto() throws {
+    let image = try #require(UIImage(data: makeJPEGData(width: 900, height: 600)))
+    let view = PhotoZoomScrollView(frame: CGRect(x: 0, y: 0, width: 300, height: 500))
+    view.setImage(image)
+    view.layoutIfNeeded()
+    #expect(view.contentSize.width == 300)
+    #expect(view.contentSize.height == 200)
+    #expect(view.contentInset.top == 150)
+    view.setZoomScale(2, animated: false)
+    #expect(view.zoomScale == 2)
+    let portrait = try #require(UIImage(data: makeJPEGData(width: 600, height: 900)))
+    view.setImage(portrait)
+    view.layoutIfNeeded()
+    #expect(view.zoomScale == 1)
+    #expect(view.contentSize.height == 450)
+    #expect(view.contentInset.top == 25)
+  }
+
   private func makeJPEGData(width: Int, height: Int) throws -> Data {
     let format = UIGraphicsImageRendererFormat()
     format.scale = 1

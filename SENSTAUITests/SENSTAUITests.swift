@@ -27,6 +27,34 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testPhotoViewerZoomPagingAndDismissal() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+    XCTAssertTrue(card.waitForExistence(timeout: 10))
+    card.tap()
+    let open = app.buttons.matching(identifier: "photo-detail-open-viewer").firstMatch
+    XCTAssertTrue(open.waitForExistence(timeout: 10))
+    open.tap()
+    let photo = app.images.matching(identifier: "photo-zoom-view").firstMatch
+    XCTAssertTrue(photo.waitForExistence(timeout: 10))
+    XCTAssertEqual(photo.value as? String, "100%")
+    photo.doubleTap()
+    XCTAssertNotEqual(photo.value as? String, "100%")
+    photo.doubleTap()
+    XCTAssertEqual(photo.value as? String, "100%")
+    app.buttons["다음 사진"].tap()
+    XCTAssertTrue(app.navigationBars["2 / 2"].waitForExistence(timeout: 5))
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Photo viewer"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    app.buttons["photo-viewer-close"].tap()
+    XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
+  }
+
+  @MainActor
   func testLaunchesWithBrand() throws {
     let app = XCUIApplication()
     app.launch()
@@ -75,5 +103,9 @@ final class SENSTAUITests: XCTestCase {
     let windowFrame = app.windows.firstMatch.frame
     XCTAssertEqual(pager.frame.minX, windowFrame.minX + 16, accuracy: 1)
     XCTAssertEqual(pager.frame.maxX, windowFrame.maxX - 16, accuracy: 1)
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Photo detail"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
   }
 }

@@ -337,6 +337,7 @@ struct CachedAsyncPhotoImage<Content: View>: View {
   @ViewBuilder let content: (CachedPhotoImagePhase) -> Content
 
   @Environment(\.displayScale) private var displayScale
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var loadedImage: UIImage?
   @State private var failed = false
 
@@ -359,7 +360,7 @@ struct CachedAsyncPhotoImage<Content: View>: View {
             displayScale: displayScale
           )
           try Task.checkCancellation()
-          if startedAt.duration(to: clock.now) > .milliseconds(100) {
+          if !reduceMotion && startedAt.duration(to: clock.now) > .milliseconds(100) {
             withAnimation(.easeOut(duration: 0.16)) {
               loadedImage = decodedImage.image
             }
