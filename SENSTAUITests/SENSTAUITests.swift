@@ -172,6 +172,33 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testPhotographerRetryAndPhotoNavigation() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+    XCTAssertTrue(card.waitForExistence(timeout: 10))
+    card.tap()
+    let writer = app.buttons["photo-detail-photographer"]
+    XCTAssertTrue(writer.waitForExistence(timeout: 5))
+    writer.tap()
+    let retry = app.buttons["photographer-retry"]
+    XCTAssertTrue(retry.waitForExistence(timeout: 5))
+    retry.tap()
+    XCTAssertTrue(app.staticTexts["photographer-name"].waitForExistence(timeout: 5))
+    let photo = app.buttons.matching(identifier: "photographer-photo").firstMatch
+    XCTAssertTrue(photo.waitForExistence(timeout: 5))
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Photographer recent works"
+    screenshot.lifetime = .keepAlways
+    add(screenshot)
+    photo.tap()
+    XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(app.staticTexts["photographer-name"].waitForExistence(timeout: 5))
+  }
+
+  @MainActor
   func testLaunchesWithBrand() throws {
     let app = XCUIApplication()
     app.launch()

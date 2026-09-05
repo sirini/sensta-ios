@@ -64,6 +64,49 @@ struct PhotoPostDetailContractTests {
     }
   }
 
+  @Test
+  func photographerRequestsUseExactUIDWithoutAuthentication() throws {
+    let base = try #require(URL(string: "https://sensta.me/goapi/"))
+    for latest in [false, true] {
+      let request = try PhotographerEndpoint.request(baseURL: base, userID: 42, latest: latest)
+      let url = try #require(request.url)
+      let query = try #require(URLComponents(url: url, resolvingAgainstBaseURL: false))
+      #expect(query.path == (latest ? "/goapi/board/user/latest" : "/goapi/auth/user/info"))
+      #expect(query.queryItems?.first { $0.name == "targetUserUid" }?.value == "42")
+      #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+      #expect(request.httpMethod == "GET")
+    }
+    #expect(throws: NuboAPIError.invalidRequest) {
+      try PhotographerEndpoint.request(baseURL: base, userID: 0)
+    }
+  }
+
+  @Test
+  func photographerRejectsMismatchedAndBlockedProfiles() throws {
+    let data = Data(
+      #"{"success":true,"code":0,"error":"","result":{"uid":42,"name":"사진가","profile":"","signature":"소개","blocked":false}}"#
+        .utf8)
+    let info = try JSONDecoder().decode(PhotographerInfoDTO.self, from: data)
+    #expect(try info.checked(userID: 42).name == "사진가")
+    #expect(throws: NuboAPIError.invalidResponse) { try info.checked(userID: 43) }
+    let blockedData = Data(
+      String(decoding: data, as: UTF8.self).replacingOccurrences(of: "false", with: "true").utf8)
+    let blocked = try JSONDecoder().decode(PhotographerInfoDTO.self, from: blockedData)
+    #expect(throws: NuboAPIError.invalidResponse) { try blocked.checked(userID: 42) }
+  }
+
+  @Test
+  func photographerLatestFiltersOtherBoardsInvalidIDsAndDuplicates() throws {
+    let data = Data(
+      #"{"success":true,"code":0,"error":"","result":{"posts":[{"postUid":101,"board":{"id":"photo"}},{"postUid":102,"board":{"id":"free"}},{"postUid":101,"board":{"id":"photo"}},{"postUid":0,"board":{"id":"photo"}},{"postUid":99,"board":{"id":"photo"}}]}}"#
+        .utf8)
+    #expect(
+      try JSONDecoder().decode(PhotographerLatestDTO.self, from: data).photoIDs() == [101, 99])
+    let failure = Data(#"{"success":false,"code":3,"error":"denied","result":null}"#.utf8)
+    let response = try JSONDecoder().decode(PhotographerLatestDTO.self, from: failure)
+    #expect(throws: NuboAPIError.server(code: 3, message: "denied")) { try response.photoIDs() }
+  }
+
   private func fixtureData(named name: String) throws -> Data {
     let url = try #require(
       Bundle(for: PhotoDetailFixtureBundleMarker.self).url(
@@ -76,3 +119,50 @@ struct PhotoPostDetailContractTests {
 }
 
 private final class PhotoDetailFixtureBundleMarker {}
+
+struct PhotographerServiceTests {
+  @Test
+  func onlyDisplaysValidatedPostIdentityAndReportsUnavailableWorks() async throws {
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [PhotographerURLProtocol.self]
+    let session = URLSession(configuration: config)
+    defer { session.invalidateAndCancel() }
+    let base = try #require(URL(string: "https://example.test/goapi/"))
+    let profile = try await PhotoPostDetailService(apiBaseURL: base, session: session)
+      .fetchPhotographer(id: 42)
+    #expect(profile.writer.id == 42)
+    #expect(profile.posts.map(\.id) == [101])
+    #expect(profile.unavailableCount == 1)
+  }
+}
+
+private final class PhotographerURLProtocol: URLProtocol, @unchecked Sendable {
+  override class func canInit(with request: URLRequest) -> Bool { true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func startLoading() {
+    do {
+      let url = try #require(request.url)
+      let data: Data
+      if url.path.hasSuffix("auth/user/info") {
+        data = Data(
+          #"{"success":true,"code":0,"error":"","result":{"uid":42,"name":"사진가","profile":"","signature":"소개","blocked":false}}"#
+            .utf8)
+      } else if url.path.hasSuffix("board/user/latest") {
+        data = Data(
+          #"{"success":true,"code":0,"error":"","result":{"posts":[{"postUid":101,"board":{"id":"photo"}},{"postUid":102,"board":{"id":"photo"}}]}}"#
+            .utf8)
+      } else {
+        let fixture = try #require(
+          Bundle(for: PhotoDetailFixtureBundleMarker.self).url(
+            forResource: "board-view-photo", withExtension: "json"))
+        data = try Data(contentsOf: fixture)
+      }
+      let response = try #require(
+        HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
+      client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+      client?.urlProtocol(self, didLoad: data)
+      client?.urlProtocolDidFinishLoading(self)
+    } catch { client?.urlProtocol(self, didFailWithError: error) }
+  }
+  override func stopLoading() {}
+}

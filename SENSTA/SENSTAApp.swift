@@ -89,6 +89,15 @@ struct SENSTAApp: App {
   private actor PhotoViewerUITestService: PhotoPostDetailServing {
     private var commentAttempts = 0
 
+    private var photographerAttempts = 0
+    func fetchPhotographer(id: Int) async throws -> PhotographerProfile {
+      photographerAttempts += 1
+      if photographerAttempts == 1 { throw NuboAPIError.networkUnavailable }
+      let post = try await fetchPost(id: 1).post
+      return PhotographerProfile(
+        writer: post.writer, signature: "빛과 여백, 일상 속 작은 순간을 기록합니다.", posts: [post],
+        unavailableCount: 0)
+    }
     func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {
       commentAttempts += 1
       if commentAttempts == 1 { throw NuboAPIError.networkUnavailable }

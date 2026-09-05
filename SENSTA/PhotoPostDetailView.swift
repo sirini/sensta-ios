@@ -6,9 +6,11 @@ struct PhotoPostDetailView: View {
   @State private var showsPhotoViewer = false
   @State private var commentsScrollRequest = 0
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  private let detailService: any PhotoPostDetailServing
   private let commentsService: any PhotoCommentsServing
 
   init(postID: Int, service: any PhotoPostDetailServing) {
+    detailService = service
     commentsService = service
     _model = State(initialValue: PhotoPostDetailViewModel(postID: postID, service: service))
   }
@@ -131,20 +133,27 @@ struct PhotoPostDetailView: View {
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("photo-detail-title")
 
-      HStack(spacing: 10) {
-        profileImage(for: post.writer)
+      NavigationLink {
+        PhotographerView(writer: post.writer, service: detailService)
+      } label: {
+        HStack(spacing: 10) {
+          profileImage(for: post.writer)
 
-        VStack(alignment: .leading, spacing: 2) {
-          Text(post.writer.name)
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-            .truncationMode(.tail)
-          Text(post.submitted, format: .dateTime.year().month().day())
-            .font(.caption)
-            .foregroundStyle(.secondary)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(post.writer.name)
+              .font(.subheadline.weight(.semibold))
+              .lineLimit(1)
+              .truncationMode(.tail)
+            Text(post.submitted, format: .dateTime.year().month().day())
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-      }
+        .contentShape(Rectangle())
+      }.buttonStyle(.plain).accessibilityIdentifier("photo-detail-photographer")
+        .disabled(post.writer.id <= 0)
     }
   }
 

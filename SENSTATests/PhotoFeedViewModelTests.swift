@@ -324,3 +324,30 @@ private actor ExploreRecordingService: PhotoFeedServing {
     return [PhotoPostTag(id: boardID, name: "빛")]
   }
 }
+
+@MainActor
+struct PhotographerModelTests {
+  @Test
+  func refreshFailureKeepsPreviouslyLoadedProfile() async {
+    let model = PhotographerModel()
+    let service = PhotographerRefreshService()
+    await model.load(userID: 42, service: service)
+    #expect(model.profile?.writer.id == 42)
+    await model.load(userID: 42, service: service)
+    #expect(model.profile?.writer.id == 42)
+    #expect(model.error != nil)
+    #expect(!model.isLoading)
+  }
+}
+
+private actor PhotographerRefreshService: PhotoPostDetailServing {
+  private var attempts = 0
+  func fetchPost(id: Int) async throws -> PhotoPostDetail { throw NuboAPIError.configuration }
+  func fetchPhotographer(id: Int) async throws -> PhotographerProfile {
+    attempts += 1
+    if attempts > 1 { throw NuboAPIError.networkUnavailable }
+    return PhotographerProfile(
+      writer: PhotoPostWriter(id: id, name: "사진가", profileURL: nil, badgeKeys: []), signature: "",
+      posts: [], unavailableCount: 0)
+  }
+}

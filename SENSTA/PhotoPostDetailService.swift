@@ -1,10 +1,14 @@
 import Foundation
 
 protocol PhotoPostDetailServing: PhotoCommentsServing {
+  func fetchPhotographer(id: Int) async throws -> PhotographerProfile
   func fetchPost(id: Int) async throws -> PhotoPostDetail
 }
 
 extension PhotoPostDetailServing {
+  func fetchPhotographer(id: Int) async throws -> PhotographerProfile {
+    throw NuboAPIError.configuration
+  }
   func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {
     throw NuboAPIError.configuration
   }
@@ -43,6 +47,48 @@ struct PhotoPostDetailService: PhotoPostDetailServing {
 
   init(apiBaseURL: URL, session: URLSession = .shared) {
     client = NuboAPIClient(apiBaseURL: apiBaseURL, session: session)
+  }
+
+  func fetchPhotographer(id: Int) async throws -> PhotographerProfile {
+    let infoData = try await client.data(
+      for: PhotographerEndpoint.request(baseURL: client.apiBaseURL, userID: id))
+    let info = try JSONDecoder().decode(PhotographerInfoDTO.self, from: infoData).checked(
+      userID: id)
+    let latestData = try await client.data(
+      for: PhotographerEndpoint.request(baseURL: client.apiBaseURL, userID: id, latest: true))
+    let ids = try JSONDecoder().decode(PhotographerLatestDTO.self, from: latestData).photoIDs()
+    var posts: [PhotoPost] = []
+    var unavailable = 0
+    // 최근 활동 응답의 제목을 바로 노출하지 않고 상세 API의 공개 접근 검사를 거친다.
+    for start in stride(from: 0, to: ids.count, by: 3) {
+      try Task.checkCancellation()
+      let batch = Array(ids[start..<min(start + 3, ids.count)])
+      let results = try await withThrowingTaskGroup(of: (Int, PhotoPost?).self) { group in
+        for (index, postID) in batch.enumerated() {
+          group.addTask {
+            do {
+              let detail = try await fetchPost(id: postID)
+              guard detail.post.id == postID, detail.post.writer.id == id else {
+                return (index, nil)
+              }
+              return (index, detail.post)
+            } catch is CancellationError { throw CancellationError() } catch { return (index, nil) }
+          }
+        }
+        var results: [(Int, PhotoPost?)] = []
+        for try await result in group { results.append(result) }
+        return results.sorted { $0.0 < $1.0 }
+      }
+      for (_, post) in results {
+        if let post { posts.append(post) } else { unavailable += 1 }
+      }
+    }
+    return PhotographerProfile(
+      writer: PhotoPostWriter(
+        id: id, name: info.name,
+        profileURL: MediaURLResolver.url(for: info.profile, apiBaseURL: client.apiBaseURL),
+        badgeKeys: info.badges?.map(\.key) ?? []), signature: info.signature, posts: posts,
+      unavailableCount: unavailable)
   }
 
   func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {
