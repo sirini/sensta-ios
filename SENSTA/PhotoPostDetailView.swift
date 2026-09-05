@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PhotoPostDetailView: View {
+  @Environment(\.accountSession) private var account
   @State private var model: PhotoPostDetailViewModel
   @State private var selectedImageID: PhotoPostImage.ID?
   @State private var showsPhotoViewer = false
@@ -184,7 +185,12 @@ struct PhotoPostDetailView: View {
   private func footer(_ detail: PhotoPostDetail) -> some View {
     VStack(alignment: .leading, spacing: 12) {
       HStack(spacing: 18) {
-        metric("heart", value: detail.post.likeCount, name: "좋아요")
+        if let account, let boardID = detail.boardID {
+          PhotoLikeButton(
+            post: detail.post, boardID: boardID, account: account, detailService: detailService)
+        } else {
+          metric("heart", value: detail.post.likeCount, name: "좋아요")
+        }
         metric("bubble.right", value: detail.post.commentCount, name: "댓글")
         metric("eye", value: detail.post.viewCount, name: "조회")
       }

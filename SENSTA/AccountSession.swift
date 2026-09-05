@@ -78,13 +78,19 @@ enum AccountEndpoint {
 }
 
 protocol AccountServing: Sendable {
+  func data(for request: URLRequest) async throws -> Data
   func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens)
   func load(token: String) async throws -> AccountUser
   func refresh(_ refresh: String) async throws -> AccountTokens
   func logout(token: String) async throws
 }
 
+extension AccountServing {
+  func data(for request: URLRequest) async throws -> Data { throw NuboAPIError.configuration }
+}
+
 struct AccountService: AccountServing {
+  func data(for request: URLRequest) async throws -> Data { try await client.data(for: request) }
   let baseURL: URL
   private let client: NuboAPIClient
 
@@ -195,7 +201,11 @@ final class AccountSession {
   private(set) var needsRestoration = true
   private let service: any AccountServing
   private let store: any AccountTokenStoring
-  private let apiBaseURL: URL?
+  let apiBaseURL: URL?
+  let postLikes = PhotoPostLikes()
+  private var identity = UUID()
+  private var refreshTask: Task<AccountTokens, Error>?
+
   var profileURL: URL? {
     guard let apiBaseURL else { return nil }
     return MediaURLResolver.url(for: user?.profile ?? "", apiBaseURL: apiBaseURL)
@@ -217,6 +227,8 @@ final class AccountSession {
       let (user, tokens) = try await service.signin(email: email, password: password)
       try Task.checkCancellation()
       try store.save(tokens)
+      identity = UUID()
+      postLikes.reset()
       self.tokens = tokens
       self.user = user
       needsRestoration = false
@@ -255,6 +267,8 @@ final class AccountSession {
         loaded = try await service.load(token: saved.token)
       }
       try Task.checkCancellation()
+      identity = UUID()
+      postLikes.reset()
       tokens = saved
       user = loaded
       needsRestoration = false
@@ -269,6 +283,76 @@ final class AccountSession {
     }
   }
 
+  func sendAuthenticated(_ request: URLRequest) async throws -> Data {
+    guard let baseURL = apiBaseURL, let url = request.url,
+      url.scheme == "https", url.host == baseURL.host, url.port == baseURL.port,
+      url.path.hasPrefix(baseURL.path.hasSuffix("/") ? baseURL.path : baseURL.path + "/")
+    else { throw NuboAPIError.invalidRequest }
+    guard let tokens, user != nil else { throw NuboAPIError.httpStatus(401) }
+    let identity = identity
+    func send(_ token: String) async throws -> Data {
+      guard identity == self.identity, user != nil else { throw CancellationError() }
+      var request = request
+      request.httpShouldHandleCookies = false
+      request.cachePolicy = .reloadIgnoringLocalCacheData
+      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+      let data = try await service.data(for: request)
+      try Task.checkCancellation()
+      guard identity == self.identity else { throw CancellationError() }
+      return data
+    }
+    do { return try await send(tokens.token) } catch NuboAPIError.httpStatus(401) {
+      guard identity == self.identity else { throw CancellationError() }
+      let updated = try await refreshedTokens(after: tokens, identity: identity)
+      do { return try await send(updated.token) } catch NuboAPIError.httpStatus(401) {
+        if identity == self.identity { expireSession() }
+        throw NuboAPIError.httpStatus(401)
+      }
+    }
+  }
+
+  private func refreshedTokens(after failed: AccountTokens, identity: UUID) async throws
+    -> AccountTokens
+  {
+    if let tokens, tokens != failed { return tokens }
+    if let refreshTask { return try await refreshTask.value }
+    let task = Task { @MainActor in
+      do {
+        let updated = try await service.refresh(failed.refresh).checked()
+        try Task.checkCancellation()
+        guard identity == self.identity else { throw CancellationError() }
+        try store.save(updated)
+        tokens = updated
+        return updated
+      } catch NuboAPIError.server(let code, _) where [2, 3, 4, 8].contains(code) {
+        if identity == self.identity { expireSession() }
+        throw NuboAPIError.httpStatus(401)
+      } catch NuboAPIError.httpStatus(401) {
+        if identity == self.identity { expireSession() }
+        throw NuboAPIError.httpStatus(401)
+      }
+    }
+    refreshTask = task
+    defer { if identity == self.identity { refreshTask = nil } }
+    return try await task.value
+  }
+
+  private func expireSession() {
+    identity = UUID()
+    refreshTask = nil
+    tokens = nil
+    user = nil
+    postLikes.reset()
+    do {
+      try store.clear()
+      needsRestoration = false
+      error = "로그인이 만료됐어요. 다시 로그인해 주세요."
+    } catch {
+      needsRestoration = true
+      self.error = "로그인 정보를 지우지 못했어요. 기기 잠금을 해제한 뒤 다시 시도해 주세요."
+    }
+  }
+
   func logout() async {
     guard !isBusy else { return }
     isBusy = true
@@ -277,6 +361,10 @@ final class AccountSession {
     do {
       // 로컬 삭제가 실패하면 로그아웃 완료로 표시하지 않는다.
       try store.clear()
+      identity = UUID()
+      refreshTask?.cancel()
+      refreshTask = nil
+      postLikes.reset()
       let oldToken = tokens?.token
       tokens = nil
       user = nil

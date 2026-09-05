@@ -220,6 +220,7 @@ private struct PhotoFeedList: View {
 }
 
 private struct PhotoFeedCard: View {
+  @Environment(\.accountSession) private var account
   let post: PhotoPost
   let size: CGSize
   let safeAreaInsets: EdgeInsets
@@ -333,7 +334,11 @@ private struct PhotoFeedCard: View {
 
   private var counts: some View {
     HStack(spacing: 16) {
-      countLabel("heart", count: post.likeCount, name: "좋아요")
+      countLabel(
+        account?.postLikes.states[post.id]?.isLiked == true ? "heart.fill" : "heart",
+        count: account?.postLikes.counts[post.id] ?? post.likeCount, name: "좋아요"
+      )
+      .accessibilityIdentifier("photo-feed-like-\(post.id)")
       countLabel("bubble.right", count: post.commentCount, name: "댓글")
       countLabel("eye", count: post.viewCount, name: "조회")
     }

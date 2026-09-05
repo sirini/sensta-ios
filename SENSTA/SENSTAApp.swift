@@ -20,7 +20,8 @@ struct SENSTAApp: App {
     #if DEBUG
       if ProcessInfo.processInfo.arguments.contains(where: { $0.hasPrefix("--ui-test-") }) {
         _account = State(
-          initialValue: AccountSession(service: AccountUITestService(), store: AccountUITestStore())
+          initialValue: AccountSession(
+            service: AccountUITestService(), store: AccountUITestStore(), apiBaseURL: baseURL)
         )
       }
       if ProcessInfo.processInfo.arguments.contains("--ui-test-viewer") {
@@ -49,6 +50,7 @@ struct SENSTAApp: App {
     WindowGroup {
       ContentView(service: photoFeedService, detailService: photoPostDetailService)
         .accountSession(account)
+        .environment(\.accountSession, account)
         .task { await account.restore() }
         #if DEBUG
           .preferredColorScheme(
@@ -162,7 +164,29 @@ extension ContentView {
 }
 
 #if DEBUG
-  private struct AccountUITestService: AccountServing {
+  private actor AccountUITestService: AccountServing {
+    private var liked = false
+    func data(for request: URLRequest) async throws -> Data {
+      if request.httpMethod == "PATCH" {
+        let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+        liked = body["liked"] as! Bool
+        return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+      }
+      let result: [String: Any] = [
+        "config": ["uid": 2, "id": "photo", "name": "사진", "rowCount": 32],
+        "post": [
+          "uid": 1, "title": "빛과 여백", "content": "", "submitted": 0, "modified": 0,
+          "hit": 3, "status": 0, "category": ["uid": 1, "name": "사진"], "cover": "", "comment": 0,
+          "like": liked ? 2 : 1, "liked": liked,
+          "writer": ["uid": 1, "name": "사진가", "profile": "", "signature": ""],
+        ],
+        "images": [], "files": [], "tags": [], "prevPostUid": 0, "nextPostUid": 0,
+        "writerPosts": [], "writerComments": [],
+      ]
+      return try JSONSerialization.data(withJSONObject: [
+        "success": true, "code": 0, "error": "", "result": result,
+      ])
+    }
     func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
       guard password == "test-password" else { throw NuboAPIError.httpStatus(401) }
       return (

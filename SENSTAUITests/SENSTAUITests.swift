@@ -2,6 +2,50 @@ import XCTest
 
 final class SENSTAUITests: XCTestCase {
   @MainActor
+  func testLikeRequiresLoginAndSynchronizesAcrossDetailAndFeed() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+    XCTAssertTrue(card.waitForExistence(timeout: 10))
+    card.tap()
+    let like = app.buttons["photo-detail-like"]
+    for _ in 0..<4 where !like.isHittable { app.swipeUp() }
+    XCTAssertTrue(like.waitForExistence(timeout: 5))
+    like.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+    XCTAssertTrue(app.buttons["account-logout"].waitForExistence(timeout: 5))
+    app.buttons["account-close"].tap()
+    XCTAssertTrue(like.waitForExistence(timeout: 5))
+    XCTAssertEqual(like.value as? String, "1개")
+    like.tap()
+    let liked = NSPredicate(format: "label == %@ AND value == %@", "좋아요 취소", "2개")
+    expectation(for: liked, evaluatedWith: like)
+    waitForExpectations(timeout: 5)
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "Photo liked"
+    capture.lifetime = .keepAlways
+    add(capture)
+    app.navigationBars.buttons.firstMatch.tap()
+    XCTAssertTrue(card.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["photo-feed-like-1"].exists)
+    XCTAssertEqual(app.staticTexts["photo-feed-like-1"].label, "좋아요 2개")
+    card.tap()
+    for _ in 0..<4 where !like.isHittable { app.swipeUp() }
+    XCTAssertEqual(like.value as? String, "2개")
+    like.tap()
+    expectation(
+      for: NSPredicate(format: "label == %@ AND value == %@", "좋아요", "1개"), evaluatedWith: like)
+    waitForExpectations(timeout: 5)
+  }
+
+  @MainActor
   func testAccountLoginFailureSuccessProfileAndLogout() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]

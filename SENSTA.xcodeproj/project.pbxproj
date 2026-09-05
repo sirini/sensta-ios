@@ -36,6 +36,8 @@
 		B10000000000000000000006 /* AccountSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000006 /* AccountSession.swift */; };
 		B10000000000000000000007 /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000007 /* AccountView.swift */; };
 		B10000000000000000000008 /* AccountSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000008 /* AccountSessionTests.swift */; };
+		B10000000000000000000009 /* PhotoPostLikes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000009 /* PhotoPostLikes.swift */; };
+		B1000000000000000000000A /* PhotoPostLikesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000A /* PhotoPostLikesTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -93,6 +95,8 @@
 		B20000000000000000000006 /* AccountSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSession.swift; sourceTree = "<group>"; };
 		B20000000000000000000007 /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		B20000000000000000000008 /* AccountSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSessionTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000009 /* PhotoPostLikes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPostLikes.swift; sourceTree = "<group>"; };
+		B2000000000000000000000A /* PhotoPostLikesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPostLikesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +153,7 @@
 				B20000000000000000000005 /* PhotographerView.swift */,
 				B20000000000000000000007 /* AccountView.swift */,
 				B20000000000000000000006 /* AccountSession.swift */,
+				B20000000000000000000009 /* PhotoPostLikes.swift */,
 				B20000000000000000000002 /* PhotoComments.swift */,
 				A2000000000000000000001C /* PhotoImagePipeline.swift */,
 				A20000000000000000000007 /* Assets.xcassets */,
@@ -167,6 +172,7 @@
 				A20000000000000000000019 /* PhotoPostDetailContractTests.swift */,
 				B20000000000000000000003 /* PhotoCommentsTests.swift */,
 				B20000000000000000000008 /* AccountSessionTests.swift */,
+				B2000000000000000000000A /* PhotoPostLikesTests.swift */,
 				A2000000000000000000001A /* PhotoPostDetailViewModelTests.swift */,
 				A2000000000000000000001D /* PhotoImagePipelineTests.swift */,
 				A50000000000000000000007 /* Fixtures */,
@@ -368,6 +374,7 @@
 				B10000000000000000000005 /* PhotographerView.swift in Sources */,
 				B10000000000000000000007 /* AccountView.swift in Sources */,
 				B10000000000000000000006 /* AccountSession.swift in Sources */,
+				B10000000000000000000009 /* PhotoPostLikes.swift in Sources */,
 				B10000000000000000000002 /* PhotoComments.swift in Sources */,
 				A10000000000000000000014 /* PhotoImagePipeline.swift in Sources */,
 				A10000000000000000000001 /* SENSTAApp.swift in Sources */,
@@ -384,6 +391,7 @@
 				A10000000000000000000011 /* PhotoPostDetailContractTests.swift in Sources */,
 				B10000000000000000000003 /* PhotoCommentsTests.swift in Sources */,
 				B10000000000000000000008 /* AccountSessionTests.swift in Sources */,
+				B1000000000000000000000A /* PhotoPostLikesTests.swift in Sources */,
 				A10000000000000000000012 /* PhotoPostDetailViewModelTests.swift in Sources */,
 				A10000000000000000000015 /* PhotoImagePipelineTests.swift in Sources */,
 			);
