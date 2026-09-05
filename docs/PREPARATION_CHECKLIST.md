@@ -34,8 +34,8 @@
 - [x] 공용 Google server client audience와 mobile 인증·refresh 계약
 - [x] Sign in with Apple 서버 검증과 외부 계정 연결 정책
 - [ ] `ios` push platform 등록과 APNs/FCM payload
-- [ ] `sensta-ios` 게시글 출처와 `sensta-app` 업적 정책
-- [ ] HEIC/JPEG 업로드, 썸네일, EXIF와 GPS 제거 계약
+- [x] `sensta-ios` 게시글 출처와 플랫폼 공통 `sensta-app` 업적 정책
+- [x] HEIC/JPEG 방향 정규화, 썸네일, EXIF와 GPS 제거 계약
 - [ ] UGC 게시 전 필터와 신고 처리 운영 계약
 - [ ] iOS가 사용하는 endpoint별 request/response fixture
 - [ ] GOAPI 보안 회귀 테스트와 NUBO API contract 문서 갱신

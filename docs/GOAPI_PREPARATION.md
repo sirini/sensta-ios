@@ -58,21 +58,19 @@ Google 로그인을 제공하는 iOS 앱의 심사와 사용자 편의를 위해
 
 ## 4. 앱 출처와 업적
 
-현재 사진 첨부 게시글의 `sensta-app` 업적은 `X-Nubo-Client: sensta-android`에만 연결된다.
+사진 첨부 게시글의 `sensta-app` 업적은 Android와 iOS를 구분하지 않는 하나의 영구 업적이다.
 
-- `sensta-ios`를 같은 앱 업적 대상으로 볼지 제품 정책을 확정한다.
-- 허용한다면 `X-Nubo-Client: sensta-ios`와 `X-Nubo-App-Version`을 기록한다.
-- 헤더는 인증 수단이 아니며 사용자 UID는 JWT에서만 가져오는 원칙을 유지한다.
+- Android는 `X-Nubo-Client: sensta-android`, iOS는 `X-Nubo-Client: sensta-ios`를 보낸다.
+- 서버는 두 출처를 각 게시글의 `post_origin`에 구분해 기록하지만 동일한 `sensta-app` 업적을 수여한다.
+- 관리 화면의 정의는 `SENSTA 앱 포토그래퍼`이며 사용자별 `(user_uid, badge_key)`가 유일하므로 어느
+  플랫폼에서 먼저 획득해도 중복 수여되지 않는다.
+- 헤더는 인증 수단이 아니며 사용자 UID는 JWT에서만 가져온다.
 
 ## 5. iPhone 사진 업로드
 
-현재 GOAPI 이미지 확장자 판별에는 HEIC가 포함되지 않아 iPhone 원본을 그대로 올리면 썸네일·EXIF 처리가
-빠질 수 있다.
-
-- 첫 릴리스는 iOS에서 선택한 사진을 privacy-safe JPEG로 정규화하는 방안을 우선 검토한다.
-- 서버가 HEIC를 직접 받을 경우 libvips decode, orientation, thumbnail, EXIF, AI 설명과 원본 다운로드를
-  Ubuntu 22.04 공식 runtime에서 함께 시험한다.
-- JPEG/HEIC 확장자와 실제 MIME·magic bytes 불일치를 검증한다.
+iOS 앱은 선택한 JPEG·HEIC 사진을 방향이 정규화된 JPEG로 변환하고 긴 변을 4096px로 제한한 뒤 정확한
+GPS 메타데이터를 제거해 기존 multipart 계약으로 보낸다. GOAPI는 저장된 JPEG를 기존 썸네일·EXIF·AI
+설명 경로로 처리한다. 원본 HEIC를 서버에 직접 보내는 계약은 사용하지 않는다.
 - 정확한 GPS 관련 EXIF는 공개 업로드 전에 제거한다.
 - 최대 9장·합계 100MB, 취소, 부분 실패와 임시 파일 정리를 회귀 테스트한다.
 - Live Photo와 RAW는 첫 릴리스 범위에서 제외하고 사용자에게 처리 결과를 명확히 알린다.
