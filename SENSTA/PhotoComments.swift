@@ -157,9 +157,8 @@ final class PhotoCommentsViewModel {
   }
 }
 
-struct PhotoCommentsView: View {
+struct PhotoCommentsSection: View {
   @State private var model: PhotoCommentsViewModel
-  @Environment(\.dismiss) private var dismiss
 
   init(boardID: Int, postID: Int, service: any PhotoCommentsServing) {
     _model = State(
@@ -167,68 +166,62 @@ struct PhotoCommentsView: View {
   }
 
   var body: some View {
-    NavigationStack {
-      ScrollView {
-        LazyVStack(alignment: .leading, spacing: 24) {
-          if model.hasLoaded && model.comments.isEmpty {
-            ContentUnavailableView("아직 공개 댓글이 없어요", systemImage: "bubble.left.and.bubble.right")
-          }
-          ForEach(model.comments) { comment in
-            VStack(alignment: .leading, spacing: 10) {
-              HStack(alignment: .firstTextBaseline) {
-                if comment.isReply {
-                  Image(systemName: "arrow.turn.down.right")
-                    .foregroundStyle(.tertiary)
-                    .accessibilityLabel("답글")
-                }
-                Text(comment.writer).font(.subheadline.weight(.semibold))
-                Spacer(minLength: 8)
-                Text(comment.submitted, format: .dateTime.month().day())
-                  .font(.caption).foregroundStyle(.secondary)
-              }
-              Text(comment.content)
-                .font(.body)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
-              if comment.likeCount > 0 {
-                Label("\(comment.likeCount)", systemImage: "heart")
-                  .font(.caption).foregroundStyle(.secondary)
-                  .accessibilityLabel("좋아요 \(comment.likeCount)개")
-              }
+    LazyVStack(alignment: .leading, spacing: 24) {
+      HStack {
+        Text("댓글").font(.headline)
+          .accessibilityAddTraits(.isHeader)
+        Spacer()
+        Button("댓글 새로고침", systemImage: "arrow.clockwise") { Task { await model.refresh() } }
+          .labelStyle(.iconOnly)
+          .foregroundStyle(.secondary)
+          .disabled(model.isLoading)
+      }
+      if model.hasLoaded && model.comments.isEmpty {
+        ContentUnavailableView("아직 공개 댓글이 없어요", systemImage: "bubble.left.and.bubble.right")
+      }
+      ForEach(model.comments) { comment in
+        VStack(alignment: .leading, spacing: 10) {
+          HStack(alignment: .firstTextBaseline) {
+            if comment.isReply {
+              Image(systemName: "arrow.turn.down.right")
+                .foregroundStyle(.tertiary)
+                .accessibilityLabel("답글")
             }
-            .padding(.leading, comment.isReply ? 20 : 0)
-            Divider()
+            Text(comment.writer).font(.subheadline.weight(.semibold))
+            Spacer(minLength: 8)
+            Text(comment.submitted, format: .dateTime.month().day())
+              .font(.caption).foregroundStyle(.secondary)
           }
-          if model.isLoading {
-            ProgressView().frame(maxWidth: .infinity)
-          } else if let error = model.error {
-            VStack(spacing: 12) {
-              Text(error).foregroundStyle(.secondary)
-              Button("다시 시도") {
-                Task { await model.retry() }
-              }
-              .accessibilityIdentifier("photo-comments-retry")
-            }
-            .frame(maxWidth: .infinity)
-          } else if model.hasMore {
-            Button("댓글 더 보기") { Task { await model.loadMore() } }
-              .frame(maxWidth: .infinity)
+          Text(comment.content)
+            .font(.body)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+          if comment.likeCount > 0 {
+            Label("\(comment.likeCount)", systemImage: "heart")
+              .font(.caption).foregroundStyle(.secondary)
+              .accessibilityLabel("좋아요 \(comment.likeCount)개")
           }
         }
-        .padding(24)
+        .padding(.leading, comment.isReply ? 20 : 0)
+        Divider()
       }
-      .refreshable { await model.refresh() }
-      .navigationTitle("댓글")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .topBarTrailing) {
-          Button("닫기", systemImage: "xmark") { dismiss() }
-            .labelStyle(.iconOnly)
-            .accessibilityIdentifier("photo-comments-close")
+      if model.isLoading {
+        ProgressView().frame(maxWidth: .infinity)
+      } else if let error = model.error {
+        VStack(spacing: 12) {
+          Text(error).foregroundStyle(.secondary)
+          Button("다시 시도") {
+            Task { await model.retry() }
+          }
+          .accessibilityIdentifier("photo-comments-retry")
         }
+        .frame(maxWidth: .infinity)
+      } else if model.hasMore {
+        Button("댓글 더 보기") { Task { await model.loadMore() } }
+          .frame(maxWidth: .infinity)
       }
-      .task { await model.loadIfNeeded() }
     }
-    .presentationDragIndicator(.visible)
+    .task { await model.loadIfNeeded() }
+    .accessibilityIdentifier("photo-comments-section")
   }
 }

@@ -27,7 +27,8 @@ The iOS app should feel native to Apple platforms while preserving the product b
 - Prioritize iOS-only progress and reuse existing Android-compatible API contracts before backend changes.
   Defer server work when possible; preserve deployed Android clients when changes become necessary.
 - Keep the approved immersive feed identity. Other screens should favor native iOS controls, restrained
-  decoration, visible whitespace, and the full photographic composition.
+  decoration, visible whitespace, and the full photographic composition. Group a compact EXIF summary above
+  the AI description in one theme-aware shaded panel; show comments inline below the post.
 - The product owner handles production backend updates/restarts and browser-based Firebase/OAuth/APNs setup.
   Provide precise deployment or setup instructions when those steps become necessary.
 

@@ -4,7 +4,8 @@ struct PhotoPostDetailView: View {
   @State private var model: PhotoPostDetailViewModel
   @State private var selectedImageID: PhotoPostImage.ID?
   @State private var showsPhotoViewer = false
-  @State private var showsComments = false
+  @State private var commentsScrollRequest = 0
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private let commentsService: any PhotoCommentsServing
 
   init(postID: Int, service: any PhotoPostDetailServing) {
@@ -37,7 +38,7 @@ struct PhotoPostDetailView: View {
       if case .loaded(let detail) = model.state {
         ToolbarItemGroup(placement: .topBarTrailing) {
           if detail.boardID != nil {
-            Button("댓글 보기", systemImage: "bubble.right") { showsComments = true }
+            Button("댓글로 이동", systemImage: "bubble.right") { commentsScrollRequest += 1 }
               .accessibilityIdentifier("photo-detail-comments")
           }
           if let shareURL = detail.shareURL {
@@ -45,11 +46,6 @@ struct PhotoPostDetailView: View {
               .accessibilityLabel("게시물 공유")
           }
         }
-      }
-    }
-    .sheet(isPresented: $showsComments) {
-      if case .loaded(let detail) = model.state, let boardID = detail.boardID {
-        PhotoCommentsView(boardID: boardID, postID: detail.post.id, service: commentsService)
       }
     }
     .fullScreenCover(isPresented: $showsPhotoViewer) {
@@ -62,51 +58,68 @@ struct PhotoPostDetailView: View {
   }
 
   private func loadedContent(_ detail: PhotoPostDetail) -> some View {
-    ScrollView {
-      VStack(alignment: .leading, spacing: 28) {
-        titleSection(detail.post)
+    ScrollViewReader { proxy in
+      ScrollView {
+        VStack(alignment: .leading, spacing: 28) {
+          titleSection(detail.post)
 
-        PhotoDetailImagePager(
-          images: detail.images,
-          selectedImageID: $selectedImageID,
-          fallbackTitle: detail.post.title,
-          onOpen: { imageID in
-            selectedImageID = imageID
-            showsPhotoViewer = true
+          VStack(alignment: .leading, spacing: 10) {
+            PhotoDetailImagePager(
+              images: detail.images,
+              selectedImageID: $selectedImageID,
+              fallbackTitle: detail.post.title,
+              onOpen: { imageID in
+                selectedImageID = imageID
+                showsPhotoViewer = true
+              }
+            )
+
+            if let image = selectedImage(in: detail.images) {
+              PhotoMetadataSection(image: image)
+            }
           }
-        )
 
-        if let image = selectedImage(in: detail.images) {
-          PhotoMetadataSection(image: image)
-        }
+          let bodyText = detail.post.content.nuboPlainText
+          if !bodyText.isEmpty {
+            Text(bodyText)
+              .font(.body)
+              .fixedSize(horizontal: false, vertical: true)
+          }
 
-        let bodyText = detail.post.content.nuboPlainText
-        if !bodyText.isEmpty {
-          Text(bodyText)
-            .font(.body)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-
-        if !detail.tags.isEmpty {
-          ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-              ForEach(detail.tags) { tag in
-                Text("#\(tag.name)")
-                  .font(.subheadline.weight(.medium))
-                  .foregroundStyle(.tint)
-                  .padding(.horizontal, 12)
-                  .padding(.vertical, 7)
-                  .background(.tint.opacity(0.1), in: Capsule())
+          if !detail.tags.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+              HStack(spacing: 8) {
+                ForEach(detail.tags) { tag in
+                  Text("#\(tag.name)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.tint)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.tint.opacity(0.1), in: Capsule())
+                }
               }
             }
           }
-        }
 
-        footer(detail)
+          footer(detail)
+
+          if let boardID = detail.boardID {
+            Divider()
+            PhotoCommentsSection(boardID: boardID, postID: detail.post.id, service: commentsService)
+              .id("photo-comments")
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 20)
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.horizontal, 16)
-      .padding(.vertical, 20)
+      .onChange(of: commentsScrollRequest) { _, _ in
+        if reduceMotion {
+          proxy.scrollTo("photo-comments", anchor: .top)
+        } else {
+          withAnimation { proxy.scrollTo("photo-comments", anchor: .top) }
+        }
+      }
     }
     .background(Color(.systemBackground))
   }
@@ -335,37 +348,37 @@ private struct PhotoMetadataSection: View {
   let image: PhotoPostImage
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      if !facts.isEmpty {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), alignment: .leading)], spacing: 10) {
-          ForEach(facts) { fact in
-            VStack(alignment: .leading, spacing: 2) {
-              Text(fact.label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-              Text(fact.value)
-                .font(.caption.weight(.medium))
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            }
-          }
+    if !facts.isEmpty || !image.description.isEmpty {
+      VStack(alignment: .leading, spacing: 0) {
+        if !facts.isEmpty {
+          Text(facts.map(\.value).joined(separator: " · "))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineSpacing(3)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(14)
+            .accessibilityLabel(facts.map { "\($0.label) \($0.value)" }.joined(separator: ", "))
+            .accessibilityIdentifier("photo-metadata-exif")
         }
-        .padding(.vertical, 8)
-      }
-
-      if !image.description.isEmpty {
-        Label {
-          Text(image.description).fixedSize(horizontal: false, vertical: true)
-        } icon: {
-          Image(systemName: "sparkles").foregroundStyle(.tint)
+        if !facts.isEmpty && !image.description.isEmpty {
+          Divider().padding(.horizontal, 14)
         }
-        .font(.subheadline)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel("사진 설명: \(image.description)")
+        if !image.description.isEmpty {
+          Text(image.description)
+            .font(.subheadline)
+            .foregroundStyle(.primary)
+            .lineSpacing(4)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(14)
+            .accessibilityLabel("AI 사진 설명: \(image.description)")
+            .accessibilityIdentifier("photo-metadata-description")
+        }
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+      .accessibilityElement(children: .contain)
+      .accessibilityIdentifier("photo-metadata-panel")
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var facts: [PhotoFact] {
@@ -398,9 +411,6 @@ private struct PhotoMetadataSection: View {
     }
     if let iso = exif.iso {
       values.append(PhotoFact(label: "감도", value: "ISO \(iso)"))
-    }
-    if let width = exif.width, let height = exif.height {
-      values.append(PhotoFact(label: "크기", value: "\(width) × \(height)"))
     }
     return values
   }

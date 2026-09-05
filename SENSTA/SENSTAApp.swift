@@ -33,6 +33,17 @@ struct SENSTAApp: App {
   var body: some Scene {
     WindowGroup {
       ContentView(service: photoFeedService, detailService: photoPostDetailService)
+        #if DEBUG
+          .preferredColorScheme(
+            ProcessInfo.processInfo.arguments.contains("--ui-test-dark")
+              ? .dark : ProcessInfo.processInfo.arguments.contains("--ui-test-light") ? .light : nil
+          )
+          .transformEnvironment(\.dynamicTypeSize) { size in
+            if ProcessInfo.processInfo.arguments.contains("--ui-test-large-text") {
+              size = .accessibility3
+            }
+          }
+        #endif
     }
   }
 }
@@ -82,14 +93,14 @@ struct SENSTAApp: App {
         submitted: .now, viewCount: 3, coverURL: nil, commentCount: 0, likeCount: 1,
         isLiked: false, writer: PhotoPostWriter(id: 1, name: "사진가", profileURL: nil, badgeKeys: []))
       let exif = PhotoExif(
-        make: "", model: "", aperture: nil, iso: nil, focalLength: nil,
-        exposure: nil, width: 900, height: 600, date: nil)
+        make: "Panasonic", model: "DC-G100", aperture: 400, iso: 250, focalLength: 40,
+        exposure: 16666, width: 900, height: 600, date: nil)
       return PhotoPostDetail(
         post: post,
         images: [1, 2].map {
           PhotoPostImage(
             id: $0, largeURL: nil, smallURL: nil,
-            description: "테스트 사진 \($0)", exif: exif)
+            description: "나무 사이로 스며드는 빛과 차분한 여백이 어우러진 풍경입니다. 사진 \($0)", exif: exif)
         },
         tags: [], attachments: [], previousPostID: nil, nextPostID: nil, shareURL: nil, boardID: 2)
     }

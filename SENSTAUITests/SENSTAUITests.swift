@@ -55,28 +55,71 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
-  func testCommentsRetryPaginationAndDismissal() throws {
+  func testInlineCommentsRetryPaginationAndScrolling() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]
     app.launch()
     let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
     XCTAssertTrue(card.waitForExistence(timeout: 10))
     card.tap()
-    let comments = app.buttons["photo-detail-comments"]
-    XCTAssertTrue(comments.waitForExistence(timeout: 10))
-    comments.tap()
+    XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 10))
     let retry = app.buttons["photo-comments-retry"]
-    XCTAssertTrue(retry.waitForExistence(timeout: 5))
+    for _ in 0..<5 {
+      if retry.exists && retry.isHittable { break }
+      app.swipeUp(velocity: .slow)
+    }
+    XCTAssertTrue(retry.isHittable)
+    XCTAssertEqual(app.sheets.count, 0)
     retry.tap()
     XCTAssertTrue(app.staticTexts["여백이 아름다운 사진입니다. 1"].waitForExistence(timeout: 5))
-    app.buttons["댓글 더 보기"].tap()
+    let more = app.buttons["댓글 더 보기"]
+    for _ in 0..<4 {
+      if more.exists && more.isHittable { break }
+      app.swipeUp(velocity: .slow)
+    }
+    XCTAssertTrue(more.isHittable)
+    more.tap()
     XCTAssertTrue(app.staticTexts["여백이 아름다운 사진입니다. 2"].waitForExistence(timeout: 5))
     let screenshot = XCTAttachment(screenshot: app.screenshot())
     screenshot.name = "Photo comments"
     screenshot.lifetime = .keepAlways
     add(screenshot)
-    app.buttons["photo-comments-close"].tap()
-    XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.navigationBars["사진"].exists)
+    XCTAssertEqual(app.sheets.count, 0)
+  }
+
+  @MainActor
+  func testMetadataPanelInLightDarkAndLargeText() throws {
+    for appearance in ["light", "dark", "large-text"] {
+      let app = XCUIApplication()
+      app.launchArguments = ["--ui-test-viewer", "--ui-test-\(appearance)"]
+      app.launch()
+      let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+      XCTAssertTrue(card.waitForExistence(timeout: 10))
+      card.tap()
+      XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 10))
+      let panel = app.otherElements["photo-metadata-panel"]
+      let exif = app.staticTexts["photo-metadata-exif"]
+      let description = app.staticTexts["photo-metadata-description"]
+      for _ in 0..<4 {
+        if description.exists && description.isHittable { break }
+        app.swipeUp(velocity: .slow)
+      }
+      XCTAssertTrue(panel.exists)
+      XCTAssertTrue(exif.exists)
+      XCTAssertTrue(description.isHittable)
+      XCTAssertLessThan(exif.frame.maxY, description.frame.minY)
+      XCTAssertGreaterThanOrEqual(panel.frame.minX, app.windows.firstMatch.frame.minX + 15)
+      XCTAssertLessThanOrEqual(panel.frame.maxX, app.windows.firstMatch.frame.maxX - 15)
+      let screenshot = XCTAttachment(screenshot: app.screenshot())
+      screenshot.name = "Metadata \(appearance)"
+      screenshot.lifetime = .keepAlways
+      add(screenshot)
+      app.buttons["photo-detail-comments"].tap()
+      XCTAssertTrue(app.buttons["photo-comments-retry"].isHittable)
+      XCTAssertEqual(app.sheets.count, 0)
+      app.terminate()
+    }
   }
 
   @MainActor
