@@ -107,6 +107,23 @@ struct PhotoPostDetailContractTests {
     #expect(throws: NuboAPIError.server(code: 3, message: "denied")) { try response.photoIDs() }
   }
 
+  @Test
+  func publicSummaryRequestAndUnavailableResponse() throws {
+    let base = try #require(URL(string: "https://sensta.me/goapi/"))
+    let request = try PhotographerEndpoint.summaryRequest(baseURL: base, userID: 42)
+    #expect(
+      request.url?.absoluteString
+        == "https://sensta.me/goapi/board/user/summary?id=photo&targetUserUid=42")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    for json in [
+      #"{"success":true,"code":0,"error":"","result":null}"#,
+      #"{"success":true,"code":0,"error":"","result":{"postCount":-1,"photoCount":0,"likeCount":0}}"#,
+    ] {
+      let dto = try JSONDecoder().decode(PhotographerSummaryDTO.self, from: Data(json.utf8))
+      #expect(throws: NuboAPIError.malformedResponse) { try dto.checked() }
+    }
+  }
+
   private func fixtureData(named name: String) throws -> Data {
     let url = try #require(
       Bundle(for: PhotoDetailFixtureBundleMarker.self).url(
@@ -122,6 +139,20 @@ private final class PhotoDetailFixtureBundleMarker {}
 
 struct PhotographerServiceTests {
   @Test
+  func summaryFailureDoesNotHideProfileAndWorks() async throws {
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [PhotographerURLProtocol.self]
+    let session = URLSession(configuration: config)
+    defer { session.invalidateAndCancel() }
+    let base = try #require(URL(string: "https://summary-unavailable.test/goapi/"))
+    let profile = try await PhotoPostDetailService(apiBaseURL: base, session: session)
+      .fetchPhotographer(id: 42)
+    #expect(profile.writer.id == 42)
+    #expect(profile.posts.map(\.id) == [101])
+    #expect(profile.summary == nil)
+  }
+
+  @Test
   func onlyDisplaysValidatedPostIdentityAndReportsUnavailableWorks() async throws {
     let config = URLSessionConfiguration.ephemeral
     config.protocolClasses = [PhotographerURLProtocol.self]
@@ -133,6 +164,9 @@ struct PhotographerServiceTests {
     #expect(profile.writer.id == 42)
     #expect(profile.posts.map(\.id) == [101])
     #expect(profile.unavailableCount == 1)
+    #expect(profile.summary?.postCount == 24)
+    #expect(profile.summary?.photoCount == 58)
+    #expect(profile.summary?.likeCount == 132)
   }
 }
 
@@ -147,6 +181,10 @@ private final class PhotographerURLProtocol: URLProtocol, @unchecked Sendable {
         data = Data(
           #"{"success":true,"code":0,"error":"","result":{"uid":42,"name":"사진가","profile":"","signature":"소개","blocked":false}}"#
             .utf8)
+      } else if url.path.hasSuffix("board/user/summary") {
+        data = Data(
+          #"{"success":true,"code":0,"error":"","result":{"postCount":24,"photoCount":58,"likeCount":132}}"#
+            .utf8)
       } else if url.path.hasSuffix("board/user/latest") {
         data = Data(
           #"{"success":true,"code":0,"error":"","result":{"posts":[{"postUid":101,"board":{"id":"photo"}},{"postUid":102,"board":{"id":"photo"}}]}}"#
@@ -158,7 +196,11 @@ private final class PhotographerURLProtocol: URLProtocol, @unchecked Sendable {
         data = try Data(contentsOf: fixture)
       }
       let response = try #require(
-        HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
+        HTTPURLResponse(
+          url: url,
+          statusCode: url.host == "summary-unavailable.test"
+            && url.path.hasSuffix("board/user/summary") ? 404 : 200, httpVersion: nil,
+          headerFields: nil))
       client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
       client?.urlProtocol(self, didLoad: data)
       client?.urlProtocolDidFinishLoading(self)

@@ -83,12 +83,20 @@ struct PhotoPostDetailService: PhotoPostDetailServing {
         if let post { posts.append(post) } else { unavailable += 1 }
       }
     }
+    var summary: PhotographerSummary?
+    do {
+      let data = try await client.data(
+        for: PhotographerEndpoint.summaryRequest(baseURL: client.apiBaseURL, userID: id))
+      summary = try JSONDecoder().decode(PhotographerSummaryDTO.self, from: data).checked()
+    } catch is CancellationError { throw CancellationError() } catch { summary = nil }
+    var badgeKeys = Set<String>()
+    let badges = (info.badges ?? []).filter { !$0.key.isEmpty && badgeKeys.insert($0.key).inserted }
     return PhotographerProfile(
       writer: PhotoPostWriter(
         id: id, name: info.name,
         profileURL: MediaURLResolver.url(for: info.profile, apiBaseURL: client.apiBaseURL),
         badgeKeys: info.badges?.map(\.key) ?? []), signature: info.signature, posts: posts,
-      unavailableCount: unavailable)
+      unavailableCount: unavailable, badges: badges, summary: summary)
   }
 
   func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {

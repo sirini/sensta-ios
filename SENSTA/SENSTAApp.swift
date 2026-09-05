@@ -96,7 +96,12 @@ struct SENSTAApp: App {
       let post = try await fetchPost(id: 1).post
       return PhotographerProfile(
         writer: post.writer, signature: "빛과 여백, 일상 속 작은 순간을 기록합니다.", posts: [post],
-        unavailableCount: 0)
+        unavailableCount: 0,
+        badges: [
+          BoardBadgeDTO(
+            key: "sensta-app", name: "SENSTA 앱 포토그래퍼", description: "SENSTA 앱으로 사진을 공유한 사용자입니다.",
+            iconKey: "aperture", earnedAt: 1_788_410_731_496)
+        ], summary: PhotographerSummary(postCount: 24, photoCount: 58, likeCount: 132))
     }
     func fetchComments(boardID: Int, postID: Int, page: Int) async throws -> PhotoCommentsPage {
       commentAttempts += 1

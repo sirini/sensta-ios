@@ -186,12 +186,21 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertTrue(retry.waitForExistence(timeout: 5))
     retry.tap()
     XCTAssertTrue(app.staticTexts["photographer-name"].waitForExistence(timeout: 5))
+    XCTAssertEqual(app.otherElements["photographer-stat-작품"].value as? String, "24")
+    XCTAssertEqual(app.otherElements["photographer-stat-사진"].value as? String, "58")
+    XCTAssertEqual(app.otherElements["photographer-stat-받은 좋아요"].value as? String, "132")
+    let badge = app.buttons["photographer-badge-sensta-app"]
+    XCTAssertTrue(badge.waitForExistence(timeout: 5))
+    badge.tap()
+    XCTAssertTrue(app.staticTexts["SENSTA 앱으로 사진을 공유한 사용자입니다."].waitForExistence(timeout: 5))
+    app.buttons["닫기"].tap()
     let photo = app.buttons.matching(identifier: "photographer-photo").firstMatch
     XCTAssertTrue(photo.waitForExistence(timeout: 5))
     let screenshot = XCTAttachment(screenshot: app.screenshot())
     screenshot.name = "Photographer recent works"
     screenshot.lifetime = .keepAlways
     add(screenshot)
+    if !photo.isHittable { app.swipeUp(velocity: .slow) }
     photo.tap()
     XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
     app.navigationBars.buttons.firstMatch.tap()
