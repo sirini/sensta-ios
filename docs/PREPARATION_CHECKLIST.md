@@ -64,7 +64,7 @@
 - [x] 공개 개인정보처리방침: `https://sensta.me/privacy`
 - [x] 공개 이용약관: `https://sensta.me/terms`
 - [x] 공개 계정 삭제 안내: `https://sensta.me/delete-account`
-- [ ] 전용 지원 URL 운영 배포: NUBO `/support` 구현·검증 완료, `https://sensta.me/support` 배포 필요
+- [x] 전용 지원 URL 운영 배포 및 `https://sensta.me/support` 외부 HTTP 200 확인
 - [x] 신고·차단·운영자 조치·부적절 콘텐츠 필터의 심사 시나리오 작성
 - [x] App Privacy 데이터 수집표 작성
 - [x] Firebase·Google 등 third-party SDK privacy manifest가 Release 앱 번들에 포함되는지 확인
@@ -72,9 +72,10 @@
 - [x] 앱 Privacy Manifest와 UserDefaults 필수 사유 `CA92.1` 선언
 - [x] 연령 등급 질문, 콘텐츠 권리와 수출 규정 답변 준비
 - [x] 대한민국 비즈니스 규정 준수용 연락처 및 사업자등록번호 보유 여부 확인 완료
-- [ ] App Review용 테스트 계정 생성: 검토 메모 초안은 작성 완료
+- [x] App Review용 운영 테스트 계정 생성과 검토 메모·연락처 입력
 - [x] 1024px App Store 아이콘과 실데이터 6.9형 iPhone 스크린샷 5장 준비
 - [x] 정식 Xcode 26.6의 `SENSTA 1.0 (1)`을 App Store Connect에 업로드
+- [x] App Privacy 13개 데이터 유형 게시와 `SENSTA 1.0 (1)` App Review 제출
 - [ ] TestFlight 내부 테스트 후 실제 사용자 여정 회귀 테스트
 
 ## 첫 개발 세션
