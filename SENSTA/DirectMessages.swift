@@ -19,6 +19,7 @@ struct DirectMessage: Identifiable, Equatable, Sendable {
   let senderID: Int
   let text: String
   let sentAt: Date
+  let readAt: Date?
 }
 
 struct DirectMessageThread: Identifiable, Equatable, Sendable {
@@ -80,6 +81,7 @@ private struct DirectMessageDTO: Decodable {
   let userUid: Int
   let message: String
   let timestamp: Int64
+  let readAt: Int64?
 }
 
 private struct DirectMessageHistoryResponseDTO: Decodable {
@@ -95,12 +97,15 @@ private struct DirectMessageHistoryResponseDTO: Decodable {
     var messageIDs = Set<Int>()
     return try items.map { item in
       let message = item.message.nuboPlainText
+      let readAt = item.readAt ?? 0
       guard item.uid > 0, item.userUid > 0, item.timestamp >= 0, !message.isEmpty,
-        message.unicodeScalars.count <= 2_000, messageIDs.insert(item.uid).inserted
+        readAt >= 0, message.unicodeScalars.count <= 2_000,
+        messageIDs.insert(item.uid).inserted
       else { throw NuboAPIError.malformedResponse }
       return DirectMessage(
         id: item.uid, senderID: item.userUid, text: message,
-        sentAt: Date(timeIntervalSince1970: Double(item.timestamp) / 1_000))
+        sentAt: Date(timeIntervalSince1970: Double(item.timestamp) / 1_000),
+        readAt: readAt > 0 ? Date(timeIntervalSince1970: Double(readAt) / 1_000) : nil)
     }
     .sorted { left, right in
       if left.sentAt == right.sentAt { return left.id < right.id }
@@ -124,6 +129,31 @@ private struct DirectMessageSendResponseDTO: Decodable {
     guard success, code == 0 else { throw NuboAPIError.server(code: code, message: "") }
     guard let result, result > 0 else { throw NuboAPIError.malformedResponse }
     return result
+  }
+}
+
+private struct DirectMessageReadBody: Encodable {
+  let targetUserUid: Int
+  let throughUid: Int
+}
+
+private struct DirectMessageReadResponseDTO: Decodable {
+  let success: Bool
+  let error: String
+  let code: Int
+  let result: Result?
+
+  struct Result: Decodable {
+    let throughUid: Int
+    let readAt: Int64
+    let updatedCount: Int64
+  }
+
+  func checked(expectedThroughID: Int) throws {
+    guard success, code == 0 else { throw NuboAPIError.server(code: code, message: "") }
+    guard let result, result.throughUid == expectedThroughID, result.readAt >= 0,
+      result.updatedCount >= 0
+    else { throw NuboAPIError.malformedResponse }
   }
 }
 
@@ -160,6 +190,16 @@ enum DirectMessageEndpoint {
     return request
   }
 
+  static func markRead(baseURL: URL, targetUserID: Int, throughID: Int) throws -> URLRequest {
+    guard targetUserID > 0, throughID > 0 else { throw NuboAPIError.invalidRequest }
+    var request = try AccountEndpoint.request(
+      baseURL: baseURL, path: "chat/read", method: "PATCH")
+    request.httpBody = try JSONEncoder().encode(
+      DirectMessageReadBody(targetUserUid: targetUserID, throughUid: throughID))
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    return request
+  }
+
   private static func request(
     baseURL: URL, path: String, queryItems: [URLQueryItem]
   ) throws -> URLRequest {
@@ -170,6 +210,52 @@ enum DirectMessageEndpoint {
     var request = try AccountEndpoint.request(baseURL: baseURL, path: path)
     request.url = url
     return request
+  }
+}
+
+enum DirectMessageHashtags {
+  private static let expression = try! NSRegularExpression(
+    pattern: #"(?<![\p{L}\p{N}_])#[\p{L}\p{N}_]+"#)
+
+  static func keywords(in text: String) -> [String] {
+    matches(in: text).map(\.keyword)
+  }
+
+  static func linkedText(_ text: String) -> AttributedString {
+    var attributed = AttributedString(text)
+    for match in matches(in: text) {
+      guard let attributedRange = Range(match.range, in: attributed),
+        let url = link(for: match.keyword)
+      else { continue }
+      attributed[attributedRange].link = url
+      attributed[attributedRange].underlineStyle = .single
+    }
+    return attributed
+  }
+
+  static func keyword(from url: URL) -> String? {
+    guard url.scheme == "sensta", url.host == "hashtag",
+      let keyword = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+        .queryItems?.first(where: { $0.name == "keyword" })?.value?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+      !keyword.isEmpty
+    else { return nil }
+    return keyword
+  }
+
+  private static func link(for keyword: String) -> URL? {
+    var components = URLComponents()
+    components.scheme = "sensta"
+    components.host = "hashtag"
+    components.queryItems = [URLQueryItem(name: "keyword", value: keyword)]
+    return components.url
+  }
+
+  private static func matches(in text: String) -> [(range: Range<String.Index>, keyword: String)] {
+    expression.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap { match in
+      guard let range = Range(match.range, in: text) else { return nil }
+      return (range, String(text[range].dropFirst()))
+    }
   }
 }
 
@@ -219,6 +305,9 @@ final class DirectMessageModel {
   private(set) var sendError: String?
   private var loadedTargetID: Int?
   private var loadedIdentity: UUID?
+  private var markedThroughID: Int?
+  private var refreshInProgress = false
+  private var messageGeneration = 0
 
   var draftLength: Int { draft.unicodeScalars.count }
   var canSend: Bool {
@@ -226,24 +315,36 @@ final class DirectMessageModel {
     return !trimmed.isEmpty && trimmed.unicodeScalars.count <= 2_000 && !isLoading && !isSending
   }
 
-  func load(partner: DirectMessagePartner, using account: AccountSession, force: Bool = false) async
+  func load(
+    partner: DirectMessagePartner, using account: AccountSession, force: Bool = false,
+    quietly: Bool = false
+  ) async
   {
     guard let user = account.user, user.uid != partner.id, let baseURL = account.apiBaseURL else {
       messages = []
       loadError = nil
       loadedIdentity = nil
       loadedTargetID = nil
+      markedThroughID = nil
       return
     }
     let identity = account.sessionIdentity
+    let currentMessageGeneration = messageGeneration
+    if loadedTargetID != partner.id || loadedIdentity != identity { markedThroughID = nil }
     guard force || loadedTargetID != partner.id || loadedIdentity != identity,
-      !isLoading, !isSending
+      !refreshInProgress, !isSending
     else {
       return
     }
-    isLoading = true
-    loadError = nil
-    defer { isLoading = false }
+    refreshInProgress = true
+    if !quietly {
+      isLoading = true
+      loadError = nil
+    }
+    defer {
+      refreshInProgress = false
+      if !quietly { isLoading = false }
+    }
     do {
       let request = try DirectMessageEndpoint.history(
         baseURL: baseURL, targetUserID: partner.id)
@@ -252,9 +353,12 @@ final class DirectMessageModel {
         .checked()
       try Task.checkCancellation()
       guard identity == account.sessionIdentity else { return }
+      guard currentMessageGeneration == messageGeneration else { return }
       messages = result
       loadedTargetID = partner.id
       loadedIdentity = identity
+      await markReadIfNeeded(
+        messages: result, partner: partner, account: account, identity: identity, baseURL: baseURL)
     } catch is CancellationError {
     } catch {
       guard identity == account.sessionIdentity else { return }
@@ -280,8 +384,10 @@ final class DirectMessageModel {
       try Task.checkCancellation()
       guard identity == account.sessionIdentity else { return }
       if !messages.contains(where: { $0.id == messageID }) {
+        messageGeneration += 1
         messages.append(
-          DirectMessage(id: messageID, senderID: user.uid, text: outgoing, sentAt: .now))
+          DirectMessage(
+            id: messageID, senderID: user.uid, text: outgoing, sentAt: .now, readAt: nil))
       }
       if draft.trimmingCharacters(in: .whitespacesAndNewlines) == outgoing { draft = "" }
     } catch is CancellationError {
@@ -290,11 +396,44 @@ final class DirectMessageModel {
       sendError = "메시지를 보내지 못했어요. 연결 또는 상대방과의 차단 상태를 확인해 주세요."
     }
   }
+
+  private func markReadIfNeeded(
+    messages: [DirectMessage], partner: DirectMessagePartner, account: AccountSession,
+    identity: UUID, baseURL: URL
+  ) async {
+    guard let throughID = messages.last(where: { $0.senderID == partner.id })?.id,
+      throughID > (markedThroughID ?? 0)
+    else { return }
+    do {
+      let request = try DirectMessageEndpoint.markRead(
+        baseURL: baseURL, targetUserID: partner.id, throughID: throughID)
+      let data = try await account.sendAuthenticated(request)
+      try JSONDecoder().decode(DirectMessageReadResponseDTO.self, from: data)
+        .checked(expectedThroughID: throughID)
+      try Task.checkCancellation()
+      guard identity == account.sessionIdentity else { return }
+      markedThroughID = throughID
+    } catch is CancellationError {
+    } catch {
+      // 대화 표시는 유지하고 다음 polling에서 읽음 처리를 다시 시도한다.
+    }
+  }
 }
 
 struct DirectMessageThreadListView: View {
   let account: AccountSession
+  let feedService: (any PhotoFeedServing)?
+  let detailService: (any PhotoPostDetailServing)?
   @State private var model = DirectMessageThreadListModel()
+
+  init(
+    account: AccountSession, feedService: (any PhotoFeedServing)? = nil,
+    detailService: (any PhotoPostDetailServing)? = nil
+  ) {
+    self.account = account
+    self.feedService = feedService
+    self.detailService = detailService
+  }
 
   var body: some View {
     Group {
@@ -315,7 +454,9 @@ struct DirectMessageThreadListView: View {
       } else {
         List(model.threads) { thread in
           NavigationLink {
-            DirectMessageView(partner: thread.partner, account: account)
+            DirectMessageView(
+              partner: thread.partner, account: account, feedService: feedService,
+              detailService: detailService)
           } label: {
             DirectMessageThreadRow(thread: thread)
           }
@@ -357,10 +498,24 @@ private struct DirectMessageThreadRow: View {
 struct DirectMessageView: View {
   let partner: DirectMessagePartner
   let account: AccountSession
+  let feedService: (any PhotoFeedServing)?
+  let detailService: (any PhotoPostDetailServing)?
   @State private var model = DirectMessageModel()
+  @State private var selectedHashtag: String?
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @FocusState private var composerFocused: Bool
+
+  init(
+    partner: DirectMessagePartner, account: AccountSession,
+    feedService: (any PhotoFeedServing)? = nil,
+    detailService: (any PhotoPostDetailServing)? = nil
+  ) {
+    self.partner = partner
+    self.account = account
+    self.feedService = feedService
+    self.detailService = detailService
+  }
 
   var body: some View {
     @Bindable var model = model
@@ -390,7 +545,10 @@ struct DirectMessageView: View {
                 .padding(.top, 60)
               }
               ForEach(model.messages) { message in
-                messageBubble(message)
+                messageBubble(
+                  message,
+                  isLatestMine: message.id
+                    == model.messages.last(where: { $0.senderID == account.user?.uid })?.id)
                   .id(message.id)
               }
             }
@@ -455,8 +613,28 @@ struct DirectMessageView: View {
     }
     .navigationTitle(partner.name)
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .principal) {
+        HStack(spacing: 8) {
+          AccountAvatar(
+            url: partner.profileURL, size: 30,
+            accessibilityLabel: "\(partner.name) 프로필 사진")
+          Text(partner.name).font(.headline).lineLimit(1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("direct-message-partner")
+      }
+    }
+    .navigationDestination(item: $selectedHashtag) { hashtag in
+      hashtagSearchDestination(hashtag)
+    }
     .task(id: account.sessionIdentity) {
       await model.load(partner: partner, using: account)
+      while !Task.isCancelled {
+        do { try await Task.sleep(for: .seconds(12)) } catch { return }
+        guard scenePhase == .active else { continue }
+        await model.load(partner: partner, using: account, force: true, quietly: true)
+      }
     }
     .onChange(of: scenePhase) { _, phase in
       guard phase == .active else { return }
@@ -468,18 +646,34 @@ struct DirectMessageView: View {
     Task { await model.send(to: partner, using: account) }
   }
 
-  private func messageBubble(_ message: DirectMessage) -> some View {
+  private func messageBubble(_ message: DirectMessage, isLatestMine: Bool) -> some View {
     let mine = message.senderID == account.user?.uid
     return HStack {
       if mine { Spacer(minLength: 52) }
       VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
-        Text(message.text)
+        Text(DirectMessageHashtags.linkedText(message.text))
           .font(.body)
           .foregroundStyle(mine ? Color.white : Color.primary)
+          .tint(mine ? Color.white : Color.accentColor)
           .fixedSize(horizontal: false, vertical: true)
+          .environment(
+            \.openURL,
+            OpenURLAction { url in
+              guard let hashtag = DirectMessageHashtags.keyword(from: url) else {
+                return .discarded
+              }
+              selectedHashtag = hashtag
+              return .handled
+            })
         Text(message.sentAt, format: .dateTime.month().day().hour().minute())
           .font(.caption2)
           .foregroundStyle(mine ? Color.white.opacity(0.76) : Color.secondary)
+        if mine && isLatestMine {
+          Text(message.readAt == nil ? "전송됨" : "읽음")
+            .font(.caption2.weight(.medium))
+            .foregroundStyle(Color.white.opacity(0.86))
+            .accessibilityIdentifier("direct-message-read-\(message.id)")
+        }
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
@@ -490,7 +684,27 @@ struct DirectMessageView: View {
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(mine ? "내 메시지" : "\(partner.name)의 메시지")
-    .accessibilityValue("\(message.text), \(message.sentAt.formatted())")
+    .accessibilityValue(
+      "\(message.text), \(message.sentAt.formatted())\(mine && isLatestMine ? (message.readAt == nil ? ", 전송됨" : ", 읽음") : "")"
+    )
     .accessibilityIdentifier("direct-message-\(message.id)")
+  }
+
+  @ViewBuilder
+  private func hashtagSearchDestination(_ hashtag: String) -> some View {
+    let initialRequest = PhotoSearchRequest(keyword: hashtag, option: .hashtag)
+    if let feedService, let detailService {
+      PhotoSearchView(
+        service: feedService, detailService: detailService, initialRequest: initialRequest)
+    } else if let baseURL = account.apiBaseURL {
+      PhotoSearchView(
+        service: PhotoFeedService(apiBaseURL: baseURL),
+        detailService: PhotoPostDetailService(apiBaseURL: baseURL),
+        initialRequest: initialRequest)
+    } else {
+      ContentUnavailableView(
+        "탐색을 열 수 없어요", systemImage: "magnifyingglass",
+        description: Text("앱 설정을 확인한 뒤 다시 시도해 주세요."))
+    }
   }
 }

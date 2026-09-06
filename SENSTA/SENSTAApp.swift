@@ -245,15 +245,24 @@ extension ContentView {
           "success": true, "code": 0, "error": "",
           "result": [
             [
-              "uid": 101, "userUid": 2, "message": "빛이 참 좋네요.",
-              "timestamp": 1_788_600_000_000 as Int64,
+              "uid": 101, "userUid": 2, "message": "#여름사진 빛이 참 좋네요.",
+              "timestamp": 1_788_600_000_000 as Int64, "readAt": 0,
             ],
             [
               "uid": 102, "userUid": 1, "message": "고맙습니다.",
               "timestamp": 1_788_600_030_000 as Int64,
+              "readAt": 1_788_600_040_000 as Int64,
             ],
           ],
         ])
+      }
+      if request.url?.path.hasSuffix("/chat/read") == true {
+        let body = try JSONDecoder().decode([String: Int].self, from: request.httpBody!)
+        guard body["targetUserUid"] == 2, body["throughUid"] == 101
+        else { throw NuboAPIError.invalidRequest }
+        return Data(
+          #"{"success":true,"error":"","code":0,"result":{"throughUid":101,"readAt":1788600065000,"updatedCount":1}}"#
+            .utf8)
       }
       if request.url?.path.hasSuffix("/chat/save") == true {
         let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]

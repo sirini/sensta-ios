@@ -446,6 +446,16 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["알림 사진가"].waitForExistence(timeout: 5))
     XCTAssertTrue(
       app.descendants(matching: .any)["direct-message-101"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.descendants(matching: .any)["direct-message-partner"].exists)
+    XCTAssertEqual(
+      app.descendants(matching: .any)["direct-message-read-102"].label, "읽음")
+    let hashtag = app.links["#여름사진"]
+    XCTAssertTrue(hashtag.waitForExistence(timeout: 5))
+    hashtag.tap()
+    XCTAssertTrue(app.navigationBars["탐색"].waitForExistence(timeout: 5))
+    XCTAssertEqual(app.searchFields.firstMatch.value as? String, "여름사진")
+    app.navigationBars["탐색"].buttons.firstMatch.tap()
+    XCTAssertTrue(app.navigationBars["알림 사진가"].waitForExistence(timeout: 5))
     let input = app.textFields["direct-message-input"]
     XCTAssertTrue(input.isHittable)
     input.tap()

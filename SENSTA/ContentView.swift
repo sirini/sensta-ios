@@ -105,7 +105,8 @@ struct ContentView: View {
               if let account, account.user != nil {
                 NavigationLink {
                   PhotoNotificationsView(
-                    center: notificationCenter, account: account, detailService: detailService)
+                    center: notificationCenter, account: account, detailService: detailService,
+                    feedService: feedService)
                 } label: {
                   PhotoNotificationBell(hasUnread: notificationCenter.hasUnread)
                 }
@@ -172,7 +173,7 @@ struct ContentView: View {
     }
     .sheet(isPresented: $showAccount) {
       if let account {
-        AccountView(session: account, detailService: detailService)
+        AccountView(session: account, detailService: detailService, feedService: feedService)
           .environment(\.dynamicTypeSize, dynamicTypeSize)
           .presentationDragIndicator(.visible)
       }

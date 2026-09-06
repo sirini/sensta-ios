@@ -28,7 +28,15 @@ private actor DirectMessageAccountStub: AccountServing {
     case "/goapi/chat/history":
       let duplicate = mode == .duplicateHistory ? 101 : 102
       return Data(
-        "{\"success\":true,\"error\":\"\",\"code\":0,\"result\":[{\"uid\":\(duplicate),\"userUid\":7,\"message\":\"답장\",\"timestamp\":2000},{\"uid\":101,\"userUid\":2,\"message\":\"안녕 &amp; 반가워요\",\"timestamp\":1000}]}"
+        "{\"success\":true,\"error\":\"\",\"code\":0,\"result\":[{\"uid\":\(duplicate),\"userUid\":7,\"message\":\"답장 #여름사진\",\"timestamp\":2000,\"readAt\":2500},{\"uid\":101,\"userUid\":2,\"message\":\"안녕 &amp; 반가워요\",\"timestamp\":1000,\"readAt\":0}]}"
+          .utf8)
+    case "/goapi/chat/read":
+      let body = try JSONDecoder().decode([String: Int].self, from: request.httpBody!)
+      guard body == ["targetUserUid": 2, "throughUid": 101] else {
+        throw NuboAPIError.invalidRequest
+      }
+      return Data(
+        #"{"success":true,"error":"","code":0,"result":{"throughUid":101,"readAt":3000,"updatedCount":1}}"#
           .utf8)
     case "/goapi/chat/save":
       if mode == .rejectSend {
@@ -83,6 +91,16 @@ struct DirectMessagesTests {
       try JSONDecoder().decode([String: JSONValue].self, from: send.httpBody!) == [
         "targetUserUid": .number(2), "message": .string("안녕하세요"),
       ])
+
+    let read = try DirectMessageEndpoint.markRead(
+      baseURL: baseURL, targetUserID: 2, throughID: 101)
+    #expect(read.url?.path == "/goapi/chat/read")
+    #expect(read.httpMethod == "PATCH")
+    #expect(read.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    #expect(
+      try JSONDecoder().decode([String: JSONValue].self, from: read.httpBody!) == [
+        "targetUserUid": .number(2), "throughUid": .number(101),
+      ])
     #expect(throws: NuboAPIError.invalidRequest) {
       try DirectMessageEndpoint.send(baseURL: baseURL, targetUserID: 2, message: "   ")
     }
@@ -107,9 +125,13 @@ struct DirectMessagesTests {
     await chat.load(partner: partner, using: session)
     #expect(chat.messages.map(\.id) == [101, 102])
     #expect(chat.messages.first?.text == "안녕 & 반가워요")
+    #expect(chat.messages.last?.readAt != nil)
 
     let requests = await service.requests
-    #expect(requests.count == 2)
+    #expect(requests.count == 3)
+    #expect(requests.map { $0.url?.path } == [
+      "/goapi/chat/list", "/goapi/chat/history", "/goapi/chat/read",
+    ])
     #expect(
       requests.allSatisfy {
         $0.value(forHTTPHeaderField: "Authorization") == "Bearer chat-access"
@@ -131,6 +153,7 @@ struct DirectMessagesTests {
     #expect(model.messages.last?.id == 103)
     #expect(model.messages.last?.senderID == 7)
     #expect(model.messages.last?.text == "새 사진 멋져요")
+    #expect(model.messages.last?.readAt == nil)
     #expect(model.draft.isEmpty)
     #expect(model.sendError == nil)
     let request = await service.requests.last
@@ -158,6 +181,17 @@ struct DirectMessagesTests {
     await malformed.load(partner: partner, using: malformedSession)
     #expect(malformed.messages.isEmpty)
     #expect(malformed.loadError != nil)
+  }
+
+  @Test func hashtagsBecomeSafeSearchLinks() throws {
+    let text = "#여름사진 같이 봐요. C#은 제외하고 #빛_산책 도 찾아요."
+    #expect(DirectMessageHashtags.keywords(in: text) == ["여름사진", "빛_산책"])
+
+    let linked = DirectMessageHashtags.linkedText(text)
+    let links = linked.runs.compactMap(\.link)
+    #expect(links.count == 2)
+    #expect(DirectMessageHashtags.keyword(from: links[0]) == "여름사진")
+    #expect(DirectMessageHashtags.keyword(from: URL(string: "https://example.com")!) == nil)
   }
 }
 

@@ -244,6 +244,17 @@ struct PhotoNotificationsView: View {
   let center: PhotoNotificationCenter
   let account: AccountSession
   let detailService: any PhotoPostDetailServing
+  let feedService: (any PhotoFeedServing)?
+
+  init(
+    center: PhotoNotificationCenter, account: AccountSession,
+    detailService: any PhotoPostDetailServing, feedService: (any PhotoFeedServing)? = nil
+  ) {
+    self.center = center
+    self.account = account
+    self.detailService = detailService
+    self.feedService = feedService
+  }
 
   var body: some View {
     Group {
@@ -262,7 +273,7 @@ struct PhotoNotificationsView: View {
                 partner: DirectMessagePartner(
                   id: notification.senderID, name: notification.senderName,
                   profileURL: notification.senderProfileURL),
-                account: account
+                account: account, feedService: feedService, detailService: detailService
               )
               .task { await center.markRead(notification, using: account) }
             } label: {

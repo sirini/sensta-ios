@@ -57,9 +57,15 @@ struct PhotoSearchView: View {
   @State private var request = PhotoSearchRequest(keyword: "", option: .aiDescription)
   @State private var recentTags: PhotoRecentTagsModel
 
-  init(service: any PhotoFeedServing, detailService: any PhotoPostDetailServing) {
+  init(
+    service: any PhotoFeedServing, detailService: any PhotoPostDetailServing,
+    initialRequest: PhotoSearchRequest = PhotoSearchRequest(keyword: "", option: .aiDescription)
+  ) {
     self.service = service
     self.detailService = detailService
+    _draft = State(initialValue: initialRequest.keyword)
+    _option = State(initialValue: initialRequest.option)
+    _request = State(initialValue: initialRequest)
     _recentTags = State(initialValue: PhotoRecentTagsModel(service: service))
   }
 

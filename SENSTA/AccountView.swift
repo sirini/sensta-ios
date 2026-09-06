@@ -4,6 +4,7 @@ import SwiftUI
 struct AccountView: View {
   @Bindable var session: AccountSession
   let detailService: any PhotoPostDetailServing
+  let feedService: (any PhotoFeedServing)?
   @State private var email = ""
   @State private var password = ""
   @State private var confirmLogout = false
@@ -18,13 +19,23 @@ struct AccountView: View {
   @FocusState private var field: Field?
   private enum Field { case email, password }
 
+  init(
+    session: AccountSession, detailService: any PhotoPostDetailServing,
+    feedService: (any PhotoFeedServing)? = nil
+  ) {
+    self.session = session
+    self.detailService = detailService
+    self.feedService = feedService
+  }
+
   var body: some View {
     NavigationStack {
       Form {
         if let user = session.user {
           Section {
             HStack(spacing: 14) {
-              AccountAvatar(url: session.profileURL, size: 48)
+              AccountAvatar(
+                url: session.profileURL, size: 48, accessibilityLabel: "내 프로필 사진")
                 .accessibilityIdentifier("account-profile-image")
               VStack(alignment: .leading, spacing: 4) {
                 Text(user.name.nuboPlainText).font(.title3.weight(.semibold))
@@ -39,7 +50,8 @@ struct AccountView: View {
             }
             .accessibilityIdentifier("account-photo-studio")
             NavigationLink {
-              DirectMessageThreadListView(account: session)
+              DirectMessageThreadListView(
+                account: session, feedService: feedService, detailService: detailService)
                 .onAppear { detent = .large }
             } label: {
               Label("1:1 메시지", systemImage: "bubble.left.and.bubble.right")
@@ -307,6 +319,13 @@ struct AccountView: View {
 struct AccountAvatar: View {
   let url: URL?
   let size: CGFloat
+  let accessibilityLabel: String
+
+  init(url: URL?, size: CGFloat, accessibilityLabel: String = "프로필 사진") {
+    self.url = url
+    self.size = size
+    self.accessibilityLabel = accessibilityLabel
+  }
 
   var body: some View {
     CachedAsyncPhotoImage(url: url, targetSize: CGSize(width: size, height: size)) { phase in
@@ -319,7 +338,7 @@ struct AccountAvatar: View {
       }
     }
     .frame(width: size, height: size).clipShape(Circle())
-    .accessibilityLabel("내 프로필 사진")
+    .accessibilityLabel(accessibilityLabel)
   }
 }
 
