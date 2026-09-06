@@ -99,7 +99,7 @@ final class SENSTAAppDelegate: NSObject, UIApplicationDelegate {
     _ application: UIApplication,
     didFailToRegisterForRemoteNotificationsWithError error: Error
   ) {
-    PushNotificationManager.shared.didFailToRegisterForRemoteNotifications()
+    PushNotificationManager.shared.didFailToRegisterForRemoteNotifications(error)
   }
 }
 
@@ -145,6 +145,7 @@ final class PushNotificationManager: NSObject, AccountLogoutCoordinating {
     FirebaseApp.configure(options: options)
     isConfigured = true
     Messaging.messaging().delegate = self
+    debugLog("Firebase configured for \(options.bundleID)")
 
     if let userInfo = launchOptions?[.remoteNotification] as? [AnyHashable: Any] {
       receive(userInfo: userInfo)
@@ -203,7 +204,8 @@ final class PushNotificationManager: NSObject, AccountLogoutCoordinating {
     self.account = nil
   }
 
-  func didFailToRegisterForRemoteNotifications() {
+  func didFailToRegisterForRemoteNotifications(_ error: Error) {
+    debugLog("APNs registration failed: \(error.localizedDescription)")
     registrationError = "Apple 푸시 서비스에 연결하지 못했어요. 네트워크를 확인해 주세요."
   }
 
@@ -268,9 +270,11 @@ final class PushNotificationManager: NSObject, AccountLogoutCoordinating {
       guard account.sessionIdentity == registration.identity else { return }
       serverRegistration = registration
       registrationError = nil
+      debugLog("GOAPI device registration succeeded")
     } catch is CancellationError {
     } catch {
       guard account.sessionIdentity == registration.identity else { return }
+      debugLog("GOAPI device registration failed: \(error.localizedDescription)")
       registrationError = "푸시 알림을 서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요."
     }
   }
@@ -294,6 +298,7 @@ final class PushNotificationManager: NSObject, AccountLogoutCoordinating {
     else { return }
     if self.installationID != installationID { serverRegistration = nil }
     self.installationID = installationID
+    debugLog("Firebase installation ID received (length: \(installationID.count))")
     Task { await registerServerDeviceIfNeeded() }
   }
 
@@ -305,6 +310,12 @@ final class PushNotificationManager: NSObject, AccountLogoutCoordinating {
   private func receive(userInfo: [AnyHashable: Any]) {
     guard let destination = RemoteNotificationDestination.make(from: userInfo) else { return }
     self.destination = destination
+  }
+
+  private func debugLog(_ message: String) {
+    #if DEBUG
+      print("[SENSTA Push] \(message)")
+    #endif
   }
 }
 
