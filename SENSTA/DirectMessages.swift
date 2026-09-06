@@ -1,0 +1,496 @@
+import Foundation
+import Observation
+import SwiftUI
+
+struct DirectMessagePartner: Identifiable, Hashable, Sendable {
+  let id: Int
+  let name: String
+  let profileURL: URL?
+
+  init(id: Int, name: String, profileURL: URL?) {
+    self.id = id
+    self.name = name.nuboPlainText
+    self.profileURL = profileURL
+  }
+}
+
+struct DirectMessage: Identifiable, Equatable, Sendable {
+  let id: Int
+  let senderID: Int
+  let text: String
+  let sentAt: Date
+}
+
+struct DirectMessageThread: Identifiable, Equatable, Sendable {
+  var id: Int { partner.id }
+  let partner: DirectMessagePartner
+  let latestMessageID: Int
+  let latestText: String
+  let sentAt: Date
+}
+
+private struct DirectMessageSenderDTO: Decodable {
+  let uid: Int
+  let name: String
+  let profile: String
+}
+
+private struct DirectMessageThreadDTO: Decodable {
+  let sender: DirectMessageSenderDTO
+  let uid: Int
+  let message: String
+  let timestamp: Int64
+}
+
+private struct DirectMessageThreadResponseDTO: Decodable {
+  let success: Bool
+  let error: String
+  let code: Int
+  let result: [DirectMessageThreadDTO]?
+
+  func checked(apiBaseURL: URL) throws -> [DirectMessageThread] {
+    guard success, code == 0 else { throw NuboAPIError.server(code: code, message: "") }
+    let items = result ?? []
+    guard items.count <= 50 else { throw NuboAPIError.malformedResponse }
+    var partnerIDs = Set<Int>()
+    return try items.map { item in
+      let name = item.sender.name.nuboPlainText
+      let message = item.message.nuboPlainText
+      guard item.uid > 0, item.sender.uid > 0, item.timestamp >= 0,
+        !name.isEmpty, name.count <= 200, message.unicodeScalars.count <= 2_000,
+        partnerIDs.insert(item.sender.uid).inserted
+      else { throw NuboAPIError.malformedResponse }
+      return DirectMessageThread(
+        partner: DirectMessagePartner(
+          id: item.sender.uid, name: name,
+          profileURL: MediaURLResolver.url(for: item.sender.profile, apiBaseURL: apiBaseURL)),
+        latestMessageID: item.uid, latestText: message,
+        sentAt: Date(timeIntervalSince1970: Double(item.timestamp) / 1_000)
+      )
+    }
+    .sorted { left, right in
+      if left.sentAt == right.sentAt { return left.latestMessageID > right.latestMessageID }
+      return left.sentAt > right.sentAt
+    }
+  }
+}
+
+private struct DirectMessageDTO: Decodable {
+  let uid: Int
+  let userUid: Int
+  let message: String
+  let timestamp: Int64
+}
+
+private struct DirectMessageHistoryResponseDTO: Decodable {
+  let success: Bool
+  let error: String
+  let code: Int
+  let result: [DirectMessageDTO]?
+
+  func checked() throws -> [DirectMessage] {
+    guard success, code == 0 else { throw NuboAPIError.server(code: code, message: "") }
+    let items = result ?? []
+    guard items.count <= 100 else { throw NuboAPIError.malformedResponse }
+    var messageIDs = Set<Int>()
+    return try items.map { item in
+      let message = item.message.nuboPlainText
+      guard item.uid > 0, item.userUid > 0, item.timestamp >= 0, !message.isEmpty,
+        message.unicodeScalars.count <= 2_000, messageIDs.insert(item.uid).inserted
+      else { throw NuboAPIError.malformedResponse }
+      return DirectMessage(
+        id: item.uid, senderID: item.userUid, text: message,
+        sentAt: Date(timeIntervalSince1970: Double(item.timestamp) / 1_000))
+    }
+    .sorted { left, right in
+      if left.sentAt == right.sentAt { return left.id < right.id }
+      return left.sentAt < right.sentAt
+    }
+  }
+}
+
+private struct DirectMessageSendBody: Encodable {
+  let targetUserUid: Int
+  let message: String
+}
+
+private struct DirectMessageSendResponseDTO: Decodable {
+  let success: Bool
+  let error: String
+  let code: Int
+  let result: Int?
+
+  func checked() throws -> Int {
+    guard success, code == 0 else { throw NuboAPIError.server(code: code, message: "") }
+    guard let result, result > 0 else { throw NuboAPIError.malformedResponse }
+    return result
+  }
+}
+
+enum DirectMessageEndpoint {
+  static func threads(baseURL: URL, limit: Int = 30) throws -> URLRequest {
+    guard (1...50).contains(limit) else { throw NuboAPIError.invalidRequest }
+    return try request(
+      baseURL: baseURL, path: "chat/list",
+      queryItems: [URLQueryItem(name: "limit", value: String(limit))])
+  }
+
+  static func history(baseURL: URL, targetUserID: Int, limit: Int = 100) throws -> URLRequest {
+    guard targetUserID > 0, (1...100).contains(limit) else {
+      throw NuboAPIError.invalidRequest
+    }
+    return try request(
+      baseURL: baseURL, path: "chat/history",
+      queryItems: [
+        URLQueryItem(name: "targetUserUid", value: String(targetUserID)),
+        URLQueryItem(name: "limit", value: String(limit)),
+      ])
+  }
+
+  static func send(baseURL: URL, targetUserID: Int, message: String) throws -> URLRequest {
+    let message = message.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard targetUserID > 0, !message.isEmpty, message.unicodeScalars.count <= 2_000 else {
+      throw NuboAPIError.invalidRequest
+    }
+    var request = try AccountEndpoint.request(
+      baseURL: baseURL, path: "chat/save", method: "POST")
+    request.httpBody = try JSONEncoder().encode(
+      DirectMessageSendBody(targetUserUid: targetUserID, message: message))
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    return request
+  }
+
+  private static func request(
+    baseURL: URL, path: String, queryItems: [URLQueryItem]
+  ) throws -> URLRequest {
+    var components = URLComponents(
+      url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)
+    components?.queryItems = queryItems
+    guard let url = components?.url else { throw NuboAPIError.invalidRequest }
+    var request = try AccountEndpoint.request(baseURL: baseURL, path: path)
+    request.url = url
+    return request
+  }
+}
+
+@MainActor @Observable
+final class DirectMessageThreadListModel {
+  private(set) var threads: [DirectMessageThread] = []
+  private(set) var isLoading = false
+  private(set) var error: String?
+  private var loadedIdentity: UUID?
+
+  func load(using account: AccountSession, force: Bool = false) async {
+    guard account.user != nil, let baseURL = account.apiBaseURL else {
+      threads = []
+      error = nil
+      loadedIdentity = nil
+      return
+    }
+    let identity = account.sessionIdentity
+    guard force || loadedIdentity != identity, !isLoading else { return }
+    isLoading = true
+    error = nil
+    defer { isLoading = false }
+    do {
+      let request = try DirectMessageEndpoint.threads(baseURL: baseURL)
+      let data = try await account.sendAuthenticated(request)
+      let result = try JSONDecoder().decode(DirectMessageThreadResponseDTO.self, from: data)
+        .checked(apiBaseURL: baseURL)
+      try Task.checkCancellation()
+      guard identity == account.sessionIdentity else { return }
+      threads = result
+      loadedIdentity = identity
+    } catch is CancellationError {
+    } catch {
+      guard identity == account.sessionIdentity else { return }
+      self.error = "메시지 목록을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    }
+  }
+}
+
+@MainActor @Observable
+final class DirectMessageModel {
+  var draft = ""
+  private(set) var messages: [DirectMessage] = []
+  private(set) var isLoading = false
+  private(set) var isSending = false
+  private(set) var loadError: String?
+  private(set) var sendError: String?
+  private var loadedTargetID: Int?
+  private var loadedIdentity: UUID?
+
+  var draftLength: Int { draft.unicodeScalars.count }
+  var canSend: Bool {
+    let trimmed = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    return !trimmed.isEmpty && trimmed.unicodeScalars.count <= 2_000 && !isLoading && !isSending
+  }
+
+  func load(partner: DirectMessagePartner, using account: AccountSession, force: Bool = false) async
+  {
+    guard let user = account.user, user.uid != partner.id, let baseURL = account.apiBaseURL else {
+      messages = []
+      loadError = nil
+      loadedIdentity = nil
+      loadedTargetID = nil
+      return
+    }
+    let identity = account.sessionIdentity
+    guard force || loadedTargetID != partner.id || loadedIdentity != identity,
+      !isLoading, !isSending
+    else {
+      return
+    }
+    isLoading = true
+    loadError = nil
+    defer { isLoading = false }
+    do {
+      let request = try DirectMessageEndpoint.history(
+        baseURL: baseURL, targetUserID: partner.id)
+      let data = try await account.sendAuthenticated(request)
+      let result = try JSONDecoder().decode(DirectMessageHistoryResponseDTO.self, from: data)
+        .checked()
+      try Task.checkCancellation()
+      guard identity == account.sessionIdentity else { return }
+      messages = result
+      loadedTargetID = partner.id
+      loadedIdentity = identity
+    } catch is CancellationError {
+    } catch {
+      guard identity == account.sessionIdentity else { return }
+      loadError = "대화 내용을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    }
+  }
+
+  func send(to partner: DirectMessagePartner, using account: AccountSession) async {
+    let outgoing = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard canSend, let user = account.user, user.uid != partner.id,
+      let baseURL = account.apiBaseURL
+    else { return }
+    let identity = account.sessionIdentity
+    isSending = true
+    sendError = nil
+    defer { isSending = false }
+    do {
+      let request = try DirectMessageEndpoint.send(
+        baseURL: baseURL, targetUserID: partner.id, message: outgoing)
+      let data = try await account.sendAuthenticated(request)
+      let messageID = try JSONDecoder().decode(DirectMessageSendResponseDTO.self, from: data)
+        .checked()
+      try Task.checkCancellation()
+      guard identity == account.sessionIdentity else { return }
+      if !messages.contains(where: { $0.id == messageID }) {
+        messages.append(
+          DirectMessage(id: messageID, senderID: user.uid, text: outgoing, sentAt: .now))
+      }
+      if draft.trimmingCharacters(in: .whitespacesAndNewlines) == outgoing { draft = "" }
+    } catch is CancellationError {
+    } catch {
+      guard identity == account.sessionIdentity else { return }
+      sendError = "메시지를 보내지 못했어요. 연결 또는 상대방과의 차단 상태를 확인해 주세요."
+    }
+  }
+}
+
+struct DirectMessageThreadListView: View {
+  let account: AccountSession
+  @State private var model = DirectMessageThreadListModel()
+
+  var body: some View {
+    Group {
+      if model.isLoading && model.threads.isEmpty {
+        ProgressView("메시지를 불러오는 중…")
+      } else if let error = model.error, model.threads.isEmpty {
+        ContentUnavailableView {
+          Label("메시지를 불러오지 못했어요", systemImage: "wifi.exclamationmark")
+        } description: {
+          Text(error)
+        } actions: {
+          Button("다시 시도") { Task { await model.load(using: account, force: true) } }
+        }
+      } else if model.threads.isEmpty {
+        ContentUnavailableView(
+          "아직 받은 메시지가 없어요", systemImage: "bubble.left.and.bubble.right",
+          description: Text("사진가 프로필에서 1:1 대화를 시작할 수 있어요."))
+      } else {
+        List(model.threads) { thread in
+          NavigationLink {
+            DirectMessageView(partner: thread.partner, account: account)
+          } label: {
+            DirectMessageThreadRow(thread: thread)
+          }
+          .accessibilityIdentifier("direct-message-thread-\(thread.partner.id)")
+        }
+        .listStyle(.plain)
+        .refreshable { await model.load(using: account, force: true) }
+      }
+    }
+    .navigationTitle("1:1 메시지")
+    .navigationBarTitleDisplayMode(.inline)
+    .task(id: account.sessionIdentity) { await model.load(using: account) }
+  }
+}
+
+private struct DirectMessageThreadRow: View {
+  let thread: DirectMessageThread
+
+  var body: some View {
+    HStack(spacing: 12) {
+      AccountAvatar(url: thread.partner.profileURL, size: 46)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 5) {
+        HStack {
+          Text(thread.partner.name).font(.headline).lineLimit(1)
+          Spacer(minLength: 8)
+          Text(thread.sentAt, format: .relative(presentation: .named))
+            .font(.caption2).foregroundStyle(.secondary)
+        }
+        Text(thread.latestText.isEmpty ? "새 메시지" : thread.latestText)
+          .font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+      }
+    }
+    .padding(.vertical, 6)
+    .accessibilityElement(children: .combine)
+  }
+}
+
+struct DirectMessageView: View {
+  let partner: DirectMessagePartner
+  let account: AccountSession
+  @State private var model = DirectMessageModel()
+  @Environment(\.scenePhase) private var scenePhase
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @FocusState private var composerFocused: Bool
+
+  var body: some View {
+    @Bindable var model = model
+    ScrollViewReader { proxy in
+      Group {
+        if model.isLoading && model.messages.isEmpty {
+          ProgressView("대화를 불러오는 중…")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let error = model.loadError, model.messages.isEmpty {
+          ContentUnavailableView {
+            Label("대화를 불러오지 못했어요", systemImage: "wifi.exclamationmark")
+          } description: {
+            Text(error)
+          } actions: {
+            Button("다시 시도") {
+              Task { await model.load(partner: partner, using: account, force: true) }
+            }
+          }
+        } else {
+          ScrollView {
+            LazyVStack(spacing: 12) {
+              if model.messages.isEmpty {
+                ContentUnavailableView(
+                  "아직 나눈 대화가 없어요", systemImage: "bubble.left.and.bubble.right",
+                  description: Text("첫 메시지로 사진 이야기를 시작해 보세요.")
+                )
+                .padding(.top, 60)
+              }
+              ForEach(model.messages) { message in
+                messageBubble(message)
+                  .id(message.id)
+              }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
+          }
+          .scrollDismissesKeyboard(.interactively)
+          .refreshable {
+            await model.load(partner: partner, using: account, force: true)
+          }
+        }
+      }
+      .onChange(of: model.messages.last?.id, initial: true) { _, messageID in
+        guard let messageID else { return }
+        if reduceMotion {
+          proxy.scrollTo(messageID, anchor: .bottom)
+        } else {
+          withAnimation { proxy.scrollTo(messageID, anchor: .bottom) }
+        }
+      }
+    }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      VStack(alignment: .leading, spacing: 8) {
+        if let error = model.sendError {
+          Label(error, systemImage: "exclamationmark.circle")
+            .font(.caption).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("direct-message-send-error")
+        }
+        HStack(alignment: .bottom, spacing: 10) {
+          TextField("메시지를 입력해 주세요", text: $model.draft, axis: .vertical)
+            .lineLimit(1...5)
+            .textFieldStyle(.roundedBorder)
+            .focused($composerFocused)
+            .submitLabel(.send)
+            .onSubmit { send() }
+            .accessibilityIdentifier("direct-message-input")
+          Button(action: send) {
+            if model.isSending {
+              ProgressView().frame(width: 30, height: 30)
+            } else {
+              Image(systemName: "arrow.up.circle.fill")
+                .font(.system(size: 30))
+            }
+          }
+          .disabled(!model.canSend)
+          .accessibilityLabel("메시지 전송")
+          .accessibilityIdentifier("direct-message-send")
+        }
+        HStack {
+          Label("개인정보는 메시지로 공유하지 마세요.", systemImage: "lock.shield")
+          Spacer()
+          Text("\(model.draftLength.formatted())/2,000")
+            .foregroundStyle(model.draftLength > 2_000 ? Color.red : Color.secondary)
+            .accessibilityLabel("메시지 길이 \(model.draftLength), 최대 2,000자")
+        }
+        .font(.caption2).foregroundStyle(.secondary)
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .background(.bar)
+    }
+    .navigationTitle(partner.name)
+    .navigationBarTitleDisplayMode(.inline)
+    .task(id: account.sessionIdentity) {
+      await model.load(partner: partner, using: account)
+    }
+    .onChange(of: scenePhase) { _, phase in
+      guard phase == .active else { return }
+      Task { await model.load(partner: partner, using: account, force: true) }
+    }
+  }
+
+  private func send() {
+    Task { await model.send(to: partner, using: account) }
+  }
+
+  private func messageBubble(_ message: DirectMessage) -> some View {
+    let mine = message.senderID == account.user?.uid
+    return HStack {
+      if mine { Spacer(minLength: 52) }
+      VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+        Text(message.text)
+          .font(.body)
+          .foregroundStyle(mine ? Color.white : Color.primary)
+          .fixedSize(horizontal: false, vertical: true)
+        Text(message.sentAt, format: .dateTime.month().day().hour().minute())
+          .font(.caption2)
+          .foregroundStyle(mine ? Color.white.opacity(0.76) : Color.secondary)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+      .background(
+        mine ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color(.secondarySystemBackground)),
+        in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+      if !mine { Spacer(minLength: 52) }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityLabel(mine ? "내 메시지" : "\(partner.name)의 메시지")
+    .accessibilityValue("\(message.text), \(message.sentAt.formatted())")
+    .accessibilityIdentifier("direct-message-\(message.id)")
+  }
+}

@@ -38,6 +38,13 @@ struct AccountView: View {
               Label("내 작품 스튜디오", systemImage: "photo.stack")
             }
             .accessibilityIdentifier("account-photo-studio")
+            NavigationLink {
+              DirectMessageThreadListView(account: session)
+                .onAppear { detent = .large }
+            } label: {
+              Label("1:1 메시지", systemImage: "bubble.left.and.bubble.right")
+            }
+            .accessibilityIdentifier("account-direct-messages")
             NavigationLink("내 공개 프로필") {
               PhotographerView(
                 writer: PhotoPostWriter(
@@ -211,8 +218,8 @@ struct AccountView: View {
     .onChange(of: field) { _, value in
       if value != nil { detent = .large }
     }
-    .onChange(of: session.user?.uid) { _, _ in
-      detent = dynamicTypeSize.isAccessibilitySize ? .large : .medium
+    .onChange(of: session.user?.uid) { _, userID in
+      detent = userID == nil && !dynamicTypeSize.isAccessibilitySize ? .medium : .large
     }
     .onChange(of: session.achievements.current?.key) { _, key in
       if key != nil { detent = .large }

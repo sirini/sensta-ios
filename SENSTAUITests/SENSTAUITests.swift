@@ -429,6 +429,83 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testDirectMessageListLoadsConversationAndPreservesNativeComposer() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-messages", "--ui-test-dark"]
+    app.launch()
+    signInForMessages(app)
+
+    let messages = app.buttons["account-direct-messages"]
+    XCTAssertTrue(messages.waitForExistence(timeout: 5))
+    messages.tap()
+    XCTAssertTrue(app.navigationBars["1:1 메시지"].waitForExistence(timeout: 5))
+    let thread = app.buttons["direct-message-thread-2"]
+    XCTAssertTrue(thread.waitForExistence(timeout: 5))
+    thread.tap()
+
+    XCTAssertTrue(app.navigationBars["알림 사진가"].waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      app.descendants(matching: .any)["direct-message-101"].waitForExistence(timeout: 5))
+    let input = app.textFields["direct-message-input"]
+    XCTAssertTrue(input.isHittable)
+    input.tap()
+    input.typeText("새 사진 멋져요")
+    let send = app.buttons["direct-message-send"]
+    XCTAssertTrue(send.isEnabled)
+    send.tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["direct-message-103"].waitForExistence(timeout: 5))
+    XCTAssertEqual(input.value as? String, "메시지를 입력해 주세요")
+
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "Native one-to-one message conversation"
+    capture.lifetime = .keepAlways
+    add(capture)
+  }
+
+  @MainActor
+  func testMessageNotificationOpensSenderConversation() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-messages"]
+    app.launch()
+    signInForMessages(app)
+    app.buttons["account-close"].tap()
+
+    let notifications = app.buttons["photo-feed-notifications"]
+    XCTAssertTrue(notifications.waitForExistence(timeout: 5))
+    notifications.tap()
+    XCTAssertTrue(app.navigationBars["알림"].waitForExistence(timeout: 5))
+    let messageNotification = app.buttons["notification-77"]
+    XCTAssertTrue(messageNotification.waitForExistence(timeout: 5))
+    messageNotification.tap()
+    XCTAssertTrue(app.navigationBars["알림 사진가"].waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      app.descendants(matching: .any)["direct-message-102"].waitForExistence(timeout: 5))
+  }
+
+  @MainActor
+  func testLoggedInPhotographerOffersDirectMessage() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-messages", "--ui-test-dark"]
+    app.launch()
+    signInForMessages(app)
+    app.buttons["account-close"].tap()
+
+    let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+    XCTAssertTrue(card.waitForExistence(timeout: 5))
+    card.tap()
+    let writer = app.buttons["photo-detail-photographer"]
+    XCTAssertTrue(writer.waitForExistence(timeout: 5))
+    writer.tap()
+    let message = app.buttons["photographer-direct-message"]
+    XCTAssertTrue(message.waitForExistence(timeout: 5))
+    message.tap()
+    XCTAssertTrue(app.navigationBars["알림 사진가"].waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      app.descendants(matching: .any)["direct-message-101"].waitForExistence(timeout: 5))
+  }
+
+  @MainActor
   func testEmailSignupVerifiesCodeAndReturnsToLogin() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]
@@ -483,6 +560,21 @@ final class SENSTAUITests: XCTestCase {
     add(capture)
     returnToLogin.tap()
     XCTAssertEqual(app.textFields["account-email"].value as? String, "new@example.com")
+  }
+
+  @MainActor
+  private func signInForMessages(_ app: XCUIApplication) {
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+    XCTAssertTrue(app.buttons["account-direct-messages"].waitForExistence(timeout: 5))
   }
 
   @MainActor

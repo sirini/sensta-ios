@@ -478,3 +478,25 @@
   범위 UI 회귀 6개, Release simulator build와 Debug 정적 분석, 자동 서명 iPhone build·설치를 확인했다.
   Xcode 27 beta 병렬 전체 단위 실행은 115개 중 기존 Keychain simulator test 한 개만 간헐 실패했고,
   해당 테스트는 단독 실행에서 통과했으며 나머지 114개는 같은 전체 실행에서 통과했다.
+
+## 1:1 메시지 기본 흐름 (2026-09-06)
+
+- 제품 소유자가 새 업적 축하와 사진가 프로필 연결 화면을 실기기에서 확인했다. 다음 수직 기능으로
+  Android·GOAPI의 기존 `GET /chat/list`, `GET /chat/history`, `POST /chat/save` 계약을 재사용해 iOS
+  1:1 메시지를 구현했다. 호출자는 상대 UID만 보내고 현재 사용자는 Bearer token으로 결정하며, 쿠키나
+  사용자 인증 정보를 URL·본문에 넣지 않는다.
+- 로그인 계정 화면에서 최근 받은 대화 목록을 열고 사진가 공개 프로필에서는 다른 사용자에게 바로
+  대화를 시작할 수 있다. 메시지는 2,000 Unicode scalar로 제한하고 전송 실패 시 초안을 유지한다. 목록·
+  대화 새로고침 실패도 이미 읽은 내용을 보존하며, 로그아웃·계정 전환 뒤의 늦은 응답은 폐기한다.
+- 알림 type 4를 보낸 사진가와의 대화로 직접 연결하고 진입할 때 읽음 처리한다. 대화 화면은 본인·상대
+  말풍선, 시각·VoiceOver 식별, 키보드 위 native composer와 개인정보 주의 안내를 제공하며 reduce
+  motion을 존중한다. 로그인 뒤 늘어난 계정 메뉴가 잘리지 않도록 로그인 상태의 시트는 큰 높이로 연다.
+- 신규 단위 테스트 4개와 메시지·알림·사진가 진입 및 기존 계정·알림·업로드 회귀 UI 테스트 6개가
+  통과했다. Release simulator build와 Debug 정적 분석, 자동 서명 iPhone build·설치를 확인했다. Xcode
+  27 beta 전체 단위 실행은 119개 중 기존 Keychain simulator test 한 개만 환경 오류로 실패했고, 해당
+  테스트는 단독 실행에서 통과했으며 나머지 118개는 같은 전체 실행에서 통과했다. 설치 뒤 자동 실행은
+  iPhone 잠금 상태라 생략됐다.
+- 원격 푸시는 다음 작업 단위다. 현재 GOAPI device 등록은 Android platform만 허용하고 iOS target에는
+  Firebase Messaging 의존성이 아직 없다. APNs/FCM token 수집·갱신과 서버의 iOS device 등록·발송을
+  함께 확장한 뒤 실기기 수신, 탭 deep link, foreground/background와 로그아웃 token 정리를 검증한다.
+  이번 작업에는 GOAPI·Android·운영 서버 변경이 없다.

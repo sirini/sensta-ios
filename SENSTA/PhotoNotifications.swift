@@ -256,7 +256,19 @@ struct PhotoNotificationsView: View {
           description: Text("새로운 활동이 생기면 이곳에서 알려드릴게요."))
       } else {
         List(center.notifications) { notification in
-          if notification.type == 4 || notification.postID <= 0 {
+          if notification.type == 4 {
+            NavigationLink {
+              DirectMessageView(
+                partner: DirectMessagePartner(
+                  id: notification.senderID, name: notification.senderName,
+                  profileURL: notification.senderProfileURL),
+                account: account
+              )
+              .task { await center.markRead(notification, using: account) }
+            } label: {
+              notificationRow(notification)
+            }
+          } else if notification.postID <= 0 {
             Button {
               Task { await center.markRead(notification, using: account) }
             } label: {

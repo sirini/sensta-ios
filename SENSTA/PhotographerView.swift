@@ -131,6 +131,7 @@ struct PhotographerView: View {
   @State private var model = PhotographerModel()
   @State private var selectedBadge: BoardBadgeDTO?
   @ScaledMetric(relativeTo: .title2) private var badgeIconHeight = 28
+  @Environment(\.accountSession) private var account
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
   var body: some View {
@@ -295,6 +296,20 @@ struct PhotographerView: View {
       if !profile.signature.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
         Text(profile.signature).font(.subheadline).foregroundStyle(.secondary).fixedSize(
           horizontal: false, vertical: true)
+      }
+      if let account, account.user != nil, account.user?.uid != profile.writer.id {
+        NavigationLink {
+          DirectMessageView(
+            partner: DirectMessagePartner(
+              id: profile.writer.id, name: profile.writer.name,
+              profileURL: profile.writer.profileURL),
+            account: account)
+        } label: {
+          Label("1:1 메시지", systemImage: "bubble.left.and.bubble.right")
+            .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityIdentifier("photographer-direct-message")
       }
     }.padding(.vertical, 12)
   }

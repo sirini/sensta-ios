@@ -114,6 +114,7 @@ struct SENSTAApp: App {
       photographerAttempts += 1
       if photographerAttempts == 1
         && !ProcessInfo.processInfo.arguments.contains("--ui-test-achievements")
+        && !ProcessInfo.processInfo.arguments.contains("--ui-test-messages")
       {
         throw NuboAPIError.networkUnavailable
       }
@@ -141,10 +142,14 @@ struct SENSTAApp: App {
         ], hasMore: page == 1)
     }
     func fetchPost(id: Int) async throws -> PhotoPostDetail {
+      let messageTest = ProcessInfo.processInfo.arguments.contains("--ui-test-messages")
       let post = PhotoPost(
         id: id, title: "빛과 여백", content: "사진의 전체 구도를 감상하세요.",
         submitted: .now, viewCount: 3, coverURL: nil, commentCount: 0, likeCount: 1,
-        isLiked: false, writer: PhotoPostWriter(id: 1, name: "사진가", profileURL: nil, badgeKeys: []))
+        isLiked: false,
+        writer: PhotoPostWriter(
+          id: messageTest ? 2 : 1, name: messageTest ? "알림 사진가" : "사진가",
+          profileURL: nil, badgeKeys: []))
       let exif = PhotoExif(
         make: "Panasonic", model: "DC-G100", aperture: 400, iso: 250, focalLength: 40,
         exposure: 16666, width: 900, height: 600, date: nil)
@@ -176,6 +181,7 @@ extension ContentView {
     private var appleLinked = false
     private var notificationRead = false
     private var acknowledgedAchievementKeys = Set<String>()
+    private var directMessageID = 102
     func data(for request: URLRequest) async throws -> Data {
       if request.url?.path.hasSuffix("/auth/apple/status") == true {
         return try JSONSerialization.data(withJSONObject: [
@@ -222,6 +228,45 @@ extension ContentView {
           "success": true, "code": 0, "error": "", "result": badges,
         ])
       }
+      if request.url?.path.hasSuffix("/chat/list") == true {
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "error": "",
+          "result": [
+            [
+              "sender": ["uid": 2, "name": "알림 사진가", "profile": ""],
+              "uid": 102, "message": "다음 사진도 기대할게요.",
+              "timestamp": 1_788_600_060_000 as Int64,
+            ]
+          ],
+        ])
+      }
+      if request.url?.path.hasSuffix("/chat/history") == true {
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "error": "",
+          "result": [
+            [
+              "uid": 101, "userUid": 2, "message": "빛이 참 좋네요.",
+              "timestamp": 1_788_600_000_000 as Int64,
+            ],
+            [
+              "uid": 102, "userUid": 1, "message": "고맙습니다.",
+              "timestamp": 1_788_600_030_000 as Int64,
+            ],
+          ],
+        ])
+      }
+      if request.url?.path.hasSuffix("/chat/save") == true {
+        let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+        guard body["targetUserUid"] as? Int == 2,
+          let message = body["message"] as? String, !message.isEmpty
+        else { throw NuboAPIError.invalidRequest }
+        if message.contains("reject") {
+          return Data(#"{"success":false,"error":"blocked","code":4,"result":null}"#.utf8)
+        }
+        directMessageID += 1
+        return Data(
+          "{\"success\":true,\"error\":\"\",\"code\":0,\"result\":\(directMessageID)}".utf8)
+      }
       if request.url?.path.hasSuffix("/board/my/studio") == true {
         guard
           request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true
@@ -265,13 +310,15 @@ extension ContentView {
         ])
       }
       if request.url?.path.hasSuffix("/home/noti/load") == true {
+        let messageTest = ProcessInfo.processInfo.arguments.contains("--ui-test-messages")
         return try JSONSerialization.data(withJSONObject: [
           "success": true, "code": 0, "error": "",
           "result": [
             [
               "uid": 77,
               "fromUser": ["uid": 2, "name": "알림 사진가", "profile": ""],
-              "type": 2, "id": "photo", "boardType": 1, "postUid": 1,
+              "type": messageTest ? 4 : 2, "id": "photo", "boardType": 1,
+              "postUid": messageTest ? 0 : 1,
               "checked": notificationRead, "timestamp": 1_788_600_000_000 as Int64,
             ]
           ],
