@@ -2,6 +2,67 @@ import XCTest
 
 final class SENSTAUITests: XCTestCase {
   @MainActor
+  func testReportsAndBlocksUserAcrossPhotoProfileAndConversation() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-safety"]
+    app.launch()
+
+    signInForSafetyTest(app)
+
+    let card = app.buttons.matching(identifier: "photo-feed-card").firstMatch
+    XCTAssertTrue(card.waitForExistence(timeout: 10))
+    card.tap()
+
+    let report = app.buttons["photo-detail-report"]
+    XCTAssertTrue(report.waitForExistence(timeout: 5))
+    report.tap()
+    let reason = app.descendants(matching: .any)["user-report-reason"]
+    XCTAssertTrue(reason.waitForExistence(timeout: 5))
+    reason.tap()
+    reason.typeText("inappropriate photo content")
+    app.buttons["user-report-submit"].tap()
+    let reported = expectation(
+      for: NSPredicate(format: "label == %@", "신고 접수됨"), evaluatedWith: report)
+    wait(for: [reported], timeout: 5)
+
+    app.buttons["photo-detail-photographer"].tap()
+    XCTAssertTrue(app.staticTexts["photographer-name"].waitForExistence(timeout: 5))
+    XCTAssertEqual(app.buttons["photographer-report"].label, "신고 접수됨")
+    app.buttons["photographer-block"].tap()
+    app.sheets["이 사용자를 차단할까요?"].buttons["차단"].tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["photographer-blocked"].waitForExistence(timeout: 5))
+    XCTAssertEqual(app.buttons["photographer-block"].label, "차단 해제")
+
+    app.buttons["photographer-block"].tap()
+    app.sheets["차단을 해제할까요?"].buttons["차단 해제"].tap()
+    XCTAssertTrue(app.buttons["photographer-direct-message"].waitForExistence(timeout: 5))
+    app.buttons["photographer-direct-message"].tap()
+    let menu = app.buttons["direct-message-safety-menu"]
+    XCTAssertTrue(menu.waitForExistence(timeout: 5))
+    menu.tap()
+    app.buttons["사용자 차단"].tap()
+    app.sheets["이 사용자를 차단할까요?"].buttons["차단"].tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["direct-message-blocked"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.textFields["direct-message-input"].exists)
+  }
+
+  @MainActor
+  private func signInForSafetyTest(_ app: XCUIApplication) {
+    app.buttons["photo-feed-account"].tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+    XCTAssertTrue(app.buttons["account-logout"].waitForExistence(timeout: 5))
+    app.buttons["account-close"].tap()
+  }
+
+  @MainActor
   func testPasswordResetUsesNeutralEmailConfirmation() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]

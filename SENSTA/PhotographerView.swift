@@ -130,6 +130,8 @@ struct PhotographerView: View {
   let service: any PhotoPostDetailServing
   @State private var model = PhotographerModel()
   @State private var selectedBadge: BoardBadgeDTO?
+  @State private var showsReport = false
+  @State private var showsBlockConfirmation = false
   @ScaledMetric(relativeTo: .title2) private var badgeIconHeight = 28
   @Environment(\.accountSession) private var account
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -142,40 +144,49 @@ struct PhotographerView: View {
         VStack(alignment: .leading, spacing: 24) {
           if let profile = model.profile {
             header(profile)
-            communitySummary(profile)
-            achievements(profile.badges)
-            Text("최근 작품").font(.headline).accessibilityAddTraits(.isHeader)
-            if profile.posts.isEmpty && profile.unavailableCount == 0 {
-              ContentUnavailableView("아직 공개된 사진이 없어요", systemImage: "photo.on.rectangle")
-            }
-            LazyVGrid(
-              columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: count),
-              spacing: 24
-            ) {
-              ForEach(profile.posts) { post in
-                NavigationLink {
-                  PhotoPostDetailView(postID: post.id, service: service)
-                } label: {
-                  VStack(alignment: .leading, spacing: 8) {
-                    CachedAsyncPhotoImage(
-                      url: post.coverURL, targetSize: CGSize(width: width, height: width * 1.25)
-                    ) { phase in
-                      if case .success(let image) = phase {
-                        image.resizable().scaledToFill()
-                      } else {
-                        Rectangle().fill(Color(.secondarySystemBackground)).overlay {
-                          Image(systemName: "photo").foregroundStyle(.tertiary)
-                        }
-                      }
-                    }.frame(width: width, height: width * 1.25).clipped()
-                    Text(post.title).font(.subheadline).lineLimit(2)
-                  }.frame(width: width, alignment: .leading).foregroundStyle(.primary)
-                }.buttonStyle(.plain).accessibilityIdentifier("photographer-photo")
+            if isBlocked {
+              ContentUnavailableView(
+                "차단한 사용자입니다", systemImage: "person.crop.circle.badge.xmark",
+                description: Text("사진과 대화를 표시하지 않습니다.")
+              )
+              .frame(maxWidth: .infinity)
+              .accessibilityIdentifier("photographer-blocked")
+            } else {
+              communitySummary(profile)
+              achievements(profile.badges)
+              Text("최근 작품").font(.headline).accessibilityAddTraits(.isHeader)
+              if profile.posts.isEmpty && profile.unavailableCount == 0 {
+                ContentUnavailableView("아직 공개된 사진이 없어요", systemImage: "photo.on.rectangle")
               }
-            }
-            if profile.unavailableCount > 0 {
-              Text("일부 작품을 불러오지 못했어요.").font(.caption).foregroundStyle(.secondary)
-              retry
+              LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: count),
+                spacing: 24
+              ) {
+                ForEach(profile.posts) { post in
+                  NavigationLink {
+                    PhotoPostDetailView(postID: post.id, service: service)
+                  } label: {
+                    VStack(alignment: .leading, spacing: 8) {
+                      CachedAsyncPhotoImage(
+                        url: post.coverURL, targetSize: CGSize(width: width, height: width * 1.25)
+                      ) { phase in
+                        if case .success(let image) = phase {
+                          image.resizable().scaledToFill()
+                        } else {
+                          Rectangle().fill(Color(.secondarySystemBackground)).overlay {
+                            Image(systemName: "photo").foregroundStyle(.tertiary)
+                          }
+                        }
+                      }.frame(width: width, height: width * 1.25).clipped()
+                      Text(post.title).font(.subheadline).lineLimit(2)
+                    }.frame(width: width, alignment: .leading).foregroundStyle(.primary)
+                  }.buttonStyle(.plain).accessibilityIdentifier("photographer-photo")
+                }
+              }
+              if profile.unavailableCount > 0 {
+                Text("일부 작품을 불러오지 못했어요.").font(.caption).foregroundStyle(.secondary)
+                retry
+              }
             }
           }
           if model.isLoading { ProgressView("사진가의 작품을 불러오는 중…").frame(maxWidth: .infinity) }
@@ -201,11 +212,42 @@ struct PhotographerView: View {
         Button("닫기") { selectedBadge = nil }.padding(.top, 8)
       }.padding(24).presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
     }
+    .sheet(isPresented: $showsReport) {
+      if let account {
+        UserReportSheet(
+          targetUserID: writer.id, targetName: writer.name, context: .user, account: account)
+      }
+    }
+    .confirmationDialog(
+      isBlocked ? "차단을 해제할까요?" : "이 사용자를 차단할까요?",
+      isPresented: $showsBlockConfirmation, titleVisibility: .visible
+    ) {
+      Button(isBlocked ? "차단 해제" : "차단", role: isBlocked ? nil : .destructive) {
+        guard let account else { return }
+        Task {
+          _ = await account.userSafety.setBlocked(
+            targetUserID: writer.id, blocked: !isBlocked, using: account)
+        }
+      }
+      Button("취소", role: .cancel) {}
+    } message: {
+      Text(
+        isBlocked
+          ? "\(writer.name)님의 사진과 대화를 다시 표시합니다."
+          : "\(writer.name)님의 사진과 대화를 더 이상 표시하지 않습니다.")
+    }
     .navigationTitle("사진가")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar(.visible, for: .navigationBar)
     .task { if model.profile == nil { await model.load(userID: writer.id, service: service) } }
+    .task(id: account?.sessionIdentity) {
+      guard let account, account.user?.uid != writer.id else { return }
+      await account.userSafety.load(targetUserID: writer.id, using: account)
+    }
   }
+
+  private var safetyState: UserSafetyState? { account?.userSafety.states[writer.id] }
+  private var isBlocked: Bool { safetyState?.isBlocked == true }
 
   private func communitySummary(_ profile: PhotographerProfile) -> some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -298,18 +340,71 @@ struct PhotographerView: View {
           horizontal: false, vertical: true)
       }
       if let account, account.user != nil, account.user?.uid != profile.writer.id {
-        NavigationLink {
-          DirectMessageView(
-            partner: DirectMessagePartner(
-              id: profile.writer.id, name: profile.writer.name,
-              profileURL: profile.writer.profileURL),
-            account: account)
-        } label: {
-          Label("1:1 메시지", systemImage: "bubble.left.and.bubble.right")
-            .frame(maxWidth: .infinity, minHeight: 44)
+        if !isBlocked {
+          NavigationLink {
+            DirectMessageView(
+              partner: DirectMessagePartner(
+                id: profile.writer.id, name: profile.writer.name,
+                profileURL: profile.writer.profileURL),
+              account: account)
+          } label: {
+            Label("1:1 메시지", systemImage: "bubble.left.and.bubble.right")
+              .frame(maxWidth: .infinity, minHeight: 44)
+          }
+          .buttonStyle(.borderedProminent)
+          .accessibilityIdentifier("photographer-direct-message")
         }
-        .buttonStyle(.borderedProminent)
-        .accessibilityIdentifier("photographer-direct-message")
+
+        HStack(spacing: 12) {
+          Button {
+            showsReport = true
+          } label: {
+            Label(
+              safetyState?.isReported == true ? "신고 접수됨" : "신고",
+              systemImage: safetyState?.isReported == true
+                ? "checkmark.circle" : "exclamationmark.bubble"
+            )
+              .frame(maxWidth: .infinity, minHeight: 44)
+          }
+          .buttonStyle(.bordered)
+          .disabled(
+            safetyState?.isReported == true || safetyState?.isLoading == true
+              || safetyState?.isMutating == true)
+          .accessibilityIdentifier("photographer-report")
+
+          Button {
+            showsBlockConfirmation = true
+          } label: {
+            Label(
+              isBlocked ? "차단 해제" : "차단",
+              systemImage: isBlocked
+                ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.xmark"
+            )
+              .frame(maxWidth: .infinity, minHeight: 44)
+          }
+          .buttonStyle(.bordered)
+          .tint(isBlocked ? .accentColor : .red)
+          .disabled(safetyState?.isLoading == true || safetyState?.isMutating == true)
+          .accessibilityIdentifier("photographer-block")
+        }
+
+        if safetyState?.isLoading == true || safetyState?.isMutating == true {
+          ProgressView("신고·차단 상태 확인 중")
+            .font(.caption)
+        }
+        if let error = safetyState?.error {
+          VStack(alignment: .leading, spacing: 6) {
+            Text(error).font(.caption).foregroundStyle(.secondary)
+            Button("상태 다시 확인") {
+              Task {
+                await account.userSafety.load(
+                  targetUserID: profile.writer.id, using: account, force: true)
+              }
+            }
+            .font(.caption)
+            .accessibilityIdentifier("photographer-safety-retry")
+          }
+        }
       }
     }.padding(.vertical, 12)
   }

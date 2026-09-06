@@ -50,22 +50,38 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
           }
         case .loaded(let posts):
-          PhotoFeedList(
-            posts: posts,
-            isLoadingMore: model.isLoadingMore,
-            loadMoreError: model.loadMoreError,
-            onOpenPost: { selectedPostID = $0 },
-            onOpenSearch: { showSearch = true },
-            onRefresh: {
-              await model.refresh()
-              if let account, account.user != nil {
-                await notificationCenter.load(using: account, force: true)
-                await account.achievements.check(using: account)
+          let visiblePosts = posts.filter {
+            account?.userSafety.blockedUserIDs.contains($0.writer.id) != true
+          }
+          Group {
+            if visiblePosts.isEmpty {
+              ContentUnavailableView {
+                Label("표시할 사진이 없어요", systemImage: "photo.on.rectangle.angled")
+              } description: {
+                Text("새로운 사진을 기다리거나 다시 확인해 주세요.")
+              } actions: {
+                Button("새로고침") { Task { await model.refresh() } }
+                  .buttonStyle(.borderedProminent)
               }
-            },
-            onLoadMore: { await model.loadMoreIfNeeded(currentPostID: $0) },
-            onRetryLoadMore: { await model.loadMore() }
-          )
+            } else {
+              PhotoFeedList(
+                posts: visiblePosts,
+                isLoadingMore: model.isLoadingMore,
+                loadMoreError: model.loadMoreError,
+                onOpenPost: { selectedPostID = $0 },
+                onOpenSearch: { showSearch = true },
+                onRefresh: {
+                  await model.refresh()
+                  if let account, account.user != nil {
+                    await notificationCenter.load(using: account, force: true)
+                    await account.achievements.check(using: account)
+                  }
+                },
+                onLoadMore: { await model.loadMoreIfNeeded(currentPostID: $0) },
+                onRetryLoadMore: { await model.loadMore() }
+              )
+            }
+          }
           .overlay(alignment: .top) {
             if let message = model.refreshError {
               VStack(spacing: 8) {
@@ -165,7 +181,7 @@ struct ContentView: View {
         PhotoPostDetailView(postID: postID, service: detailService)
       }
       .navigationDestination(isPresented: $showSearch) {
-        PhotoSearchView(service: feedService, detailService: detailService)
+        PhotoSearchView(service: activeFeedService, detailService: detailService)
       }
       .navigationDestination(isPresented: $showAchievementProfile) {
         if let account, let user = account.user {
@@ -179,7 +195,7 @@ struct ContentView: View {
       .navigationDestination(item: $selectedMessageUserID) { userID in
         if let account {
           RemoteDirectMessageDestinationView(
-            userID: userID, account: account, feedService: feedService,
+            userID: userID, account: account, feedService: activeFeedService,
             detailService: detailService)
         }
       }
@@ -212,14 +228,22 @@ struct ContentView: View {
       guard let account, account.user != nil else {
         notificationCenter.reset()
         account?.achievements.reset()
+        if let account {
+          await model.replaceService(
+            AccountPhotoFeedService(fallback: feedService, account: account))
+        }
         return
       }
+      await model.replaceService(AccountPhotoFeedService(fallback: feedService, account: account))
       await notificationCenter.load(using: account)
       await account.achievements.check(using: account)
       openRemoteNotificationIfPossible()
     }
     .onChange(of: pushNotifications.destination, initial: true) { _, _ in
       openRemoteNotificationIfPossible()
+    }
+    .onChange(of: account?.userSafety.blockedUserIDs ?? []) { _, _ in
+      Task { await model.refresh() }
     }
     .onChange(of: scenePhase) { _, phase in
       guard phase == .active, let account, account.user != nil else { return }
@@ -242,6 +266,11 @@ struct ContentView: View {
       selectedMessageUserID = userID
     }
     pushNotifications.clearDestination()
+  }
+
+  private var activeFeedService: any PhotoFeedServing {
+    guard let account else { return feedService }
+    return AccountPhotoFeedService(fallback: feedService, account: account)
   }
 }
 

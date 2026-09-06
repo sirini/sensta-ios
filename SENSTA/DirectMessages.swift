@@ -453,6 +453,17 @@ final class DirectMessageModel {
     }
   }
 
+  func hideBlockedConversation() {
+    messageGeneration += 1
+    messages = []
+    loadedTargetID = nil
+    loadedIdentity = nil
+    markedThroughID = nil
+    loadError = nil
+    sendError = nil
+    draft = ""
+  }
+
   private func markReadIfNeeded(
     messages: [DirectMessage], partner: DirectMessagePartner, account: AccountSession,
     identity: UUID, baseURL: URL
@@ -555,6 +566,7 @@ private struct DirectMessagePollingID: Equatable {
   let identity: UUID
   let partnerID: Int
   let isActive: Bool
+  let isBlocked: Bool
 }
 
 struct DirectMessageView: View {
@@ -565,6 +577,8 @@ struct DirectMessageView: View {
   private let pushNotifications: PushNotificationManager
   @State private var model = DirectMessageModel()
   @State private var selectedHashtag: String?
+  @State private var showsReport = false
+  @State private var showsBlockConfirmation = false
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.colorScheme) private var colorScheme
@@ -574,6 +588,9 @@ struct DirectMessageView: View {
   private var palette: DirectMessagePalette {
     DirectMessagePalette(colorScheme: colorScheme)
   }
+
+  private var safetyState: UserSafetyState? { account.userSafety.states[partner.id] }
+  private var isBlocked: Bool { safetyState?.isBlocked == true }
 
   init(
     partner: DirectMessagePartner, account: AccountSession,
@@ -592,7 +609,14 @@ struct DirectMessageView: View {
     @Bindable var model = model
     ScrollViewReader { proxy in
       Group {
-        if model.isLoading && model.messages.isEmpty {
+        if isBlocked {
+          ContentUnavailableView(
+            "차단한 사용자입니다", systemImage: "person.crop.circle.badge.xmark",
+            description: Text("차단을 해제하면 대화를 다시 볼 수 있습니다.")
+          )
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          .accessibilityIdentifier("direct-message-blocked")
+        } else if model.isLoading && model.messages.isEmpty {
           ProgressView("대화를 불러오는 중…")
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = model.loadError, model.messages.isEmpty {
@@ -652,45 +676,47 @@ struct DirectMessageView: View {
       }
     }
     .safeAreaInset(edge: .bottom, spacing: 0) {
-      VStack(alignment: .leading, spacing: 8) {
-        if let error = model.sendError {
-          Label(error, systemImage: "exclamationmark.circle")
-            .font(.caption).foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("direct-message-send-error")
-        }
-        HStack(alignment: .bottom, spacing: 10) {
-          TextField("메시지를 입력해 주세요", text: $model.draft, axis: .vertical)
-            .lineLimit(1...5)
-            .textFieldStyle(.roundedBorder)
-            .focused($composerFocused)
-            .submitLabel(.send)
-            .onSubmit { send() }
-            .accessibilityIdentifier("direct-message-input")
-          Button(action: send) {
-            if model.isSending {
-              ProgressView().frame(width: 30, height: 30)
-            } else {
-              Image(systemName: "arrow.up.circle.fill")
-                .font(.system(size: 30))
-            }
+      if !isBlocked {
+        VStack(alignment: .leading, spacing: 8) {
+          if let error = model.sendError {
+            Label(error, systemImage: "exclamationmark.circle")
+              .font(.caption).foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityIdentifier("direct-message-send-error")
           }
-          .disabled(!model.canSend)
-          .accessibilityLabel("메시지 전송")
-          .accessibilityIdentifier("direct-message-send")
+          HStack(alignment: .bottom, spacing: 10) {
+            TextField("메시지를 입력해 주세요", text: $model.draft, axis: .vertical)
+              .lineLimit(1...5)
+              .textFieldStyle(.roundedBorder)
+              .focused($composerFocused)
+              .submitLabel(.send)
+              .onSubmit { send() }
+              .accessibilityIdentifier("direct-message-input")
+            Button(action: send) {
+              if model.isSending {
+                ProgressView().frame(width: 30, height: 30)
+              } else {
+                Image(systemName: "arrow.up.circle.fill")
+                  .font(.system(size: 30))
+              }
+            }
+            .disabled(!model.canSend)
+            .accessibilityLabel("메시지 전송")
+            .accessibilityIdentifier("direct-message-send")
+          }
+          HStack {
+            Label("개인정보는 메시지로 공유하지 마세요.", systemImage: "lock.shield")
+            Spacer()
+            Text("\(model.draftLength.formatted())/2,000")
+              .foregroundStyle(model.draftLength > 2_000 ? Color.red : Color.secondary)
+              .accessibilityLabel("메시지 길이 \(model.draftLength), 최대 2,000자")
+          }
+          .font(.caption2).foregroundStyle(.secondary)
         }
-        HStack {
-          Label("개인정보는 메시지로 공유하지 마세요.", systemImage: "lock.shield")
-          Spacer()
-          Text("\(model.draftLength.formatted())/2,000")
-            .foregroundStyle(model.draftLength > 2_000 ? Color.red : Color.secondary)
-            .accessibilityLabel("메시지 길이 \(model.draftLength), 최대 2,000자")
-        }
-        .font(.caption2).foregroundStyle(.secondary)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(palette.composer)
       }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 10)
-      .background(palette.composer)
     }
     .background(palette.background.ignoresSafeArea())
     .navigationTitle(partner.name)
@@ -708,6 +734,71 @@ struct DirectMessageView: View {
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("direct-message-partner")
       }
+      ToolbarItem(placement: .topBarTrailing) {
+        Menu {
+          Button {
+            showsReport = true
+          } label: {
+            Label(
+              safetyState?.isReported == true ? "신고 접수됨" : "사용자 신고",
+              systemImage: safetyState?.isReported == true
+                ? "checkmark.circle" : "exclamationmark.bubble"
+            )
+          }
+          .disabled(
+            safetyState?.isReported == true || safetyState?.isLoading == true
+              || safetyState?.isMutating == true)
+
+          Button(role: isBlocked ? nil : .destructive) {
+            showsBlockConfirmation = true
+          } label: {
+            Label(
+              isBlocked ? "차단 해제" : "사용자 차단",
+              systemImage: isBlocked
+                ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.xmark"
+            )
+          }
+          .disabled(safetyState?.isLoading == true || safetyState?.isMutating == true)
+
+          if safetyState?.error != nil {
+            Button("상태 다시 확인", systemImage: "arrow.clockwise") {
+              Task {
+                await account.userSafety.load(
+                  targetUserID: partner.id, using: account, force: true)
+              }
+            }
+          }
+        } label: {
+          Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel("신고 및 차단")
+        .accessibilityIdentifier("direct-message-safety-menu")
+      }
+    }
+    .sheet(isPresented: $showsReport) {
+      UserReportSheet(
+        targetUserID: partner.id, targetName: partner.name, context: .user, account: account)
+    }
+    .confirmationDialog(
+      isBlocked ? "차단을 해제할까요?" : "이 사용자를 차단할까요?",
+      isPresented: $showsBlockConfirmation, titleVisibility: .visible
+    ) {
+      Button(isBlocked ? "차단 해제" : "차단", role: isBlocked ? nil : .destructive) {
+        let shouldBlock = !isBlocked
+        Task {
+          if await account.userSafety.setBlocked(
+            targetUserID: partner.id, blocked: shouldBlock, using: account), shouldBlock
+          {
+            model.hideBlockedConversation()
+          }
+        }
+      }
+      Button("취소", role: .cancel) {}
+    } message: {
+      Text(
+        isBlocked
+          ? "\(partner.name)님의 사진과 대화를 다시 표시합니다."
+          : "\(partner.name)님의 사진과 대화를 더 이상 표시하지 않습니다.")
     }
     .navigationDestination(item: $selectedHashtag) { hashtag in
       hashtagSearchDestination(hashtag)
@@ -715,12 +806,18 @@ struct DirectMessageView: View {
     .task(
       id: DirectMessagePollingID(
         identity: account.sessionIdentity, partnerID: partner.id,
-        isActive: scenePhase == .active)
+        isActive: scenePhase == .active, isBlocked: isBlocked)
     ) {
       guard scenePhase == .active else { return }
+      await account.userSafety.load(targetUserID: partner.id, using: account)
+      guard account.userSafety.states[partner.id]?.isBlocked != true else {
+        model.hideBlockedConversation()
+        return
+      }
       await model.load(partner: partner, using: account, force: true)
       while !Task.isCancelled {
         do { try await Task.sleep(for: .seconds(12)) } catch { return }
+        guard account.userSafety.states[partner.id]?.isBlocked != true else { return }
         await model.load(partner: partner, using: account, force: true, quietly: true)
       }
     }

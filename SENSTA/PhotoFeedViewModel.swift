@@ -12,7 +12,7 @@ final class PhotoFeedViewModel {
     case failed(String)
   }
 
-  private let service: any PhotoFeedServing
+  private var service: any PhotoFeedServing
   private var requestID: UUID?
   private var fetchTask: Task<PhotoFeedPage, Error>?
   private var nextPage = 1
@@ -25,6 +25,19 @@ final class PhotoFeedViewModel {
 
   init(service: any PhotoFeedServing) {
     self.service = service
+  }
+
+  func replaceService(_ service: any PhotoFeedServing) async {
+    fetchTask?.cancel()
+    requestID = nil
+    self.service = service
+    state = .idle
+    nextPage = 1
+    hasMorePages = false
+    boardID = nil
+    refreshError = nil
+    loadMoreError = nil
+    await loadIfNeeded()
   }
 
   func loadIfNeeded() async {

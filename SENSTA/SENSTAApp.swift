@@ -122,6 +122,7 @@ struct SENSTAApp: App {
       if photographerAttempts == 1
         && !ProcessInfo.processInfo.arguments.contains("--ui-test-achievements")
         && !ProcessInfo.processInfo.arguments.contains("--ui-test-messages")
+        && !ProcessInfo.processInfo.arguments.contains("--ui-test-safety")
       {
         throw NuboAPIError.networkUnavailable
       }
@@ -149,13 +150,14 @@ struct SENSTAApp: App {
         ], hasMore: page == 1)
     }
     func fetchPost(id: Int) async throws -> PhotoPostDetail {
-      let messageTest = ProcessInfo.processInfo.arguments.contains("--ui-test-messages")
+      let otherUserTest = ProcessInfo.processInfo.arguments.contains("--ui-test-messages")
+        || ProcessInfo.processInfo.arguments.contains("--ui-test-safety")
       let post = PhotoPost(
         id: id, title: "빛과 여백", content: "사진의 전체 구도를 감상하세요.",
         submitted: .now, viewCount: 3, coverURL: nil, commentCount: 0, likeCount: 1,
         isLiked: false,
         writer: PhotoPostWriter(
-          id: messageTest ? 2 : 1, name: messageTest ? "알림 사진가" : "사진가",
+          id: otherUserTest ? 2 : 1, name: otherUserTest ? "알림 사진가" : "사진가",
           profileURL: nil, badgeKeys: []))
       let exif = PhotoExif(
         make: "Panasonic", model: "DC-G100", aperture: 400, iso: 250, focalLength: 40,
@@ -187,9 +189,50 @@ extension ContentView {
     private var commentID = 100
     private var appleLinked = false
     private var notificationRead = false
+    private var userReported = false
+    private var userBlocked = false
     private var acknowledgedAchievementKeys = Set<String>()
     private var directMessageID = 102
     func data(for request: URLRequest) async throws -> Data {
+      if request.url?.path.hasSuffix("/board/list") == true {
+        guard request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true
+        else { throw NuboAPIError.httpStatus(401) }
+        let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+        let page = Int(query?.first(where: { $0.name == "page" })?.value ?? "1") ?? 1
+        let ids = page == 1 ? Array(1...4) : page == 2 ? Array(5...6) : []
+        let otherUser = ProcessInfo.processInfo.arguments.contains("--ui-test-safety")
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "error": "",
+          "result": [
+            "totalPostCount": 6,
+            "config": ["uid": 2, "id": "photo", "name": "사진", "rowCount": 4],
+            "notices": [],
+            "posts": ids.map { boardListItem(uid: $0, writerID: otherUser ? 2 : 1) },
+            "blackList": userBlocked ? [2] : [], "isAdmin": false,
+          ],
+        ])
+      }
+      if request.url?.path.hasSuffix("/auth/user/report") == true {
+        if request.httpMethod == "POST" {
+          let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+          guard body["targetUserUid"] as? Int == 2,
+            body["checkedBlackList"] as? Bool == false,
+            (body["content"] as? String)?.contains("신고:") == true
+          else { throw NuboAPIError.invalidRequest }
+          userReported = true
+          return Data(#"{"success":true,"code":0,"error":"","result":null}"#.utf8)
+        }
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "error": "",
+          "result": ["isReported": userReported, "isBannedByMe": userBlocked],
+        ])
+      }
+      if request.url?.path.hasSuffix("/auth/user/block") == true {
+        let body = try JSONDecoder().decode([String: Int].self, from: request.httpBody!)
+        guard body["targetUserUid"] == 2 else { throw NuboAPIError.invalidRequest }
+        userBlocked = request.httpMethod == "PUT"
+        return Data(#"{"success":true,"code":0,"error":"","result":null}"#.utf8)
+      }
       if request.url?.path.hasSuffix("/auth/apple/status") == true {
         return try JSONSerialization.data(withJSONObject: [
           "success": true, "code": 0, "result": ["linked": appleLinked],
@@ -479,6 +522,19 @@ extension ContentView {
         "modified": 1_788_600_001_000 as Int64,
         "status": status, "imageCount": uid == 101 ? 3 : 1,
         "hit": hit, "like": 4, "comment": 2,
+      ]
+    }
+
+    private func boardListItem(uid: Int, writerID: Int) -> [String: Any] {
+      [
+        "uid": uid, "title": "테스트 사진 \(uid)", "content": "",
+        "submitted": 1_788_600_000_000 as Int64, "modified": 0, "hit": 0, "status": 0,
+        "category": ["uid": 1, "name": "사진"], "cover": "", "comment": 0, "like": 0,
+        "liked": false,
+        "writer": [
+          "uid": writerID, "name": writerID == 2 ? "알림 사진가" : "테스트 사진가",
+          "profile": "", "signature": "", "badges": [],
+        ],
       ]
     }
   }

@@ -5,6 +5,7 @@ struct PhotoPostDetailView: View {
   @State private var model: PhotoPostDetailViewModel
   @State private var selectedImageID: PhotoPostImage.ID?
   @State private var showsPhotoViewer = false
+  @State private var showsReport = false
   @State private var commentsScrollRequest = 0
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private let detailService: any PhotoPostDetailServing
@@ -31,7 +32,15 @@ struct PhotoPostDetailView: View {
             .buttonStyle(.borderedProminent)
         }
       case .loaded(let detail):
-        loadedContent(detail)
+        if account?.userSafety.states[detail.post.writer.id]?.isBlocked == true {
+          ContentUnavailableView(
+            "차단한 사용자의 사진입니다", systemImage: "photo.badge.exclamationmark",
+            description: Text("차단을 해제하면 사진을 다시 볼 수 있습니다.")
+          )
+          .accessibilityIdentifier("photo-detail-blocked")
+        } else {
+          loadedContent(detail)
+        }
       }
     }
     .navigationTitle("사진")
@@ -48,6 +57,23 @@ struct PhotoPostDetailView: View {
             ShareLink(item: shareURL) { Image(systemName: "square.and.arrow.up") }
               .accessibilityLabel("게시물 공유")
           }
+          if canReport(detail.post) {
+            Button {
+              showsReport = true
+            } label: {
+              Image(
+                systemName: account?.userSafety.states[detail.post.writer.id]?.isReported == true
+                  ? "checkmark.circle" : "exclamationmark.bubble")
+            }
+            .disabled(
+              account?.userSafety.states[detail.post.writer.id]?.isReported == true
+                || account?.userSafety.states[detail.post.writer.id]?.isLoading == true
+                || account?.userSafety.states[detail.post.writer.id]?.isMutating == true)
+            .accessibilityLabel(
+              account?.userSafety.states[detail.post.writer.id]?.isReported == true
+                ? "신고 접수됨" : "사진 신고")
+            .accessibilityIdentifier("photo-detail-report")
+          }
         }
       }
     }
@@ -57,7 +83,32 @@ struct PhotoPostDetailView: View {
           images: detail.images, selectedImageID: $selectedImageID, title: detail.post.title)
       }
     }
+    .sheet(isPresented: $showsReport) {
+      if let account, let detail = loadedDetail {
+        UserReportSheet(
+          targetUserID: detail.post.writer.id, targetName: detail.post.writer.name,
+          context: .photo(postID: detail.post.id), account: account)
+      }
+    }
     .task { await model.loadIfNeeded() }
+    .task(id: safetyLoadID) {
+      guard let account, let detail = loadedDetail, canReport(detail.post) else { return }
+      await account.userSafety.load(targetUserID: detail.post.writer.id, using: account)
+    }
+  }
+
+  private var loadedDetail: PhotoPostDetail? {
+    guard case .loaded(let detail) = model.state else { return nil }
+    return detail
+  }
+
+  private var safetyLoadID: String {
+    "\(account?.sessionIdentity.uuidString ?? "signed-out"):\(loadedDetail?.post.writer.id ?? 0)"
+  }
+
+  private func canReport(_ post: PhotoPost) -> Bool {
+    guard let user = account?.user else { return false }
+    return post.writer.id > 0 && post.writer.id != user.uid
   }
 
   private func loadedContent(_ detail: PhotoPostDetail) -> some View {

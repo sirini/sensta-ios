@@ -184,6 +184,37 @@ struct PhotoFeedService: PhotoFeedServing {
   }
 }
 
+struct AccountPhotoFeedService: PhotoFeedServing {
+  let fallback: any PhotoFeedServing
+  let account: AccountSession
+
+  func recentTags(boardID: Int) async throws -> [PhotoPostTag] {
+    try await fallback.recentTags(boardID: boardID)
+  }
+
+  func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
+    try await search("", page: page, option: .title)
+  }
+
+  func search(_ keyword: String, page: Int, option: PhotoSearchOption) async throws
+    -> PhotoFeedPage
+  {
+    guard let baseURL = account.apiBaseURL, await account.user != nil else {
+      return try await fallback.search(keyword, page: page, option: option)
+    }
+    let request = try PhotoFeedEndpoint.makeRequest(
+      apiBaseURL: baseURL, page: page, keyword: keyword, option: option)
+    let data = try await account.sendAuthenticated(request)
+    let envelope: BoardListResponseDTO
+    do {
+      envelope = try JSONDecoder().decode(BoardListResponseDTO.self, from: data)
+    } catch {
+      throw NuboAPIError.malformedResponse
+    }
+    return try envelope.makeFeedPage(apiBaseURL: baseURL, requestedPage: page)
+  }
+}
+
 struct UnavailablePhotoFeedService: PhotoFeedServing {
   func fetchPage(_ page: Int) async throws -> PhotoFeedPage {
     throw NuboAPIError.configuration

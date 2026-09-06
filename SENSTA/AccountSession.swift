@@ -442,6 +442,7 @@ final class AccountSession {
   private let store: any AccountTokenStoring
   let apiBaseURL: URL?
   let postLikes = PhotoPostLikes()
+  let userSafety = UserSafetyCenter()
   let achievements = AchievementInbox()
   @ObservationIgnored weak var logoutCoordinator: (any AccountLogoutCoordinating)?
   private var identity = UUID()
@@ -646,6 +647,7 @@ final class AccountSession {
     try store.save(response.1)
     identity = UUID()
     postLikes.reset()
+    userSafety.reset()
     achievements.reset()
     tokens = response.1
     user = response.0
@@ -682,6 +684,7 @@ final class AccountSession {
       try Task.checkCancellation()
       identity = UUID()
       postLikes.reset()
+      userSafety.reset()
       achievements.reset()
       tokens = saved
       user = loaded
@@ -787,6 +790,7 @@ final class AccountSession {
     user = nil
     appleLinked = nil
     postLikes.reset()
+    userSafety.reset()
     achievements.reset()
     do {
       try store.clear()
@@ -811,6 +815,7 @@ final class AccountSession {
       refreshTask?.cancel()
       refreshTask = nil
       postLikes.reset()
+      userSafety.reset()
       achievements.reset()
       let oldToken = tokens?.token
       tokens = nil
