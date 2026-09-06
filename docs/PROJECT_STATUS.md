@@ -409,3 +409,12 @@
   탐색은 상단에서 제목 행 우측으로 옮겨 제목과 중심선을 맞췄다. 상단에는 계정과 로그인 시 알림만 남긴다.
   전체 단위 105개와 피드 배치·알림·업로드, 카드 상세 진입, 탐색→검색 결과→상세 UI 흐름을 통과했고
   시뮬레이터 캡처에서 최종 간격과 정렬을 확인했다. Release 앱도 실제 iPhone에 설치·실행했다.
+
+## Android 공통 앱 아이콘 (2026-09-06)
+
+- iOS target에 빠져 있던 `AppIcon` asset과 Debug·Release asset catalog 설정을 추가했다. Android 8+
+  adaptive icon의 최신 조리개·빛의 흐름 전경과 `#2A211B` 배경을 그대로 사용하되, iOS가 모서리 mask를
+  적용하도록 둥근 모서리를 이미지에 중복해서 넣지 않았다.
+- App Store 원본은 1024×1024 sRGB 8-bit RGB의 완전 불투명 PNG로 만들었다. Xcode 27에서 Debug·Release
+  simulator와 unsigned Release device build가 통과했고, 생성된 앱의 `CFBundleIconName=AppIcon`과
+  120px 홈 화면 icon 산출물을 확인했다. 앱 기능·API·Android·GOAPI 변경은 없다.
