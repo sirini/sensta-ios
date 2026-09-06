@@ -717,3 +717,6 @@
   Associated Domains, `get-task-allow=false`, App Store provisioning profile을 확인했다.
 - 실제 공개 운영 사진으로 피드·탐색·상세와 AI 설명·사진가 프로필·전체 화면 감상 6.9형 스크린샷 5장을
   만들었다. 모두 1320×2868, alpha 없는 PNG이며 `build/AppStoreScreenshots/6.9-inch/`에 보관한다.
+- `SENSTA 1.0 (1)`을 App Store Connect에 실제 업로드했다. Apple의 package 분석과 SPI 분석을 통과해
+  `Uploaded package is processing` 응답을 받았다. 처리 완료 뒤 TestFlight 내부 그룹에 연결해 설치를
+  확인하고, 지원 페이지 배포와 App Privacy·연령 등급·버전 메타데이터를 입력하는 일이 남아 있다.
