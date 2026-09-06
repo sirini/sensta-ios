@@ -581,17 +581,21 @@ struct PhotoStudioView: View {
 private struct PhotoStudioPostRow: View {
   let post: PhotoStudioPost
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  @Environment(\.displayScale) private var displayScale
 
   var body: some View {
     Group {
       if dynamicTypeSize.isAccessibilitySize {
         VStack(alignment: .leading, spacing: 12) {
-          cover.frame(maxWidth: .infinity)
+          GeometryReader { geometry in
+            cover(side: geometry.size.width)
+          }
+          .aspectRatio(1, contentMode: .fit)
           details
         }
       } else {
         HStack(spacing: 12) {
-          cover.frame(width: 96, height: 96)
+          cover(side: 96)
           details
         }
       }
@@ -601,9 +605,10 @@ private struct PhotoStudioPostRow: View {
     .accessibilityValue(accessibilityValue)
   }
 
-  private var cover: some View {
-    CachedAsyncPhotoImage(
-      url: post.coverURL, targetSize: CGSize(width: 384, height: 384)
+  private func cover(side: CGFloat) -> some View {
+    let pixelSide = max(384, ceil(side * displayScale))
+    return CachedAsyncPhotoImage(
+      url: post.coverURL, targetSize: CGSize(width: pixelSide, height: pixelSide)
     ) { phase in
       if case .success(let image) = phase {
         image.resizable().scaledToFill()
@@ -613,7 +618,7 @@ private struct PhotoStudioPostRow: View {
         }
       }
     }
-    .aspectRatio(1, contentMode: .fill)
+    .frame(width: side, height: side)
     .clipped()
     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     .overlay {
