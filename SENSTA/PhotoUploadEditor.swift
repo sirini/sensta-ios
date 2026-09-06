@@ -28,6 +28,7 @@ enum PhotoUploadFilter: String, CaseIterable, Identifiable, Sendable {
 }
 
 struct PhotoUploadEdits: Equatable, Hashable, Sendable {
+  var crop: PhotoUploadCrop?
   var rotationQuarterTurns = 0
   var isMirrored = false
   var filter: PhotoUploadFilter = .original
@@ -36,7 +37,12 @@ struct PhotoUploadEdits: Equatable, Hashable, Sendable {
   var rotationDegrees: Double { Double(rotationQuarterTurns * 90) }
 
   var needsRendering: Bool {
-    rotationQuarterTurns != 0 || isMirrored || (filter != .original && filterIntensity > 0)
+    crop != nil || rotationQuarterTurns != 0 || isMirrored
+      || (filter != .original && filterIntensity > 0)
+  }
+
+  mutating func setCrop(_ crop: PhotoUploadCrop?) {
+    self.crop = crop?.isFull == true ? nil : crop
   }
 
   mutating func rotateClockwise() {
@@ -124,8 +130,25 @@ enum PhotoUploadRenderer {
       image = CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
     guard let image else { throw PhotoUploadPreparationError.unreadableImage }
-    let transformed = try transform(image, edits: edits)
+    let cropped = try crop(image, to: edits.crop)
+    let transformed = try transform(cropped, edits: edits)
     return try applyFilter(to: transformed, edits: edits)
+  }
+
+  private static func crop(_ source: CGImage, to crop: PhotoUploadCrop?) throws -> CGImage {
+    guard let crop else { return source }
+    let minimumX = floor(crop.x * Double(source.width))
+    let minimumY = floor(crop.y * Double(source.height))
+    let maximumX = ceil((crop.x + crop.width) * Double(source.width))
+    let maximumY = ceil((crop.y + crop.height) * Double(source.height))
+    let pixelRect = CGRect(
+      x: CGFloat(max(0, minimumX)), y: CGFloat(max(0, minimumY)),
+      width: CGFloat(min(Double(source.width), maximumX) - max(0, minimumX)),
+      height: CGFloat(min(Double(source.height), maximumY) - max(0, minimumY)))
+    guard pixelRect.width >= 1, pixelRect.height >= 1,
+      let cropped = source.cropping(to: pixelRect.integral)
+    else { throw PhotoUploadPreparationError.unreadableImage }
+    return cropped
   }
 
   private static func transform(_ source: CGImage, edits: PhotoUploadEdits) throws -> CGImage {
@@ -249,6 +272,8 @@ struct PhotoUploadEditorView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var edits: PhotoUploadEdits
   @State private var isSaving = false
+  @State private var isCropping = false
+  @State private var cropPreviewImage: UIImage?
 
   init(
     photo: PreparedUploadPhoto, position: Int, totalCount: Int,
@@ -259,6 +284,7 @@ struct PhotoUploadEditorView: View {
     self.totalCount = totalCount
     self.onSave = onSave
     _edits = State(initialValue: photo.edits)
+    _cropPreviewImage = State(initialValue: UIImage(data: photo.sourcePreviewData))
   }
 
   var body: some View {
@@ -301,13 +327,26 @@ struct PhotoUploadEditorView: View {
       }
       .overlay { if isSaving { ProgressView("편집 내용을 저장하는 중…") } }
       .interactiveDismissDisabled(isSaving)
+      .task(id: photo.id) { await loadCropPreview() }
+      .fullScreenCover(isPresented: $isCropping) {
+        if let image = cropPreviewImage {
+          PhotoUploadCropView(image: image, initialCrop: edits.crop) { crop in
+            edits.setCrop(crop)
+          }
+        }
+      }
     }
   }
 
   private var editActions: some View {
     VStack(spacing: 10) {
       Text("\(position) / \(totalCount)").font(.caption).foregroundStyle(.secondary)
-      HStack(spacing: 10) {
+      HStack(spacing: 8) {
+        editorButton("자르기", systemImage: "crop", identifier: "photo-editor-crop") {
+          isCropping = true
+        }
+        .disabled(cropPreviewImage == nil)
+        .accessibilityValue(edits.crop == nil ? "원본 영역" : "자른 영역")
         editorButton("회전", systemImage: "rotate.right", identifier: "photo-editor-rotate") {
           edits.rotateClockwise()
         }
@@ -326,12 +365,23 @@ struct PhotoUploadEditorView: View {
     _ title: String, systemImage: String, identifier: String, action: @escaping () -> Void
   ) -> some View {
     Button(action: action) {
-      Label(title, systemImage: systemImage)
-        .font(.subheadline)
-        .frame(maxWidth: .infinity, minHeight: 44)
+      VStack(spacing: 5) {
+        Image(systemName: systemImage).font(.body)
+        Text(title).font(.caption)
+      }
+      .frame(maxWidth: .infinity, minHeight: 48)
     }
     .buttonStyle(.bordered)
     .accessibilityIdentifier(identifier)
+  }
+
+  private func loadCropPreview() async {
+    let data = try? await Task.detached(priority: .userInitiated) {
+      try PhotoUploadRenderer.makePreviewData(
+        fileURL: photo.sourceFileURL, edits: PhotoUploadEdits(), maximumPixelSize: 1_600)
+    }.value
+    guard !Task.isCancelled, let data, let image = UIImage(data: data) else { return }
+    cropPreviewImage = image
   }
 
   private var filterSelector: some View {

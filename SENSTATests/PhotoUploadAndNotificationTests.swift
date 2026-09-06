@@ -112,6 +112,8 @@ struct PhotoUploadAndNotificationTests {
   @Test
   func uploadEditStateKeepsAndroidCompatibleRotationMirrorAndFilterControls() {
     var edits = PhotoUploadEdits()
+    let crop = PhotoUploadCrop(x: 0.1, y: 0.2, width: 0.7, height: 0.6)
+    edits.setCrop(crop)
     edits.rotateClockwise()
     #expect(edits.rotationDegrees == 90)
     edits.toggleMirror()
@@ -120,6 +122,7 @@ struct PhotoUploadAndNotificationTests {
     #expect(edits.isMirrored)
     #expect(edits.filter == .warm)
     #expect(edits.filterIntensity == 1)
+    #expect(edits.crop == crop)
     #expect(edits.needsRendering)
 
     edits.rotateClockwise()
@@ -135,10 +138,32 @@ struct PhotoUploadAndNotificationTests {
   }
 
   @Test
+  func uploadCropPresetsAndGesturesStayInsideNormalizedSource() {
+    let sourceSize = CGSize(width: 120, height: 80)
+    let portrait = PhotoUploadCrop.centered(for: .portrait45, sourceSize: sourceSize)
+    #expect(abs(portrait.x - 0.233_333) < 0.000_01)
+    #expect(portrait.y == 0)
+    #expect(abs(portrait.width - 0.533_333) < 0.000_01)
+    #expect(portrait.height == 1)
+
+    let moved = portrait.moved(byX: -1, y: 1)
+    #expect(moved.x == 0)
+    #expect(moved.y == 0)
+    let resized = moved.resized(
+      from: .bottomTrailing, to: CGPoint(x: 0.3, y: 0.4),
+      aspect: .free, sourceSize: sourceSize)
+    #expect(resized.x == 0)
+    #expect(resized.y == 0)
+    #expect(abs(resized.width - 0.3) < 0.000_01)
+    #expect(abs(resized.height - 0.4) < 0.000_01)
+  }
+
+  @Test
   func uploadRendererAppliesEditsAndKeepsPrivacySafeMetadata() throws {
     let source = try makeImageData(type: UTType.jpeg, orientation: 1)
     let prepared = try PhotoUploadPreparer.prepare(data: source)
     var edits = PhotoUploadEdits()
+    edits.setCrop(PhotoUploadCrop(x: 0.25, y: 0, width: 0.5, height: 1))
     edits.rotateClockwise()
     edits.toggleMirror()
     edits.selectFilter(.mono)
@@ -153,7 +178,7 @@ struct PhotoUploadAndNotificationTests {
     let average = try averageRGBA(of: rendered.fileURL)
 
     #expect(image.width == 80)
-    #expect(image.height == 120)
+    #expect(image.height == 60)
     #expect(rendered.fileURL != rendered.sourceFileURL)
     #expect(rendered.edits == edits)
     #expect(!rendered.previewData.isEmpty)
@@ -162,6 +187,54 @@ struct PhotoUploadAndNotificationTests {
     #expect(exif[kCGImagePropertyExifDateTimeOriginal] as? String == "2026:09:06 01:23:45")
     #expect(abs(Int(average[0]) - Int(average[1])) <= 2)
     #expect(abs(Int(average[1]) - Int(average[2])) <= 2)
+  }
+
+  @Test
+  func uploadRendererCropsOriginalPixelsBeforeOtherEdits() throws {
+    let prepared = try PhotoUploadPreparer.prepare(data: makeQuadrantImageData())
+    var edits = PhotoUploadEdits()
+    edits.setCrop(PhotoUploadCrop(x: 0, y: 0, width: 0.5, height: 0.5))
+    let rendered = try PhotoUploadRenderer.render(prepared, edits: edits)
+    defer { rendered.removeFile() }
+
+    let output = try #require(CGImageSourceCreateWithURL(rendered.fileURL as CFURL, nil))
+    let image = try #require(CGImageSourceCreateImageAtIndex(output, 0, nil))
+    let average = try averageRGBA(of: rendered.fileURL)
+    #expect(image.width == 60)
+    #expect(image.height == 40)
+    #expect(average[0] > 200)
+    #expect(average[1] < 40)
+    #expect(average[2] < 40)
+  }
+
+  @Test @MainActor
+  func uploadModelKeepsPerPhotoCropAndCleansReplacedRenders() async throws {
+    let defaults = try #require(UserDefaults(suiteName: "photo-upload-crop-\(UUID().uuidString)"))
+    let model = PhotoUploadModel(defaults: defaults)
+    model.installEditorFixtureIfNeeded()
+    let first = try #require(model.photos.first)
+    let second = try #require(model.photos.last)
+    let firstSourceURL = first.sourceFileURL
+    let secondSourceURL = second.sourceFileURL
+    var edits = PhotoUploadEdits()
+    edits.setCrop(PhotoUploadCrop(x: 0.2, y: 0, width: 0.6, height: 1))
+
+    #expect(await model.applyEdits(to: first.id, edits: edits))
+    let firstRenderedURL = try #require(model.photos.first?.fileURL)
+    #expect(firstRenderedURL != firstSourceURL)
+    #expect(model.photos.first?.edits.crop == edits.crop)
+    #expect(model.photos.last?.edits == PhotoUploadEdits())
+
+    edits.rotateClockwise()
+    #expect(await model.applyEdits(to: first.id, edits: edits))
+    #expect(!FileManager.default.fileExists(atPath: firstRenderedURL.path))
+    #expect(FileManager.default.fileExists(atPath: firstSourceURL.path))
+    #expect(FileManager.default.fileExists(atPath: secondSourceURL.path))
+
+    model.cleanUp()
+    #expect(model.photos.isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: firstSourceURL.path))
+    #expect(!FileManager.default.fileExists(atPath: secondSourceURL.path))
   }
 
   @Test
@@ -263,6 +336,24 @@ struct PhotoUploadAndNotificationTests {
     CGImageDestinationAddImage(destination, cgImage, properties as CFDictionary)
     guard CGImageDestinationFinalize(destination) else { return nil }
     return data as Data
+  }
+
+  private func makeQuadrantImageData() throws -> Data {
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.opaque = true
+    let image = UIGraphicsImageRenderer(size: CGSize(width: 120, height: 80), format: format)
+      .image { context in
+        UIColor(red: 1, green: 0, blue: 0, alpha: 1).setFill()
+        context.fill(CGRect(x: 0, y: 0, width: 60, height: 40))
+        UIColor(red: 0, green: 0, blue: 1, alpha: 1).setFill()
+        context.fill(CGRect(x: 0, y: 40, width: 60, height: 40))
+        UIColor(red: 0, green: 1, blue: 0, alpha: 1).setFill()
+        context.fill(CGRect(x: 60, y: 0, width: 60, height: 40))
+        UIColor(red: 1, green: 1, blue: 0, alpha: 1).setFill()
+        context.fill(CGRect(x: 60, y: 40, width: 60, height: 40))
+      }
+    return try #require(image.jpegData(compressionQuality: 0.96))
   }
 
   private func averageRGBA(of fileURL: URL) throws -> [UInt8] {

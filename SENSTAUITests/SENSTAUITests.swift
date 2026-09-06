@@ -991,6 +991,24 @@ final class SENSTAUITests: XCTestCase {
 
     firstPhoto.tap()
     XCTAssertTrue(app.navigationBars["사진 편집"].waitForExistence(timeout: 5))
+    let cropButton = app.buttons["photo-editor-crop"]
+    XCTAssertEqual(cropButton.value as? String, "원본 영역")
+    cropButton.tap()
+    XCTAssertTrue(app.navigationBars["사진 자르기"].waitForExistence(timeout: 5))
+    app.buttons["photo-crop-aspect-portrait45"].tap()
+    let cropCapture = XCTAttachment(screenshot: app.screenshot())
+    cropCapture.name = "Native photo crop with aspect controls"
+    cropCapture.lifetime = .keepAlways
+    add(cropCapture)
+    app.navigationBars["사진 자르기"].buttons["취소"].tap()
+    XCTAssertTrue(app.navigationBars["사진 편집"].waitForExistence(timeout: 5))
+    XCTAssertEqual(cropButton.value as? String, "원본 영역")
+    cropButton.tap()
+    XCTAssertTrue(app.navigationBars["사진 자르기"].waitForExistence(timeout: 5))
+    app.buttons["photo-crop-aspect-portrait45"].tap()
+    app.buttons["photo-crop-apply"].tap()
+    XCTAssertTrue(app.navigationBars["사진 편집"].waitForExistence(timeout: 5))
+    XCTAssertEqual(cropButton.value as? String, "자른 영역")
     app.buttons["photo-editor-rotate"].tap()
     app.buttons["photo-editor-mirror"].tap()
     app.buttons["photo-editor-filter-warm"].tap()
