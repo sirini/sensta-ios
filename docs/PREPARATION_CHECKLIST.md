@@ -50,7 +50,7 @@
 - [ ] 각 앱의 `GoogleService-Info.plist`를 구성별 로컬 경로에 안전하게 배치
 - [x] 운영·개발 Apple App ID에서 Push Notifications 활성화
 - [x] 운영·개발 Apple App ID에서 Associated Domains와 Sign in with Apple 활성화
-- [ ] APNs 인증 키 생성 및 Firebase Console에 업로드
+- [ ] Sandbox·Production APNs 인증 키 생성 및 각 Firebase iOS 앱 환경에 업로드
 - [x] Google OAuth iOS client ID 생성
 - [x] Sign in with Apple server configuration과 GOAPI 검증 준비
 - [ ] 실제 iPhone에서 foreground/background/종료 상태 알림 검증

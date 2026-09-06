@@ -35,10 +35,20 @@ Associated Domains, Push Notifications와 Sign in with Apple capability가 활�
 Apple Developer 계정이 활성화되면 다음을 준비한다.
 
 1. 운영·개발 App ID의 Push Notifications capability는 이미 활성화돼 있다.
-2. Apple Developer의 Keys에서 APNs 인증 키를 생성한다. `.p8` 파일은 한 번만 내려받을 수 있으므로 안전한
-   비밀 저장소에 보관하고 Key ID를 함께 기록한다. Team ID는 `WKPCU58CWL`이다.
-3. Firebase Console > 프로젝트 설정 > Cloud Messaging에서 `SENSTA iOS`와 `SENSTA iOS Debug` 각각의
-   Apple 앱 구성에 같은 APNs 인증 키, Key ID와 Team ID를 업로드한다.
+2. Apple Developer의 Keys에서 환경별 APNs 인증 키를 만든다. 현재 Apple key 생성 화면에서는
+   `Apple Push Notification service`를 선택하고 `Configure`에서 환경과 범위를 지정한다.
+   - 개발: 이름 `SENSTA APNs Sandbox`, 환경 `Sandbox`, 범위 `Topic Specific`, topic
+     `me.sensta.ios.debug`
+   - 운영: 이름 `SENSTA APNs Production`, 환경 `Production`, 범위 `Topic Specific`, topic
+     `me.sensta.ios`
+   두 환경을 분리하면 한 키의 노출이나 폐기가 다른 환경에 미치는 영향을 줄이고 Apple의 환경 분리 권고와
+   맞는다. `.p8` 파일은 한 번만 내려받을 수 있으므로 안전한 비밀 저장소에 보관하고 각 Key ID를 함께
+   기록한다. Team ID는 `WKPCU58CWL`이다.
+3. Firebase Console > 프로젝트 설정 > Cloud Messaging에서 환경을 맞춰 업로드한다.
+   - `SENSTA iOS Debug`: Development APNs authentication key에 Sandbox `.p8`, Key ID, Team ID
+   - `SENSTA iOS`: Production APNs authentication key에 Production `.p8`, Key ID, Team ID
+   Firebase는 development·production 키 중 하나 이상을 허용하지만, SENSTA는 실제 QA와 출시를 모두
+   검증하므로 두 환경을 각각 구성한다.
 4. Xcode target의 Push Notifications capability는 이미 활성화돼 있다. 현재 payload는 사용자에게 보이는
    alert push이므로 silent background fetch용 `remote-notification` Background Mode는 추가하지 않는다.
 5. 앱은 알림 화면에서 사용자가 `알림 켜기`를 선택할 때 권한을 요청하고, 허용된 경우에만 APNs와 FCM FID를
