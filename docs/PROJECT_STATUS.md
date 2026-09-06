@@ -558,14 +558,20 @@
   통과했다. 전체 단위 실행에서 신규 push 테스트와 기존 테스트는 통과했고 기존 Keychain simulator
   환경 테스트 한 개만 묶음 실행에서 재현됐으며 단독 실행은 통과했다. Release simulator build, Debug
   정적 분석과 자동 서명 iPhone Debug build가 통과했고 서명된 앱의 개발 APNs entitlement도 확인했다.
-- 실제 수신 시험 전 외부 준비가 남아 있다. Firebase Console에서 Debug·Release 앱의
-  `GoogleService-Info.plist`를 각각 내려받고, Apple Developer의 APNs `.p8` 키를 두 Firebase 앱의 Cloud
-  Messaging 설정에 올린다. GOAPI를 운영 반영한 뒤 iPhone에서 foreground·background·종료 상태와 사진·
-  1:1 메시지 deep link, 로그아웃·계정 전환을 검증한다.
+- 제품 소유자가 Debug·Release Firebase plist와 APNs 키, 운영 GOAPI의 service-account JSON 경로를
+  구성하고 `1ccf15a` runtime을 배포했다. Wi-Fi 전용 iPhone 15 Pro Max에서 종료·background 상태의 실제
+  1:1 메시지 push 수신과 알림 선택 시 해당 대화 deep link를 확인했다. iOS 27 beta의 async 알림 delegate
+  bridge가 일으키던 background main-thread assertion은 `d835162`에서 completion-handler 방식으로 교체했다.
+- foreground 대화방에서는 알림 banner만 표시되고 이력이 갱신되지 않던 문제를 `e9bc3f2`에서 수정했다.
+  foreground push payload를 일회성 수신 이벤트로 전달해 현재 상대가 보낸 메시지면 즉시 이력을 갱신한다.
+  12초 polling task도 계정·상대·앱 active 상태를 수명주기로 삼아 background에서 취소하고 active 복귀 시
+  새로 시작한다. 동시에 들어온 push와 polling 조회는 후속 갱신 한 번으로 합쳐 새 메시지를 놓치지 않는다.
+  관련 단위 8개와 Release simulator·서명 실기기 Debug build를 통과했고, 제품 소유자가 실제 foreground
+  대화방의 즉시 말풍선 추가와 자동 하단 이동을 확인했다. 백엔드 추가 변경은 없다.
 
 ## 다음 작업 (현재)
 
-1. Firebase·APNs 외부 구성을 완료하고 새 GOAPI runtime을 운영 반영한 뒤 iPhone 원격 push 수신을 검증한다.
+1. 실제 iPhone에서 사진 활동 push와 foreground·종료 상태의 사진 상세 deep link를 추가 검증한다.
 2. 실제 iPhone에서 알림 읽음 처리와 JPEG·HEIC 다중 업로드를 마무리 검증한다.
 3. 신고와 차단을 작은 수직 기능 단위로 구현한다. 서버 계약 변경이 필요하면 웹·Android·iOS 영향을 함께
    확인하고 제품 소유자에게 먼저 알린다.
