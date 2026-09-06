@@ -35,8 +35,9 @@ struct AccountView: View {
           Section {
             HStack(spacing: 14) {
               AccountAvatar(
-                url: session.profileURL, size: 48, accessibilityLabel: "내 프로필 사진")
-                .accessibilityIdentifier("account-profile-image")
+                url: session.profileURL, size: 48, accessibilityLabel: "내 프로필 사진"
+              )
+              .accessibilityIdentifier("account-profile-image")
               VStack(alignment: .leading, spacing: 4) {
                 Text(user.name.nuboPlainText).font(.title3.weight(.semibold))
                 Text(user.id).font(.subheadline).foregroundStyle(.secondary)
@@ -51,8 +52,9 @@ struct AccountView: View {
             .accessibilityIdentifier("account-photo-studio")
             NavigationLink {
               DirectMessageThreadListView(
-                account: session, feedService: feedService, detailService: detailService)
-                .onAppear { detent = .large }
+                account: session, feedService: feedService, detailService: detailService
+              )
+              .onAppear { detent = .large }
             } label: {
               Label("1:1 메시지", systemImage: "bubble.left.and.bubble.right")
             }
@@ -85,6 +87,15 @@ struct AccountView: View {
           Section {
             Button("로그아웃", role: .destructive) { confirmLogout = true }
               .disabled(session.isBusy).accessibilityIdentifier("account-logout")
+            NavigationLink {
+              AccountDeletionView(session: session)
+                .onAppear { detent = .large }
+            } label: {
+              Label("계정 및 데이터 삭제", systemImage: "trash")
+                .foregroundStyle(.red)
+            }
+            .disabled(session.isBusy)
+            .accessibilityIdentifier("account-delete-navigation")
           }.listRowBackground(rowBackground)
         } else if session.needsRestoration {
           Section {
@@ -344,6 +355,7 @@ struct AccountAvatar: View {
 
 struct AppleSignInPayload: Equatable, Sendable {
   let identityToken: String
+  let authorizationCode: String
   let name: String
 }
 
@@ -361,7 +373,8 @@ struct SENSTAAppleSignInButton: View {
           completion(
             .success(
               AppleSignInPayload(
-                identityToken: "ui-test-apple-id-token", name: "Apple 사진가")))
+                identityToken: "ui-test-apple-id-token",
+                authorizationCode: "ui-test-apple-authorization-code", name: "Apple 사진가")))
         } label: {
           Label(linking ? "Apple로 계속하기" : "Apple로 로그인", systemImage: "apple.logo")
             .font(.headline)
@@ -415,12 +428,15 @@ struct SENSTAAppleSignInButton: View {
   private static func payload(from authorization: ASAuthorization) throws -> AppleSignInPayload {
     guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
       let tokenData = credential.identityToken,
-      let identityToken = String(data: tokenData, encoding: .utf8), !identityToken.isEmpty
+      let identityToken = String(data: tokenData, encoding: .utf8), !identityToken.isEmpty,
+      let codeData = credential.authorizationCode,
+      let authorizationCode = String(data: codeData, encoding: .utf8), !authorizationCode.isEmpty
     else { throw NuboAPIError.invalidResponse }
     let name =
       credential.fullName.map {
         PersonNameComponentsFormatter.localizedString(from: $0, style: .default)
       } ?? ""
-    return AppleSignInPayload(identityToken: identityToken, name: name)
+    return AppleSignInPayload(
+      identityToken: identityToken, authorizationCode: authorizationCode, name: name)
   }
 }

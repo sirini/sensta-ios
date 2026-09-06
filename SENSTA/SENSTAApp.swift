@@ -256,6 +256,24 @@ extension ContentView {
         appleLinked = true
         return Data(#"{"success":true,"code":0,"result":{"linked":true}}"#.utf8)
       }
+      if request.url?.path.hasSuffix("/auth/apple/delete/nonce") == true {
+        return Data(
+          #"{"success":true,"code":0,"result":{"nonce":"ui-test-apple-delete-nonce"}}"#.utf8)
+      }
+      if request.url?.path.hasSuffix("/auth/apple/account") == true {
+        let body = try JSONDecoder().decode([String: String].self, from: request.httpBody!)
+        guard body["identityToken"] == "ui-test-apple-id-token",
+          body["authorizationCode"] == "ui-test-apple-authorization-code",
+          body["nonce"] == "ui-test-apple-delete-nonce",
+          body["confirmation"] == "DELETE"
+        else { throw NuboAPIError.invalidRequest }
+        return Data(#"{"success":true,"code":0,"error":"","result":null}"#.utf8)
+      }
+      if request.url?.path.hasSuffix("/auth/account") == true {
+        let body = try JSONDecoder().decode([String: String].self, from: request.httpBody!)
+        guard body["confirmation"] == "DELETE" else { throw NuboAPIError.invalidRequest }
+        return Data(#"{"success":true,"code":0,"error":"","result":null}"#.utf8)
+      }
       if request.url?.path.hasSuffix("/auth/user/achievements") == true {
         guard request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true
         else { throw NuboAPIError.httpStatus(401) }

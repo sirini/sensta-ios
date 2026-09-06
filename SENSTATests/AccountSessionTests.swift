@@ -120,6 +120,46 @@ private actor AppleLinkStub: AccountServing {
   func logout(token: String) async throws {}
 }
 
+private actor AccountDeletionStub: AccountServing {
+  let appleLinked: Bool
+  let rejectsDeletion: Bool
+  private(set) var authorizationHeaders: [String] = []
+  private(set) var deletionBody: [String: String] = [:]
+
+  init(appleLinked: Bool, rejectsDeletion: Bool = false) {
+    self.appleLinked = appleLinked
+    self.rejectsDeletion = rejectsDeletion
+  }
+
+  func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
+    (testUser, testTokens)
+  }
+
+  func data(for request: URLRequest) async throws -> Data {
+    authorizationHeaders.append(request.value(forHTTPHeaderField: "Authorization") ?? "")
+    switch request.url?.path {
+    case "/goapi/auth/apple/status":
+      return Data(
+        "{\"success\":true,\"code\":0,\"result\":{\"linked\":\(appleLinked)}}".utf8)
+    case "/goapi/auth/apple/delete/nonce":
+      return Data(
+        #"{"success":true,"code":0,"result":{"nonce":"delete-nonce"}}"#.utf8)
+    case "/goapi/auth/account", "/goapi/auth/apple/account":
+      deletionBody = try JSONDecoder().decode([String: String].self, from: request.httpBody!)
+      if rejectsDeletion {
+        return Data(#"{"success":false,"code":4,"error":"server detail","result":null}"#.utf8)
+      }
+      return Data(#"{"success":true,"code":0,"error":"","result":null}"#.utf8)
+    default:
+      throw NuboAPIError.invalidRequest
+    }
+  }
+
+  func load(token: String) async throws -> AccountUser { testUser }
+  func refresh(_ refresh: String) async throws -> AccountTokens { rotatedTokens }
+  func logout(token: String) async throws {}
+}
+
 private actor UploadAccountStub: AccountServing {
   private(set) var authorizationHeaders: [String] = []
   private(set) var uploadedBodies: [Data] = []
@@ -176,6 +216,36 @@ struct AccountContractTests {
       String(decoding: verify.httpBody!, as: UTF8.self)
         == "target=42&code=123456&id=photo%2Bios%40example.com&password=Password%21%2B1&name=%EC%82%AC%EC%A7%84%EA%B0%80"
     )
+  }
+
+  @Test func accountDeletionContractsRequireExactConfirmationAndFreshAppleAuthorization() throws {
+    let baseURL = URL(string: "https://example.com/goapi/")!
+    let standard = try AccountEndpoint.deleteAccount(baseURL: baseURL, confirmation: "DELETE")
+    #expect(standard.url?.path == "/goapi/auth/account")
+    #expect(standard.httpMethod == "DELETE")
+    #expect(
+      try JSONDecoder().decode([String: String].self, from: standard.httpBody!) == [
+        "confirmation": "DELETE"
+      ])
+
+    let apple = try AccountEndpoint.deleteAppleAccount(
+      baseURL: baseURL, identityToken: "apple.identity", authorizationCode: "fresh.code",
+      nonce: "delete.nonce", confirmation: "DELETE")
+    #expect(apple.url?.path == "/goapi/auth/apple/account")
+    #expect(apple.httpMethod == "DELETE")
+    #expect(
+      try JSONDecoder().decode([String: String].self, from: apple.httpBody!) == [
+        "identityToken": "apple.identity", "authorizationCode": "fresh.code",
+        "nonce": "delete.nonce", "confirmation": "DELETE",
+      ])
+    #expect(throws: NuboAPIError.invalidRequest) {
+      try AccountEndpoint.deleteAccount(baseURL: baseURL, confirmation: "delete")
+    }
+    #expect(throws: NuboAPIError.invalidRequest) {
+      try AccountEndpoint.deleteAppleAccount(
+        baseURL: baseURL, identityToken: "apple.identity", authorizationCode: "",
+        nonce: "delete.nonce", confirmation: "DELETE")
+    }
   }
 
   @Test func passwordResetUsesPublicJSONContractWithoutLeakingCredentials() throws {
@@ -491,6 +561,57 @@ struct AccountSessionTests {
       await service.authorizationHeaders == [
         "Bearer access-one", "Bearer access-one", "Bearer access-one",
       ])
+  }
+
+  @Test func standardAccountDeletionClearsSessionOnlyAfterServerSuccess() async {
+    let service = AccountDeletionStub(appleLinked: false)
+    let store = MemoryTokenStore()
+    let session = AccountSession(
+      service: service, store: store, apiBaseURL: URL(string: "https://example.com/goapi/")!)
+    await session.signin(email: testUser.id, password: "secret")
+    await session.loadAppleStatus()
+
+    #expect(await session.deleteAccount(confirmation: "DELETE"))
+    #expect(session.user == nil)
+    #expect(store.value == nil)
+    #expect(await service.deletionBody == ["confirmation": "DELETE"])
+    #expect(await service.authorizationHeaders.allSatisfy { $0 == "Bearer access-one" })
+  }
+
+  @Test func appleAccountDeletionUsesBoundNonceAndAuthorizationCode() async {
+    let service = AccountDeletionStub(appleLinked: true)
+    let store = MemoryTokenStore()
+    let session = AccountSession(
+      service: service, store: store, apiBaseURL: URL(string: "https://example.com/goapi/")!)
+    await session.signin(email: testUser.id, password: "secret")
+    await session.loadAppleStatus()
+    let nonce = await session.prepareAppleAccountDeletion()
+
+    #expect(nonce == "delete-nonce")
+    #expect(
+      await session.deleteAppleAccount(
+        identityToken: "apple.identity", authorizationCode: "fresh.code",
+        nonce: nonce!, confirmation: "DELETE"))
+    #expect(session.user == nil)
+    #expect(store.value == nil)
+    #expect(
+      await service.deletionBody == [
+        "identityToken": "apple.identity", "authorizationCode": "fresh.code",
+        "nonce": "delete-nonce", "confirmation": "DELETE",
+      ])
+  }
+
+  @Test func rejectedAccountDeletionPreservesLocalSession() async {
+    let service = AccountDeletionStub(appleLinked: false, rejectsDeletion: true)
+    let store = MemoryTokenStore()
+    let session = AccountSession(
+      service: service, store: store, apiBaseURL: URL(string: "https://example.com/goapi/")!)
+    await session.signin(email: testUser.id, password: "secret")
+
+    #expect(await session.deleteAccount(confirmation: "DELETE") == false)
+    #expect(session.user == testUser)
+    #expect(store.value == testTokens)
+    #expect(session.error?.contains("그대로 유지") == true)
   }
 
   @Test func googleButtonRequiresBothClientIDs() {

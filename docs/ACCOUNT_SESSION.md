@@ -16,6 +16,8 @@
 비밀번호 재설정은 로그인 이메일을 이어받아 공개 메일 요청으로 제공한다. 등록 여부와 관계없이 같은 완료
 안내를 표시해 계정 존재 여부를 노출하지 않는다. 로그인 후 내 작품 스튜디오에서 본인의 공개·비공개
 사진 작품과 집계·정렬·페이지 추가 로드를 제공한다.
+로그인한 사용자는 계정 화면에서 `DELETE`를 직접 입력한 뒤 계정과 연결 데이터를 영구 삭제할 수 있다.
+Apple ID가 연결된 계정은 새 Apple 인증을 한 번 더 거쳐 해당 승인까지 함께 폐기한다.
 
 ## 기존 Android/GOAPI 계약
 
@@ -32,6 +34,8 @@
 | Apple 로그인 | `POST /auth/apple`, JSON `identityToken`, `nonce`, `name` | Apple subject에 연결된 계정의 token 쌍 반환 또는 새 계정 생성 |
 | Apple 연결 상태 | `GET /auth/apple/status`, Bearer access token | 현재 계정의 Apple ID 연결 여부 반환 |
 | Apple 계정 연결 | `POST /auth/apple/link/nonce`, `POST /auth/apple/link`, Bearer access token | 현재 계정과 Apple ID를 모두 증명한 뒤 연결 |
+| 일반 계정 삭제 | `DELETE /auth/account`, JSON `confirmation`, Bearer access token | 정확한 `DELETE` 확인 뒤 계정과 연결 데이터 삭제 |
+| Apple 계정 삭제 | `POST /auth/apple/delete/nonce`, `DELETE /auth/apple/account`, Bearer access token | 새 identity token·authorization code를 검증하고 Apple refresh token을 폐기한 뒤 계정 삭제 |
 | 세션 확인 | `GET /auth/load`, Bearer access token | 존재하는 비차단 계정만 로그인 상태로 표시 |
 | 토큰 갱신 | `POST /auth/android/refresh`, JSON `refresh` | access/refresh 쌍을 교체한 뒤 세션 확인 재시도 |
 | 로그아웃 | `POST /auth/logout`, Bearer access token | 로컬 삭제 성공 후 서버에도 폐기를 요청 |
@@ -58,6 +62,13 @@ Apple의 안정적인 `sub`를 계정 식별자로 저장하고 이메일을 식
 저장소에 남기지 않는다. Apple 인증 실패는 소셜 버튼 바로 아래에서 안내한다. 같은 이메일의 기존 계정,
 허용되지 않은 audience, 만료된 nonce, 이메일 검증 실패는 사용자가 다음 조치를 알 수 있는 문구로
 구분하되 토큰과 내부 서버 오류는 표시하지 않는다.
+
+Apple 연결 계정 탈퇴에는 로그인·연결과 분리된 5분짜리 nonce를 사용한다. 앱이 같은 Apple 인증 결과의
+identity token과 일회용 authorization code를 서버로 보내면, GOAPI가 App ID audience와 연결 subject를
+현재 JWT 계정에 다시 대조한다. 서버는 Apple `/auth/token`에서 refresh token을 얻고 `/auth/revoke`가
+성공한 뒤에만 로컬 계정 삭제를 시작한다. 교환·폐기 실패 시 로컬 계정과 Keychain 세션은 유지한다.
+GOAPI에는 `OAUTH_APPLE_TEAM_ID`, `OAUTH_APPLE_KEY_ID`와 `.p8` 원문 또는 파일 경로가 필요하며 private
+key와 Apple token은 로그·응답·저장소에 남기지 않는다.
 
 ## 저장과 오류 복구
 
@@ -139,6 +150,11 @@ Debug·Release bundle ID를 `OAUTH_APPLE_CLIENT_IDS`로 설정하고, 최초 반
 OAuth identity·nonce 테이블을 생성해야 한다. migration을 이미 적용한 뒤 진단용 runtime만 교체할 때는
 `install`을 다시 실행하지 않는다. 실패 시 버튼 아래 안내와 서버의 `apple oauth: identity token
 verification failed` 로그를 함께 확인한다.
+
+계정 삭제 QA: 이메일 또는 Google 계정은 내 계정 → 계정 및 데이터 삭제 → 정확한 `DELETE` 입력 → 최종
+경고 → 삭제 완료와 로그아웃 상태를 확인한다. Apple 연결 계정은 같은 화면에서 Apple 기본 버튼으로 새로
+인증한 뒤 최종 경고를 확인한다. 인증 취소·네트워크 단절·Apple token 폐기 실패 때 계정과 로그인 상태가
+유지되는지, 성공 뒤 재로그인이 새 Apple 승인 흐름을 표시하는지도 확인한다.
 
 이메일 가입 QA: 비로그인 계정 시트에서 위로 스크롤 → 이메일로 회원가입 → 사용하지 않은 이메일·이름·
 규칙에 맞는 비밀번호 입력 → 약관 동의 → 계정 만들기 → 받은 6자리 코드 입력 → 가입 완료 → 로그인으로

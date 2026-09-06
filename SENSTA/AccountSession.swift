@@ -73,6 +73,29 @@ private struct AppleAuthBody: Encodable {
   let name: String
 }
 
+private struct AccountDeletionBody: Encodable {
+  let confirmation: String
+}
+
+private struct AppleAccountDeletionBody: Encodable {
+  let identityToken: String
+  let authorizationCode: String
+  let nonce: String
+  let confirmation: String
+}
+
+private struct AccountDeletionResponse: Decodable {
+  let success: Bool
+  let error: String?
+  let code: Int
+
+  func checked() throws {
+    guard success, code == 0 else {
+      throw NuboAPIError.server(code: code, message: error ?? "")
+    }
+  }
+}
+
 private struct PasswordResetBody: Encodable {
   let email: String
 }
@@ -203,6 +226,37 @@ enum AccountEndpoint {
     try appleRequest(
       baseURL: baseURL, path: "auth/apple/link", identityToken: identityToken, nonce: nonce,
       name: name)
+  }
+
+  static func deleteAccount(baseURL: URL, confirmation: String) throws -> URLRequest {
+    guard confirmation == "DELETE" else { throw NuboAPIError.invalidRequest }
+    var request = try request(baseURL: baseURL, path: "auth/account", method: "DELETE")
+    request.httpBody = try JSONEncoder().encode(AccountDeletionBody(confirmation: confirmation))
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    return request
+  }
+
+  static func appleDeleteNonce(baseURL: URL) throws -> URLRequest {
+    try request(baseURL: baseURL, path: "auth/apple/delete/nonce", method: "POST")
+  }
+
+  static func deleteAppleAccount(
+    baseURL: URL, identityToken: String, authorizationCode: String, nonce: String,
+    confirmation: String
+  ) throws -> URLRequest {
+    let identityToken = identityToken.trimmingCharacters(in: .whitespacesAndNewlines)
+    let authorizationCode = authorizationCode.trimmingCharacters(in: .whitespacesAndNewlines)
+    let nonce = nonce.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !identityToken.isEmpty, !authorizationCode.isEmpty, !nonce.isEmpty,
+      confirmation == "DELETE"
+    else { throw NuboAPIError.invalidRequest }
+    var request = try request(baseURL: baseURL, path: "auth/apple/account", method: "DELETE")
+    request.httpBody = try JSONEncoder().encode(
+      AppleAccountDeletionBody(
+        identityToken: identityToken, authorizationCode: authorizationCode, nonce: nonce,
+        confirmation: confirmation))
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    return request
   }
 
   private static func appleRequest(
@@ -639,6 +693,89 @@ final class AccountSession {
       self.error = "이 Apple ID는 이미 다른 SENSTA 계정에 연결되어 있어요."
     } catch {
       self.error = "Apple ID를 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+    }
+  }
+
+  func prepareAppleAccountDeletion() async -> String? {
+    guard user != nil, appleLinked == true, let apiBaseURL else { return nil }
+    do {
+      let data = try await sendAuthenticated(AccountEndpoint.appleDeleteNonce(baseURL: apiBaseURL))
+      let result = try JSONDecoder().decode(AccountEnvelope<AppleNonceResult>.self, from: data)
+        .checked()
+      guard !result.nonce.isEmpty else { throw NuboAPIError.malformedResponse }
+      return result.nonce
+    } catch is CancellationError {
+      return nil
+    } catch {
+      self.error = "Apple 계정 삭제 확인을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+      return nil
+    }
+  }
+
+  func reportAppleDeletionAuthorizationFailure() {
+    guard !isBusy else { return }
+    error = "Apple ID를 확인하지 못했어요. 계정은 삭제되지 않았습니다."
+  }
+
+  func deleteAccount(confirmation: String) async -> Bool {
+    guard let apiBaseURL else { return false }
+    do {
+      return await performAccountDeletion(
+        request: try AccountEndpoint.deleteAccount(
+          baseURL: apiBaseURL, confirmation: confirmation))
+    } catch {
+      self.error = "계정 삭제 요청을 만들지 못했어요."
+      return false
+    }
+  }
+
+  func deleteAppleAccount(
+    identityToken: String, authorizationCode: String, nonce: String, confirmation: String
+  ) async -> Bool {
+    guard let apiBaseURL else { return false }
+    do {
+      return await performAccountDeletion(
+        request: try AccountEndpoint.deleteAppleAccount(
+          baseURL: apiBaseURL, identityToken: identityToken,
+          authorizationCode: authorizationCode, nonce: nonce, confirmation: confirmation))
+    } catch {
+      self.error = "Apple 계정 삭제 요청을 만들지 못했어요."
+      return false
+    }
+  }
+
+  private func performAccountDeletion(request: URLRequest) async -> Bool {
+    guard !isBusy, user != nil else { return false }
+    isBusy = true
+    error = nil
+    defer { isBusy = false }
+    do {
+      let data = try await sendAuthenticated(request)
+      try JSONDecoder().decode(AccountDeletionResponse.self, from: data).checked()
+      var localClearFailed = false
+      do { try store.clear() } catch { localClearFailed = true }
+      identity = UUID()
+      refreshTask?.cancel()
+      refreshTask = nil
+      tokens = nil
+      user = nil
+      appleLinked = nil
+      commentCounts = [:]
+      writtenCommentIDs = []
+      postLikes.reset()
+      userSafety.reset()
+      achievements.reset()
+      needsRestoration = localClearFailed
+      await logoutCoordinator?.prepareForLogout(using: self)
+      if localClearFailed {
+        self.error = "계정은 삭제됐지만 이 기기의 로그인 정보를 완전히 지우지 못했어요. 앱을 다시 실행해 주세요."
+      }
+      return true
+    } catch is CancellationError {
+      return false
+    } catch {
+      self.error = "계정을 삭제하지 못했어요. 계정은 그대로 유지됩니다. 잠시 뒤 다시 시도해 주세요."
+      return false
     }
   }
 

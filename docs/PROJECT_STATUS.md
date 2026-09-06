@@ -620,11 +620,10 @@
 
 ## 다음 작업 (현재)
 
-1. 앱 내 계정 삭제와 Sign in with Apple token 폐기를 연결한다.
-2. Android·NUBO 웹의 웜톤 라이트/다크 룩앤필을 iOS 전체 화면에 맞게 적용한다.
-3. 위 작업을 모두 모아 실제 iPhone에서 자르기 조합, 알림 읽음, JPEG·HEIC 다중 업로드와 UGC·계정·테마를
+1. Android·NUBO 웹의 웜톤 라이트/다크 룩앤필을 iOS 전체 화면에 맞게 적용한다.
+2. 위 작업을 모두 모아 실제 iPhone에서 자르기 조합, 알림 읽음, JPEG·HEIC 다중 업로드와 UGC·계정·테마를
    한 번의 최종 통합 QA로 확인한다.
-4. QA 뒤 전용 지원 URL, App Privacy 수집표와 TestFlight·App Store 제출 자료를 준비한다. 웹 Universal
+3. QA 뒤 전용 지원 URL, App Privacy 수집표와 TestFlight·App Store 제출 자료를 준비한다. 웹 Universal
    Link는 원격 push 출시를 막지 않으므로 별도 작업으로 둔다.
 
 ## 신고·차단 (2026-09-06)
@@ -657,3 +656,22 @@
   4개로 검증했다. 전체 단위 142개와 내 작품에서 비공개 사진 수정→상세 반영→삭제→목록 복귀 UI 흐름,
   Release simulator build와 Debug 정적 분석을 통과했다. 서버·Android·NUBO runtime 변경이나 운영 배포는
   없으며 실기기 확인은 최종 통합 QA에 포함한다.
+
+## 앱 내 계정 삭제와 Apple 승인 폐기 (2026-09-06)
+
+- 계정 화면에서 영구 삭제로 이동해 데이터 범위를 확인하고 영문 대문자 `DELETE`와 마지막 destructive
+  확인을 거쳐야만 실행한다. 기존 이메일·Google 계정은 웹과 같은 인증 `DELETE /auth/account` 계약을
+  재사용하며, 서버 성공 전에는 Keychain과 로그인 상태를 지우지 않는다.
+- Apple ID가 연결된 계정은 삭제 전 Apple 기본 인증을 다시 실행한다. 앱이 새 identity token·5분짜리
+  authorization code·삭제 전용 nonce를 보내면 GOAPI `24bcc4d`가 audience와 연결 subject를 현재 JWT
+  계정에 대조하고, Apple token 교환과 refresh token 폐기를 마친 뒤에만 로컬 계정을 삭제한다. 폐기 실패
+  시 로컬 계정은 유지한다.
+- GOAPI 전체 테스트·vet와 공식 Ubuntu 22.04 build, Ubuntu 24.04 및 qemu64/max runtime smoke를
+  통과했다. 교체용 binary SHA-256은
+  `8b400bc609fd60185d2b1bf919cd9f3848f66ddcb07f4cdd017326de971643f1`이다. 운영에는 기존
+  `OAUTH_APPLE_CLIENT_IDS`와 함께 Team ID·Key ID·Sign in with Apple `.p8` private key 설정이 필요하며
+  DB migration은 없다.
+- iOS endpoint·본문·확인 문자열, 서버 실패 시 세션 보존, Apple nonce·authorization code 전달을 단위
+  테스트로 검증했다. 전체 단위 146개, 이메일 계정 삭제 자동 UI 흐름, Release simulator build와 Debug
+  정적 분석을 통과했다. 실기기 삭제는 복구할 수 없으므로 최종 통합 QA에서 전용 테스트 계정으로 한 번만
+  확인한다.

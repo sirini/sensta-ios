@@ -800,6 +800,40 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testAccountDeletionRequiresExactConfirmationAndReturnsToSignedOutState() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-apple"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+
+    let navigation = app.buttons["account-delete-navigation"]
+    XCTAssertTrue(navigation.waitForExistence(timeout: 5))
+    navigation.tap()
+    let confirmation = app.textFields["account-delete-confirmation"]
+    XCTAssertTrue(confirmation.waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["account-delete-submit"].isEnabled)
+    confirmation.tap()
+    confirmation.typeText("DELETE")
+    let submit = app.buttons["account-delete-submit"]
+    XCTAssertTrue(submit.isEnabled)
+    submit.tap()
+    app.sheets["계정과 데이터를 영구 삭제할까요?"].buttons["영구 삭제"].tap()
+
+    let completion = app.buttons["account-delete-finish"]
+    let signedOut = app.textFields["account-email"]
+    XCTAssertTrue(completion.waitForExistence(timeout: 5) || signedOut.waitForExistence(timeout: 2))
+  }
+
+  @MainActor
   func testAccountSheetDarkAndLargeText() throws {
     for mode in ["--ui-test-dark", "--ui-test-large-text"] {
       let app = XCUIApplication()
