@@ -138,9 +138,9 @@ struct AccountView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
               HStack {
-                Rectangle().frame(height: 1).foregroundStyle(.separator)
+                Rectangle().frame(height: 1).foregroundStyle(SenstaTheme.outlineVariant)
                 Text("또는").font(.caption).foregroundStyle(.secondary)
-                Rectangle().frame(height: 1).foregroundStyle(.separator)
+                Rectangle().frame(height: 1).foregroundStyle(SenstaTheme.outlineVariant)
               }
               .accessibilityHidden(true)
             }
@@ -162,9 +162,9 @@ struct AccountView: View {
             Button(action: signin) {
               Text("로그인")
                 .font(.headline)
-                .foregroundStyle(.white)
+                .foregroundStyle(SenstaTheme.onPrimary)
                 .frame(maxWidth: .infinity, minHeight: 48)
-                .background(Color.accentColor, in: Capsule())
+                .background(SenstaTheme.primary, in: Capsule())
                 .contentShape(Capsule())
             }
             .buttonStyle(.plain)
@@ -235,8 +235,7 @@ struct AccountView: View {
       dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large], selection: $detent
     )
     .presentationBackground(
-      reduceTransparency
-        ? AnyShapeStyle(Color(.systemBackground)) : AnyShapeStyle(.regularMaterial)
+      AnyShapeStyle(SenstaTheme.surface.opacity(reduceTransparency ? 1 : 0.97))
     )
     .onChange(of: field) { _, value in
       if value != nil { detent = .large }
@@ -250,10 +249,11 @@ struct AccountView: View {
     .onChange(of: dynamicTypeSize, initial: true) { _, size in
       if size.isAccessibilitySize { detent = .large }
     }
+    .senstaScreenStyle()
   }
 
   private var rowBackground: Color {
-    reduceTransparency ? Color(.secondarySystemGroupedBackground) : Color.primary.opacity(0.045)
+    reduceTransparency ? SenstaTheme.surface : SenstaTheme.container.opacity(0.72)
   }
 
   private var canSignin: Bool {
@@ -345,7 +345,7 @@ struct AccountAvatar: View {
       } else {
         Image(systemName: "person.crop.circle.fill")
           .resizable().scaledToFit().foregroundStyle(.secondary)
-          .background(Color(.tertiarySystemBackground))
+          .background(SenstaTheme.containerHigh)
       }
     }
     .frame(width: size, height: size).clipShape(Circle())

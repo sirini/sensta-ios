@@ -56,6 +56,8 @@ struct SENSTAApp: App {
       )
       .accountSession(account)
       .environment(\.accountSession, account)
+      .tint(SenstaTheme.primary)
+      .background(SenstaTheme.background.ignoresSafeArea())
       .task { await account.restore() }
       .task(id: account.sessionIdentity) {
         await pushNotifications.synchronize(with: account)
@@ -88,6 +90,7 @@ struct SENSTAApp: App {
       -> PhotoFeedPage
     {
       if keyword == "empty" { return PhotoFeedPage(totalPostCount: 0, posts: []) }
+      if keyword.isEmpty { return try await fetchPage(page) }
       let result = try await fetchPage(1)
       return PhotoFeedPage(totalPostCount: result.posts.count, posts: result.posts, boardID: 2)
     }

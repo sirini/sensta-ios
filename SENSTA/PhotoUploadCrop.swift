@@ -197,6 +197,7 @@ struct PhotoUploadCropView: View {
           .accessibilityIdentifier("photo-crop-apply")
         }
       }
+      .senstaScreenStyle()
     }
   }
 

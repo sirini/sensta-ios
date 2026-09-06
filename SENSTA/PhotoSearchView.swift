@@ -86,10 +86,11 @@ struct PhotoSearchView: View {
                   .padding(.horizontal, 16)
                   .frame(minHeight: 44)
                   .background(
-                    option == choice ? Color.primary : Color(.secondarySystemBackground),
+                    option == choice ? SenstaTheme.primary : SenstaTheme.container,
                     in: Capsule()
                   )
-                  .foregroundStyle(option == choice ? Color(.systemBackground) : .primary)
+                  .foregroundStyle(
+                    option == choice ? SenstaTheme.onPrimary : SenstaTheme.foreground)
               }
               .buttonStyle(.plain)
               .accessibilityAddTraits(option == choice ? .isSelected : [])
@@ -117,6 +118,7 @@ struct PhotoSearchView: View {
     .onChange(of: draft) { _, value in
       if value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { submit() }
     }
+    .senstaScreenStyle()
   }
 
   private func submit() { request = PhotoSearchRequest(keyword: draft, option: option) }
@@ -243,7 +245,7 @@ private struct PhotoSearchResults<Header: View>: View {
                   .font(.subheadline)
                   .padding(.horizontal, 14)
                   .frame(minHeight: 44)
-                  .background(Color(.secondarySystemBackground), in: Capsule())
+                  .background(SenstaTheme.container, in: Capsule())
               }
               .buttonStyle(.plain)
               .accessibilityIdentifier("explore-tag-\(tag.id)")
@@ -301,7 +303,7 @@ private struct PhotoSearchResults<Header: View>: View {
                 if case .success(let image) = phase {
                   image.resizable().scaledToFill()
                 } else {
-                  Rectangle().fill(Color(.secondarySystemBackground))
+                  Rectangle().fill(SenstaTheme.container)
                     .overlay { Image(systemName: "photo").foregroundStyle(.tertiary) }
                 }
               }

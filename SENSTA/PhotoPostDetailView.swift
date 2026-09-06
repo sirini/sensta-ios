@@ -158,6 +158,7 @@ struct PhotoPostDetailView: View {
       guard let account, let detail = loadedDetail, canReport(detail.post) else { return }
       await account.userSafety.load(targetUserID: detail.post.writer.id, using: account)
     }
+    .senstaScreenStyle()
   }
 
   private var loadedDetail: PhotoPostDetail? {
@@ -264,7 +265,7 @@ struct PhotoPostDetailView: View {
         }
       }
     }
-    .background(Color(.systemBackground))
+    .background(SenstaTheme.background)
   }
 
   private func titleSection(_ post: PhotoPost) -> some View {
@@ -532,7 +533,7 @@ private struct PhotoMetadataSection: View {
         }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
-      .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+      .background(SenstaTheme.container, in: RoundedRectangle(cornerRadius: 10))
       .accessibilityElement(children: .contain)
       .accessibilityIdentifier("photo-metadata-panel")
     }

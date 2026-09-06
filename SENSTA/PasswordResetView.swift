@@ -89,6 +89,7 @@ struct PasswordResetView: View {
     }
     .navigationTitle("비밀번호 재설정")
     .navigationBarTitleDisplayMode(.inline)
+    .senstaScreenStyle()
   }
 
   private func requestReset() async {

@@ -64,6 +64,8 @@
 		M10000000000000000000001 /* PhotoPostManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000000000000000000001 /* PhotoPostManagement.swift */; };
 		M10000000000000000000002 /* PhotoPostManagementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000000000000000000002 /* PhotoPostManagementTests.swift */; };
 		N10000000000000000000001 /* AccountDeletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000000000000000000001 /* AccountDeletionView.swift */; };
+		O10000000000000000000001 /* SenstaTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = O20000000000000000000001 /* SenstaTheme.swift */; };
+		O10000000000000000000002 /* SenstaThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = O20000000000000000000002 /* SenstaThemeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -146,6 +148,8 @@
 		M20000000000000000000001 /* PhotoPostManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPostManagement.swift; sourceTree = "<group>"; };
 		M20000000000000000000002 /* PhotoPostManagementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPostManagementTests.swift; sourceTree = "<group>"; };
 		N20000000000000000000001 /* AccountDeletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionView.swift; sourceTree = "<group>"; };
+		O20000000000000000000001 /* SenstaTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenstaTheme.swift; sourceTree = "<group>"; };
+		O20000000000000000000002 /* SenstaThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenstaThemeTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -223,6 +227,7 @@
 				L20000000000000000000001 /* UserSafety.swift */,
 				M20000000000000000000001 /* PhotoPostManagement.swift */,
 				N20000000000000000000001 /* AccountDeletionView.swift */,
+				O20000000000000000000001 /* SenstaTheme.swift */,
 				A2000000000000000000001C /* PhotoImagePipeline.swift */,
 				A20000000000000000000007 /* Assets.xcassets */,
 				A2000000000000000000000E /* Info.plist */,
@@ -250,6 +255,7 @@
 				I20000000000000000000002 /* PushNotificationsTests.swift */,
 				L20000000000000000000002 /* UserSafetyTests.swift */,
 				M20000000000000000000002 /* PhotoPostManagementTests.swift */,
+				O20000000000000000000002 /* SenstaThemeTests.swift */,
 				A50000000000000000000007 /* Fixtures */,
 			);
 			path = SENSTATests;
@@ -499,6 +505,7 @@
 				L10000000000000000000001 /* UserSafety.swift in Sources */,
 				M10000000000000000000001 /* PhotoPostManagement.swift in Sources */,
 				N10000000000000000000001 /* AccountDeletionView.swift in Sources */,
+				O10000000000000000000001 /* SenstaTheme.swift in Sources */,
 				A10000000000000000000014 /* PhotoImagePipeline.swift in Sources */,
 				A10000000000000000000001 /* SENSTAApp.swift in Sources */,
 			);
@@ -522,6 +529,7 @@
 				I10000000000000000000002 /* PushNotificationsTests.swift in Sources */,
 				L10000000000000000000002 /* UserSafetyTests.swift in Sources */,
 				M10000000000000000000002 /* PhotoPostManagementTests.swift in Sources */,
+				O10000000000000000000002 /* SenstaThemeTests.swift in Sources */,
 				A10000000000000000000012 /* PhotoPostDetailViewModelTests.swift in Sources */,
 				A10000000000000000000015 /* PhotoImagePipelineTests.swift in Sources */,
 			);

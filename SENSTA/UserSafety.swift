@@ -314,6 +314,7 @@ struct UserReportSheet: View {
           .accessibilityIdentifier("user-report-submit")
         }
       }
+      .senstaScreenStyle()
       .interactiveDismissDisabled(state?.isMutating == true)
       .onChange(of: reason) { _, newValue in
         var limited = newValue

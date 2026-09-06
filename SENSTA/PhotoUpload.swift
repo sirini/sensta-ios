@@ -640,10 +640,11 @@ struct PhotoUploadView: View {
             }
           } label: {
             HStack {
-              if model.isUploading { ProgressView().tint(.white) }
+              if model.isUploading { ProgressView().tint(SenstaTheme.onPrimary) }
               Text(model.isUploading ? "사진을 올리는 중…" : "사진 공유하기")
                 .fontWeight(.semibold)
             }
+            .foregroundStyle(SenstaTheme.onPrimary)
             .frame(maxWidth: .infinity, minHeight: 50)
           }
           .buttonStyle(.borderedProminent)
@@ -660,6 +661,7 @@ struct PhotoUploadView: View {
           Button("취소") { dismiss() }.disabled(model.isUploading)
         }
       }
+      .senstaScreenStyle()
     }
     .interactiveDismissDisabled(model.isUploading)
     .task {
@@ -850,9 +852,11 @@ struct PhotoUploadView: View {
       .padding(.vertical, 10)
       .background(
         RoundedRectangle(cornerRadius: 12)
-          .fill(Color(.secondarySystemBackground))
+          .fill(SenstaTheme.container)
       )
-      .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 0.5))
+      .overlay(
+        RoundedRectangle(cornerRadius: 12).stroke(SenstaTheme.outlineVariant, lineWidth: 0.5)
+      )
 
       if !model.tagSuggestions.isEmpty {
         VStack(spacing: 0) {
@@ -877,8 +881,10 @@ struct PhotoUploadView: View {
             if index < model.tagSuggestions.count - 1 { Divider() }
           }
         }
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 0.5))
+        .background(SenstaTheme.container, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(
+          RoundedRectangle(cornerRadius: 12).stroke(SenstaTheme.outlineVariant, lineWidth: 0.5)
+        )
       }
 
       Text(model.tagFeedback ?? "콤마·스페이스·Return으로 추가하고, 태그를 누르면 삭제할 수 있어요.")

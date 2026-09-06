@@ -121,6 +121,7 @@ struct PhotoCommentEditorSheet: View {
       .overlay {
         if isSaving { ProgressView("댓글 수정 중") }
       }
+      .senstaScreenStyle()
     }
     .interactiveDismissDisabled(isSaving)
     .presentationDetents([.medium, .large])

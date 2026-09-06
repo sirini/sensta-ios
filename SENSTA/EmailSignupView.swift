@@ -108,6 +108,7 @@ struct EmailSignupView: View {
       confirmation = ""
       verificationCode = ""
     }
+    .senstaScreenStyle()
   }
 
   @ViewBuilder private var signupSections: some View {

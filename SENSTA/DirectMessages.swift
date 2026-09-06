@@ -3,49 +3,13 @@ import Observation
 import SwiftUI
 
 private struct DirectMessagePalette {
-  let colorScheme: ColorScheme
-
-  var background: Color {
-    colorScheme == .dark
-      ? Color(red: 28 / 255, green: 22 / 255, blue: 18 / 255)
-      : Color(red: 248 / 255, green: 243 / 255, blue: 235 / 255)
-  }
-
-  var composer: Color {
-    colorScheme == .dark
-      ? Color(red: 45 / 255, green: 36 / 255, blue: 31 / 255)
-      : Color(red: 242 / 255, green: 236 / 255, blue: 227 / 255)
-  }
-
-  var outgoing: Color {
-    colorScheme == .dark
-      ? Color(red: 91 / 255, green: 48 / 255, blue: 34 / 255)
-      : Color(red: 178 / 255, green: 88 / 255, blue: 58 / 255)
-  }
-
-  var onOutgoing: Color {
-    colorScheme == .dark
-      ? Color(red: 255 / 255, green: 219 / 255, blue: 202 / 255)
-      : Color(red: 255 / 255, green: 248 / 255, blue: 242 / 255)
-  }
-
-  var incoming: Color {
-    colorScheme == .dark
-      ? Color(red: 64 / 255, green: 54 / 255, blue: 48 / 255)
-      : Color(red: 237 / 255, green: 229 / 255, blue: 217 / 255)
-  }
-
-  var onIncoming: Color {
-    colorScheme == .dark
-      ? Color(red: 236 / 255, green: 226 / 255, blue: 216 / 255)
-      : Color(red: 48 / 255, green: 38 / 255, blue: 31 / 255)
-  }
-
-  var secondary: Color {
-    colorScheme == .dark
-      ? Color(red: 162 / 255, green: 152 / 255, blue: 142 / 255)
-      : Color(red: 115 / 255, green: 100 / 255, blue: 90 / 255)
-  }
+  let background = SenstaTheme.background
+  let composer = SenstaTheme.container
+  let outgoing = SenstaTheme.primary
+  let onOutgoing = SenstaTheme.onPrimary
+  let incoming = SenstaTheme.containerHighest
+  let onIncoming = SenstaTheme.foreground
+  let secondary = SenstaTheme.secondary
 }
 
 struct DirectMessagePartner: Identifiable, Hashable, Sendable {
@@ -365,8 +329,7 @@ final class DirectMessageModel {
   func load(
     partner: DirectMessagePartner, using account: AccountSession, force: Bool = false,
     quietly: Bool = false
-  ) async
-  {
+  ) async {
     guard let user = account.user, user.uid != partner.id, let baseURL = account.apiBaseURL else {
       messages = []
       loadError = nil
@@ -536,6 +499,7 @@ struct DirectMessageThreadListView: View {
     .navigationTitle("1:1 메시지")
     .navigationBarTitleDisplayMode(.inline)
     .task(id: account.sessionIdentity) { await model.load(using: account) }
+    .senstaScreenStyle()
   }
 }
 
@@ -581,13 +545,10 @@ struct DirectMessageView: View {
   @State private var showsBlockConfirmation = false
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
-  @Environment(\.colorScheme) private var colorScheme
   @FocusState private var composerFocused: Bool
   private static let bottomAnchorID = "direct-message-bottom"
 
-  private var palette: DirectMessagePalette {
-    DirectMessagePalette(colorScheme: colorScheme)
-  }
+  private let palette = DirectMessagePalette()
 
   private var safetyState: UserSafetyState? { account.userSafety.states[partner.id] }
   private var isBlocked: Bool { safetyState?.isBlocked == true }
@@ -643,8 +604,9 @@ struct DirectMessageView: View {
                 messageBubble(
                   message,
                   isLatestMine: message.id
-                    == model.messages.last(where: { $0.senderID == account.user?.uid })?.id)
-                  .id(message.id)
+                    == model.messages.last(where: { $0.senderID == account.user?.uid })?.id
+                )
+                .id(message.id)
               }
               Color.clear
                 .frame(height: 24)
@@ -723,6 +685,8 @@ struct DirectMessageView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbarBackground(palette.background, for: .navigationBar)
     .toolbarBackground(.visible, for: .navigationBar)
+    .foregroundStyle(SenstaTheme.foreground)
+    .tint(SenstaTheme.primary)
     .toolbar {
       ToolbarItem(placement: .principal) {
         HStack(spacing: 8) {
@@ -856,8 +820,9 @@ struct DirectMessageView: View {
       if !mine {
         AccountAvatar(
           url: partner.profileURL, size: 34,
-          accessibilityLabel: "\(partner.name) 프로필 사진")
-          .accessibilityIdentifier("direct-message-avatar-\(message.id)")
+          accessibilityLabel: "\(partner.name) 프로필 사진"
+        )
+        .accessibilityIdentifier("direct-message-avatar-\(message.id)")
       }
       VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
         Text(DirectMessageHashtags.linkedText(message.text))
@@ -894,8 +859,9 @@ struct DirectMessageView: View {
       if mine {
         AccountAvatar(
           url: account.profileURL, size: 34,
-          accessibilityLabel: "내 프로필 사진")
-          .accessibilityIdentifier("direct-message-avatar-\(message.id)")
+          accessibilityLabel: "내 프로필 사진"
+        )
+        .accessibilityIdentifier("direct-message-avatar-\(message.id)")
       }
       if !mine { Spacer(minLength: 44) }
     }

@@ -367,6 +367,7 @@ struct PhotoPostEditSheet: View {
       }
     }
     .onDisappear { suggestionTask?.cancel() }
+    .senstaScreenStyle()
   }
 }
 

@@ -113,7 +113,7 @@ struct PhotoCommentComposer: View {
       .lineLimit(3...6).focused($focused)
       .disabled(model.isSending).accessibilityIdentifier("comment-draft")
       .padding(12).background(
-        Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+        SenstaTheme.container, in: RoundedRectangle(cornerRadius: 12))
       HStack {
         if !model.hasMinimumLength {
           Text("10자 이상 입력해 주세요").font(.caption).foregroundStyle(.secondary)

@@ -478,7 +478,7 @@ struct PhotoStudioView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
-              Color(.secondarySystemGroupedBackground),
+              SenstaTheme.surface,
               in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
@@ -541,6 +541,7 @@ struct PhotoStudioView: View {
     .onChange(of: account.user?.uid) { _, userID in
       if userID == nil { dismiss() }
     }
+    .senstaScreenStyle()
   }
 
   private var summarySection: some View {
@@ -581,11 +582,13 @@ struct PhotoStudioView: View {
           } label: {
             Text(sort.label)
               .font(.subheadline.weight(model.selectedSort == sort ? .semibold : .regular))
-              .foregroundStyle(model.selectedSort == sort ? Color.white : Color.primary)
+              .foregroundStyle(
+                model.selectedSort == sort ? SenstaTheme.onPrimary : SenstaTheme.foreground
+              )
               .padding(.horizontal, 14)
               .frame(minHeight: 38)
               .background(
-                model.selectedSort == sort ? Color.accentColor : Color(.secondarySystemBackground),
+                model.selectedSort == sort ? SenstaTheme.primary : SenstaTheme.container,
                 in: Capsule())
           }
           .buttonStyle(.plain)
@@ -634,7 +637,7 @@ private struct PhotoStudioPostRow: View {
       if case .success(let image) = phase {
         image.resizable().scaledToFill()
       } else {
-        Rectangle().fill(Color(.secondarySystemBackground)).overlay {
+        Rectangle().fill(SenstaTheme.container).overlay {
           Image(systemName: "photo").font(.title2).foregroundStyle(.tertiary)
         }
       }

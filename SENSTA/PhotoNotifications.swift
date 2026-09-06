@@ -331,6 +331,7 @@ struct PhotoNotificationsView: View {
       await pushNotifications.synchronize(with: account)
       await center.load(using: account, force: true)
     }
+    .senstaScreenStyle()
   }
 
   @ViewBuilder
@@ -379,7 +380,7 @@ struct PhotoNotificationsView: View {
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 12)
-    .background(Color(.secondarySystemBackground))
+    .background(SenstaTheme.container)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("notification-push-permission")
   }

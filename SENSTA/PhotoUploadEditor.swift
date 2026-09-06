@@ -328,6 +328,7 @@ struct PhotoUploadEditorView: View {
       .overlay { if isSaving { ProgressView("편집 내용을 저장하는 중…") } }
       .interactiveDismissDisabled(isSaving)
       .task(id: photo.id) { await loadCropPreview() }
+      .senstaScreenStyle()
       .fullScreenCover(isPresented: $isCropping) {
         if let image = cropPreviewImage {
           PhotoUploadCropView(image: image, initialCrop: edits.crop) { crop in

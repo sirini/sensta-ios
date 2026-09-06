@@ -82,6 +82,7 @@ struct AccountDeletionView: View {
       pendingAppleAuthorization = nil
       appleNonce = nil
     }
+    .senstaScreenStyle()
   }
 
   @ViewBuilder private var deletionControl: some View {

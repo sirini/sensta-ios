@@ -173,7 +173,7 @@ struct PhotographerView: View {
                         if case .success(let image) = phase {
                           image.resizable().scaledToFill()
                         } else {
-                          Rectangle().fill(Color(.secondarySystemBackground)).overlay {
+                          Rectangle().fill(SenstaTheme.container).overlay {
                             Image(systemName: "photo").foregroundStyle(.tertiary)
                           }
                         }
@@ -244,6 +244,7 @@ struct PhotographerView: View {
       guard let account, account.user?.uid != writer.id else { return }
       await account.userSafety.load(targetUserID: writer.id, using: account)
     }
+    .senstaScreenStyle()
   }
 
   private var safetyState: UserSafetyState? { account?.userSafety.states[writer.id] }
@@ -268,7 +269,7 @@ struct PhotographerView: View {
         }
       }
     }.padding(16).background(
-      Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+      SenstaTheme.container, in: RoundedRectangle(cornerRadius: 16))
   }
 
   private func metric(_ name: String, value: Int?) -> some View {
@@ -305,7 +306,7 @@ struct PhotographerView: View {
                     .lineLimit(2, reservesSpace: true)
                 }.frame(width: dynamicTypeSize.isAccessibilitySize ? 220 : 140, alignment: .leading)
                   .padding(16).background(
-                    Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16)
+                    SenstaTheme.container, in: RoundedRectangle(cornerRadius: 16)
                   )
                   .contentShape(Rectangle())
               }.buttonStyle(.plain).accessibilityIdentifier("photographer-badge-\(badge.key)")
@@ -364,12 +365,13 @@ struct PhotographerView: View {
               systemImage: safetyState?.isReported == true
                 ? "checkmark.circle" : "exclamationmark.bubble"
             )
-              .frame(maxWidth: .infinity, minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: 44)
           }
           .buttonStyle(.bordered)
           .disabled(
             safetyState?.isReported == true || safetyState?.isLoading == true
-              || safetyState?.isMutating == true)
+              || safetyState?.isMutating == true
+          )
           .accessibilityIdentifier("photographer-report")
 
           Button {
@@ -380,7 +382,7 @@ struct PhotographerView: View {
               systemImage: isBlocked
                 ? "person.crop.circle.badge.checkmark" : "person.crop.circle.badge.xmark"
             )
-              .frame(maxWidth: .infinity, minHeight: 44)
+            .frame(maxWidth: .infinity, minHeight: 44)
           }
           .buttonStyle(.bordered)
           .tint(isBlocked ? .accentColor : .red)

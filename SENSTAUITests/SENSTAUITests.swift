@@ -201,16 +201,25 @@ final class SENSTAUITests: XCTestCase {
     let editDraft = app.descendants(matching: .any).matching(identifier: "comment-edit-draft")
       .firstMatch
     XCTAssertTrue(editDraft.waitForExistence(timeout: 5))
+    let originalValue = editDraft.value as? String ?? ""
     editDraft.tap()
-    editDraft.typeKey("a", modifierFlags: .command)
+    editDraft.typeKey(XCUIKeyboardKey.rightArrow.rawValue, modifierFlags: .command)
+    editDraft.typeText(
+      String(repeating: XCUIKeyboardKey.delete.rawValue, count: originalValue.count))
     editDraft.typeText("Edited comment text")
-    app.buttons["comment-edit-save"].tap()
+    let editSave = app.buttons["comment-edit-save"]
+    XCTAssertTrue(editSave.waitForExistence(timeout: 5))
+    XCTAssertTrue(editSave.isHittable)
+    editSave.tap()
+    XCTAssertTrue(app.navigationBars["댓글 수정"].waitForNonExistence(timeout: 10))
     XCTAssertTrue(app.staticTexts["Edited comment text"].waitForExistence(timeout: 5))
 
     let reply = app.buttons["comment-reply-101"]
     for _ in 0..<4 where !reply.isHittable { app.swipeUp() }
     reply.tap()
+    for _ in 0..<4 where !draft.isHittable { app.swipeUp() }
     draft.tap()
+    XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
     draft.typeText("Reply that must remain")
     app.buttons["comment-send"].tap()
     XCTAssertTrue(app.staticTexts["Reply that must remain"].waitForExistence(timeout: 5))
@@ -545,7 +554,7 @@ final class SENSTAUITests: XCTestCase {
 
     XCTAssertTrue(app.staticTexts["achievement-name"].waitForExistence(timeout: 5))
     let confirm = app.buttons["achievement-confirm"]
-    if !confirm.isHittable { app.swipeUp() }
+    for _ in 0..<4 where !confirm.isHittable { app.swipeUp() }
     XCTAssertTrue(confirm.isHittable)
     XCTAssertGreaterThanOrEqual(confirm.frame.minX, app.frame.minX)
     XCTAssertLessThanOrEqual(confirm.frame.maxX, app.frame.maxX)
@@ -872,7 +881,8 @@ final class SENSTAUITests: XCTestCase {
       XCTAssertTrue(title.isHittable)
     }
     let retry = app.buttons["photo-feed-load-more-retry"]
-    XCTAssertTrue(retry.waitForExistence(timeout: 5))
+    XCTAssertTrue(retry.waitForExistence(timeout: 10))
+    XCTAssertTrue(retry.isHittable)
     retry.tap()
     XCTAssertTrue(app.staticTexts["테스트 사진 4"].isHittable)
     app.swipeUp(velocity: .slow)
@@ -1225,7 +1235,9 @@ final class SENSTAUITests: XCTestCase {
       )
     )
 
-    let pager = app.otherElements.matching(identifier: "photo-detail-image-pager").firstMatch
+    // Xcode 27 beta가 같은 SwiftUI 컨테이너를 순간적으로 Other/ScrollView로 달리 분류할 수 있다.
+    let pager = app.descendants(matching: .any).matching(identifier: "photo-detail-image-pager")
+      .firstMatch
     XCTAssertTrue(pager.waitForExistence(timeout: 5))
     let windowFrame = app.windows.firstMatch.frame
     XCTAssertEqual(pager.frame.minX, windowFrame.minX + 16, accuracy: 1)

@@ -242,12 +242,13 @@ private struct AchievementCelebrationCard: View {
             } label: {
               Group {
                 if account.achievements.isAcknowledging {
-                  ProgressView().tint(.white)
+                  ProgressView().tint(SenstaTheme.onPrimary)
                 } else {
                   Text(remainingCount > 1 ? "확인하고 다음 업적 보기" : "확인")
                 }
               }
               .font(.headline)
+              .foregroundStyle(SenstaTheme.onPrimary)
               .frame(maxWidth: .infinity, minHeight: 48)
             }
             .buttonStyle(.borderedProminent)
@@ -264,7 +265,7 @@ private struct AchievementCelebrationCard: View {
         .frame(maxWidth: 440)
         .background(
           reduceTransparency
-            ? AnyShapeStyle(Color(.secondarySystemBackground)) : AnyShapeStyle(.regularMaterial),
+            ? AnyShapeStyle(SenstaTheme.surface) : AnyShapeStyle(SenstaTheme.surface.opacity(0.94)),
           in: RoundedRectangle(cornerRadius: 28, style: .continuous)
         )
         .overlay {
