@@ -2,6 +2,52 @@ import Foundation
 import Observation
 import SwiftUI
 
+private struct DirectMessagePalette {
+  let colorScheme: ColorScheme
+
+  var background: Color {
+    colorScheme == .dark
+      ? Color(red: 28 / 255, green: 22 / 255, blue: 18 / 255)
+      : Color(red: 248 / 255, green: 243 / 255, blue: 235 / 255)
+  }
+
+  var composer: Color {
+    colorScheme == .dark
+      ? Color(red: 45 / 255, green: 36 / 255, blue: 31 / 255)
+      : Color(red: 242 / 255, green: 236 / 255, blue: 227 / 255)
+  }
+
+  var outgoing: Color {
+    colorScheme == .dark
+      ? Color(red: 91 / 255, green: 48 / 255, blue: 34 / 255)
+      : Color(red: 178 / 255, green: 88 / 255, blue: 58 / 255)
+  }
+
+  var onOutgoing: Color {
+    colorScheme == .dark
+      ? Color(red: 255 / 255, green: 219 / 255, blue: 202 / 255)
+      : Color(red: 255 / 255, green: 248 / 255, blue: 242 / 255)
+  }
+
+  var incoming: Color {
+    colorScheme == .dark
+      ? Color(red: 64 / 255, green: 54 / 255, blue: 48 / 255)
+      : Color(red: 237 / 255, green: 229 / 255, blue: 217 / 255)
+  }
+
+  var onIncoming: Color {
+    colorScheme == .dark
+      ? Color(red: 236 / 255, green: 226 / 255, blue: 216 / 255)
+      : Color(red: 48 / 255, green: 38 / 255, blue: 31 / 255)
+  }
+
+  var secondary: Color {
+    colorScheme == .dark
+      ? Color(red: 162 / 255, green: 152 / 255, blue: 142 / 255)
+      : Color(red: 115 / 255, green: 100 / 255, blue: 90 / 255)
+  }
+}
+
 struct DirectMessagePartner: Identifiable, Hashable, Sendable {
   let id: Int
   let name: String
@@ -504,7 +550,13 @@ struct DirectMessageView: View {
   @State private var selectedHashtag: String?
   @Environment(\.scenePhase) private var scenePhase
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.colorScheme) private var colorScheme
   @FocusState private var composerFocused: Bool
+  private static let bottomAnchorID = "direct-message-bottom"
+
+  private var palette: DirectMessagePalette {
+    DirectMessagePalette(colorScheme: colorScheme)
+  }
 
   init(
     partner: DirectMessagePartner, account: AccountSession,
@@ -551,10 +603,14 @@ struct DirectMessageView: View {
                     == model.messages.last(where: { $0.senderID == account.user?.uid })?.id)
                   .id(message.id)
               }
+              Color.clear
+                .frame(height: 24)
+                .id(Self.bottomAnchorID)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 18)
+            .padding(.top, 18)
           }
+          .background(palette.background)
           .scrollDismissesKeyboard(.interactively)
           .refreshable {
             await model.load(partner: partner, using: account, force: true)
@@ -562,11 +618,17 @@ struct DirectMessageView: View {
         }
       }
       .onChange(of: model.messages.last?.id, initial: true) { _, messageID in
-        guard let messageID else { return }
-        if reduceMotion {
-          proxy.scrollTo(messageID, anchor: .bottom)
-        } else {
-          withAnimation { proxy.scrollTo(messageID, anchor: .bottom) }
+        guard messageID != nil else { return }
+        scrollToBottom(proxy, animated: !reduceMotion)
+      }
+      .onAppear {
+        scrollToBottom(proxy, animated: false)
+      }
+      .onChange(of: composerFocused) { _, focused in
+        guard focused else { return }
+        Task { @MainActor in
+          try? await Task.sleep(for: .milliseconds(180))
+          scrollToBottom(proxy, animated: !reduceMotion)
         }
       }
     }
@@ -609,10 +671,13 @@ struct DirectMessageView: View {
       }
       .padding(.horizontal, 12)
       .padding(.vertical, 10)
-      .background(.bar)
+      .background(palette.composer)
     }
+    .background(palette.background.ignoresSafeArea())
     .navigationTitle(partner.name)
     .navigationBarTitleDisplayMode(.inline)
+    .toolbarBackground(palette.background, for: .navigationBar)
+    .toolbarBackground(.visible, for: .navigationBar)
     .toolbar {
       ToolbarItem(placement: .principal) {
         HStack(spacing: 8) {
@@ -646,15 +711,34 @@ struct DirectMessageView: View {
     Task { await model.send(to: partner, using: account) }
   }
 
+  private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
+    Task { @MainActor in
+      await Task.yield()
+      if animated {
+        withAnimation(.easeOut(duration: 0.22)) {
+          proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+        }
+      } else {
+        proxy.scrollTo(Self.bottomAnchorID, anchor: .bottom)
+      }
+    }
+  }
+
   private func messageBubble(_ message: DirectMessage, isLatestMine: Bool) -> some View {
     let mine = message.senderID == account.user?.uid
-    return HStack {
-      if mine { Spacer(minLength: 52) }
+    return HStack(alignment: .bottom, spacing: 8) {
+      if mine { Spacer(minLength: 44) }
+      if !mine {
+        AccountAvatar(
+          url: partner.profileURL, size: 34,
+          accessibilityLabel: "\(partner.name) 프로필 사진")
+          .accessibilityIdentifier("direct-message-avatar-\(message.id)")
+      }
       VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
         Text(DirectMessageHashtags.linkedText(message.text))
           .font(.body)
-          .foregroundStyle(mine ? Color.white : Color.primary)
-          .tint(mine ? Color.white : Color.accentColor)
+          .foregroundStyle(mine ? palette.onOutgoing : palette.onIncoming)
+          .tint(mine ? palette.onOutgoing : Color.accentColor)
           .fixedSize(horizontal: false, vertical: true)
           .environment(
             \.openURL,
@@ -665,22 +749,30 @@ struct DirectMessageView: View {
               selectedHashtag = hashtag
               return .handled
             })
-        Text(message.sentAt, format: .dateTime.month().day().hour().minute())
-          .font(.caption2)
-          .foregroundStyle(mine ? Color.white.opacity(0.76) : Color.secondary)
-        if mine && isLatestMine {
-          Text(message.readAt == nil ? "전송됨" : "읽음")
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(Color.white.opacity(0.86))
-            .accessibilityIdentifier("direct-message-read-\(message.id)")
+        HStack(spacing: 8) {
+          Text(message.sentAt, format: .dateTime.month().day().hour().minute())
+            .font(.caption2)
+            .foregroundStyle(mine ? palette.onOutgoing.opacity(0.72) : palette.secondary)
+          if mine && isLatestMine {
+            Text(message.readAt == nil ? "전송됨" : "읽음")
+              .font(.caption2.weight(.medium))
+              .foregroundStyle(palette.onOutgoing.opacity(0.9))
+              .accessibilityIdentifier("direct-message-read-\(message.id)")
+          }
         }
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
       .background(
-        mine ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(Color(.secondarySystemBackground)),
+        mine ? AnyShapeStyle(palette.outgoing) : AnyShapeStyle(palette.incoming),
         in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-      if !mine { Spacer(minLength: 52) }
+      if mine {
+        AccountAvatar(
+          url: account.profileURL, size: 34,
+          accessibilityLabel: "내 프로필 사진")
+          .accessibilityIdentifier("direct-message-avatar-\(message.id)")
+      }
+      if !mine { Spacer(minLength: 44) }
     }
     .accessibilityElement(children: .combine)
     .accessibilityLabel(mine ? "내 메시지" : "\(partner.name)의 메시지")
