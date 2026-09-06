@@ -275,6 +275,9 @@ extension ContentView {
       SignupStatus(
         mode: "verified_email", mailConfigured: true, oauthRegistrationAllowed: true)
     }
+    func requestPasswordReset(email: String) async throws {
+      guard email == "photo@example.com" else { throw NuboAPIError.invalidRequest }
+    }
     func signup(email: String, password: String, name: String, invite: String) async throws
       -> SignupResult
     {

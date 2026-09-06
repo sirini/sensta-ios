@@ -169,6 +169,25 @@ struct AccountContractTests {
     )
   }
 
+  @Test func passwordResetUsesPublicJSONContractWithoutLeakingCredentials() throws {
+    let request = try AccountEndpoint.resetPassword(
+      baseURL: URL(string: "https://example.com/goapi/")!,
+      email: " photo+ios@example.com \n")
+    #expect(request.url?.path == "/goapi/auth/reset-password")
+    #expect(request.httpMethod == "POST")
+    #expect(request.httpShouldHandleCookies == false)
+    #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    #expect(
+      try JSONDecoder().decode([String: String].self, from: request.httpBody!) == [
+        "email": "photo+ios@example.com"
+      ])
+    #expect(throws: NuboAPIError.invalidRequest) {
+      try AccountEndpoint.resetPassword(
+        baseURL: URL(string: "https://example.com/goapi/")!, email: "  \n")
+    }
+  }
+
   @Test func decodesSignupPolicyAndVerificationResult() throws {
     let status = try JSONDecoder().decode(
       AccountEnvelope<SignupStatus>.self,

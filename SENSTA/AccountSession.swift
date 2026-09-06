@@ -73,6 +73,10 @@ private struct AppleAuthBody: Encodable {
   let name: String
 }
 
+private struct PasswordResetBody: Encodable {
+  let email: String
+}
+
 enum AccountEndpoint {
   static func request(baseURL: URL, path: String, method: String = "GET", token: String? = nil)
     throws -> URLRequest
@@ -99,6 +103,15 @@ enum AccountEndpoint {
 
   static func signupStatus(baseURL: URL) throws -> URLRequest {
     try request(baseURL: baseURL, path: "auth/signup/status")
+  }
+
+  static func resetPassword(baseURL: URL, email: String) throws -> URLRequest {
+    let email = email.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !email.isEmpty else { throw NuboAPIError.invalidRequest }
+    var request = try request(baseURL: baseURL, path: "auth/reset-password", method: "POST")
+    request.httpBody = try JSONEncoder().encode(PasswordResetBody(email: email))
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    return request
   }
 
   static func signup(
@@ -211,6 +224,7 @@ protocol AccountServing: Sendable {
   func upload(for request: URLRequest, fromFile fileURL: URL) async throws -> Data
   func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens)
   func signupStatus() async throws -> SignupStatus
+  func requestPasswordReset(email: String) async throws
   func signup(email: String, password: String, name: String, invite: String) async throws
     -> SignupResult
   func verifySignup(target: Int, code: String, email: String, password: String, name: String)
@@ -230,6 +244,7 @@ extension AccountServing {
     throw NuboAPIError.configuration
   }
   func signupStatus() async throws -> SignupStatus { throw NuboAPIError.configuration }
+  func requestPasswordReset(email: String) async throws { throw NuboAPIError.configuration }
   func signup(email: String, password: String, name: String, invite: String) async throws
     -> SignupResult
   { throw NuboAPIError.configuration }
@@ -280,6 +295,13 @@ struct AccountService: AccountServing {
   func signupStatus() async throws -> SignupStatus {
     let data = try await client.data(for: AccountEndpoint.signupStatus(baseURL: baseURL))
     return try JSONDecoder().decode(AccountEnvelope<SignupStatus>.self, from: data).checked()
+  }
+
+  func requestPasswordReset(email: String) async throws {
+    let data = try await client.data(
+      for: AccountEndpoint.resetPassword(baseURL: baseURL, email: email))
+    let accepted = try JSONDecoder().decode(AccountEnvelope<Bool>.self, from: data).checked()
+    guard accepted else { throw NuboAPIError.malformedResponse }
   }
 
   func signup(email: String, password: String, name: String, invite: String) async throws
@@ -464,6 +486,10 @@ final class AccountSession {
   }
 
   func signupStatus() async throws -> SignupStatus { try await service.signupStatus() }
+
+  func requestPasswordReset(email: String) async throws {
+    try await service.requestPasswordReset(email: email)
+  }
 
   func signup(email: String, password: String, name: String, invite: String) async throws
     -> SignupResult

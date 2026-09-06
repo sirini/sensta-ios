@@ -139,6 +139,13 @@ struct AccountView: View {
           .listRowSeparator(.hidden)
           Section {
             NavigationLink {
+              PasswordResetView(session: session, initialEmail: email)
+                .onAppear { detent = .large }
+            } label: {
+              Label("비밀번호 재설정", systemImage: "key.horizontal")
+            }
+            .accessibilityIdentifier("account-password-reset")
+            NavigationLink {
               EmailSignupView(session: session, loginEmail: $email)
                 .onAppear { detent = .large }
             } label: {

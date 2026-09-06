@@ -2,6 +2,33 @@ import XCTest
 
 final class SENSTAUITests: XCTestCase {
   @MainActor
+  func testPasswordResetUsesNeutralEmailConfirmation() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let loginEmail = app.textFields["account-email"]
+    XCTAssertTrue(loginEmail.waitForExistence(timeout: 5))
+    loginEmail.tap()
+    loginEmail.typeText("photo@example.com")
+    app.buttons["account-password-reset"].tap()
+    let resetEmail = app.textFields["password-reset-email"]
+    XCTAssertTrue(resetEmail.waitForExistence(timeout: 5))
+    XCTAssertEqual(resetEmail.value as? String, "photo@example.com")
+    app.buttons["password-reset-submit"].tap()
+    let completion = app.descendants(matching: .any)["password-reset-complete"]
+    XCTAssertTrue(completion.waitForExistence(timeout: 5))
+    XCTAssertTrue(completion.label.contains("등록되어 있다면"))
+    XCTAssertFalse(completion.label.contains("존재하지"))
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "Neutral password reset confirmation"
+    capture.lifetime = .keepAlways
+    add(capture)
+  }
+
+  @MainActor
   func testCommentLoginWriteReplyAndFailurePreservesDraft() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]

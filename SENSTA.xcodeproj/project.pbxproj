@@ -47,6 +47,7 @@
 		E10000000000000000000001 /* PhotoNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000001 /* PhotoNotifications.swift */; };
 		E10000000000000000000002 /* PhotoUpload.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000002 /* PhotoUpload.swift */; };
 		E10000000000000000000003 /* PhotoUploadAndNotificationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E20000000000000000000003 /* PhotoUploadAndNotificationTests.swift */; };
+		F10000000000000000000001 /* PasswordResetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000001 /* PasswordResetView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -114,6 +115,7 @@
 		E20000000000000000000001 /* PhotoNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoNotifications.swift; sourceTree = "<group>"; };
 		E20000000000000000000002 /* PhotoUpload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUpload.swift; sourceTree = "<group>"; };
 		E20000000000000000000003 /* PhotoUploadAndNotificationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadAndNotificationTests.swift; sourceTree = "<group>"; };
+		F20000000000000000000001 /* PasswordResetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasswordResetView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -172,6 +174,7 @@
 				B20000000000000000000007 /* AccountView.swift */,
 				B20000000000000000000006 /* AccountSession.swift */,
 				D20000000000000000000001 /* EmailSignupView.swift */,
+				F20000000000000000000001 /* PasswordResetView.swift */,
 				C20000000000000000000001 /* GoogleSignInClient.swift */,
 				B20000000000000000000009 /* PhotoPostLikes.swift */,
 				B2000000000000000000000B /* PhotoCommentComposer.swift */,
@@ -407,6 +410,7 @@
 				B10000000000000000000007 /* AccountView.swift in Sources */,
 				B10000000000000000000006 /* AccountSession.swift in Sources */,
 				D10000000000000000000001 /* EmailSignupView.swift in Sources */,
+				F10000000000000000000001 /* PasswordResetView.swift in Sources */,
 				B10000000000000000000009 /* PhotoPostLikes.swift in Sources */,
 				B1000000000000000000000B /* PhotoCommentComposer.swift in Sources */,
 				B1000000000000000000000D /* PhotoCommentManagement.swift in Sources */,
