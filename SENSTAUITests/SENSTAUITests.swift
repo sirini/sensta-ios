@@ -389,6 +389,73 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testOwnerEditsAndDeletesPhotoFromStudio() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+
+    let studio = app.buttons["account-photo-studio"]
+    XCTAssertTrue(studio.waitForExistence(timeout: 5))
+    studio.tap()
+    let views = app.buttons["photo-studio-sort-views"]
+    XCTAssertTrue(views.waitForExistence(timeout: 5))
+    views.tap()
+    let work = app.buttons["photo-studio-post-201"]
+    XCTAssertTrue(work.waitForExistence(timeout: 5))
+    work.tap()
+
+    let ownerMenu = app.buttons["photo-detail-owner-menu"]
+    XCTAssertTrue(ownerMenu.waitForExistence(timeout: 5))
+    ownerMenu.tap()
+    let edit = app.buttons["photo-detail-edit"]
+    XCTAssertTrue(edit.waitForExistence(timeout: 3))
+    edit.tap()
+    XCTAssertTrue(app.navigationBars["사진 정보 수정"].waitForExistence(timeout: 3))
+    let title = app.textFields["photo-edit-title"]
+    XCTAssertTrue(title.exists)
+    title.tap()
+    title.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 40))
+    title.typeText("수정된 비공개 사진")
+    let tags = app.textFields["photo-edit-tags"]
+    tags.tap()
+    tags.typeText("노을,빛결 ")
+    XCTAssertTrue(app.buttons["photo-edit-tag-노을"].waitForExistence(timeout: 3))
+    app.buttons["photo-edit-save"].tap()
+    let changedTitle = app.staticTexts["photo-detail-title"]
+    XCTAssertTrue(
+      XCTWaiter.wait(
+        for: [
+          XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "수정된 비공개 사진"),
+            object: changedTitle)
+        ], timeout: 5) == .completed)
+
+    XCTAssertTrue(ownerMenu.isHittable)
+    ownerMenu.tap()
+    let delete = app.buttons["photo-detail-delete"]
+    XCTAssertTrue(delete.waitForExistence(timeout: 3))
+    delete.tap()
+    let confirm = app.buttons.matching(
+      NSPredicate(format: "label == %@", "사진 삭제")
+    ).firstMatch
+    XCTAssertTrue(confirm.waitForExistence(timeout: 3))
+    confirm.tap()
+
+    XCTAssertTrue(app.navigationBars["내 작품"].waitForExistence(timeout: 5))
+    XCTAssertFalse(app.buttons["photo-studio-post-201"].exists)
+  }
+
+  @MainActor
   func testMyPhotoStudioSquareCardsAdaptToLargeText() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer", "--ui-test-large-text"]

@@ -53,6 +53,12 @@ final class PhotoFeedViewModel {
     await load(showsLoadingState: true)
   }
 
+  func apply(_ change: PhotoPostChange) {
+    guard case .deleted(let postID) = change, case .loaded(let posts) = state else { return }
+    let remaining = posts.filter { $0.id != postID }
+    state = remaining.isEmpty ? .empty : .loaded(remaining)
+  }
+
   func loadMoreIfNeeded(currentPostID: Int) async {
     guard case .loaded(let posts) = state,
       let index = posts.firstIndex(where: { $0.id == currentPostID }),

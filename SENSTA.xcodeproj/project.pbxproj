@@ -61,6 +61,8 @@
 		K10000000000000000000001 /* PhotoUploadCrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = K20000000000000000000001 /* PhotoUploadCrop.swift */; };
 		L10000000000000000000001 /* UserSafety.swift in Sources */ = {isa = PBXBuildFile; fileRef = L20000000000000000000001 /* UserSafety.swift */; };
 		L10000000000000000000002 /* UserSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = L20000000000000000000002 /* UserSafetyTests.swift */; };
+		M10000000000000000000001 /* PhotoPostManagement.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000000000000000000001 /* PhotoPostManagement.swift */; };
+		M10000000000000000000002 /* PhotoPostManagementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = M20000000000000000000002 /* PhotoPostManagementTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -140,6 +142,8 @@
 		K20000000000000000000001 /* PhotoUploadCrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadCrop.swift; sourceTree = "<group>"; };
 		L20000000000000000000001 /* UserSafety.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSafety.swift; sourceTree = "<group>"; };
 		L20000000000000000000002 /* UserSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSafetyTests.swift; sourceTree = "<group>"; };
+		M20000000000000000000001 /* PhotoPostManagement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPostManagement.swift; sourceTree = "<group>"; };
+		M20000000000000000000002 /* PhotoPostManagementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPostManagementTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -215,6 +219,7 @@
 				J20000000000000000000001 /* PhotoUploadEditor.swift */,
 				K20000000000000000000001 /* PhotoUploadCrop.swift */,
 				L20000000000000000000001 /* UserSafety.swift */,
+				M20000000000000000000001 /* PhotoPostManagement.swift */,
 				A2000000000000000000001C /* PhotoImagePipeline.swift */,
 				A20000000000000000000007 /* Assets.xcassets */,
 				A2000000000000000000000E /* Info.plist */,
@@ -241,6 +246,7 @@
 				H20000000000000000000002 /* DirectMessagesTests.swift */,
 				I20000000000000000000002 /* PushNotificationsTests.swift */,
 				L20000000000000000000002 /* UserSafetyTests.swift */,
+				M20000000000000000000002 /* PhotoPostManagementTests.swift */,
 				A50000000000000000000007 /* Fixtures */,
 			);
 			path = SENSTATests;
@@ -488,6 +494,7 @@
 				J10000000000000000000001 /* PhotoUploadEditor.swift in Sources */,
 				K10000000000000000000001 /* PhotoUploadCrop.swift in Sources */,
 				L10000000000000000000001 /* UserSafety.swift in Sources */,
+				M10000000000000000000001 /* PhotoPostManagement.swift in Sources */,
 				A10000000000000000000014 /* PhotoImagePipeline.swift in Sources */,
 				A10000000000000000000001 /* SENSTAApp.swift in Sources */,
 			);
@@ -510,6 +517,7 @@
 				H10000000000000000000002 /* DirectMessagesTests.swift in Sources */,
 				I10000000000000000000002 /* PushNotificationsTests.swift in Sources */,
 				L10000000000000000000002 /* UserSafetyTests.swift in Sources */,
+				M10000000000000000000002 /* PhotoPostManagementTests.swift in Sources */,
 				A10000000000000000000012 /* PhotoPostDetailViewModelTests.swift in Sources */,
 				A10000000000000000000015 /* PhotoImagePipelineTests.swift in Sources */,
 			);

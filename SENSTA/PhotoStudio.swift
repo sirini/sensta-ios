@@ -275,6 +275,21 @@ final class PhotoStudioModel {
 
   func refresh() async { await loadFirstPage(preservesExisting: true) }
 
+  func apply(_ change: PhotoPostChange) {
+    guard case .deleted(let postID) = change,
+      let index = posts.firstIndex(where: { $0.id == postID })
+    else { return }
+    let post = posts.remove(at: index)
+    if let summary {
+      self.summary = PhotoStudioSummary(
+        postCount: max(0, summary.postCount - 1),
+        photoCount: max(0, summary.photoCount - post.imageCount),
+        viewCount: max(0, summary.viewCount - post.viewCount),
+        likeCount: max(0, summary.likeCount - post.likeCount),
+        commentCount: max(0, summary.commentCount - post.commentCount))
+    }
+  }
+
   func selectSort(_ sort: PhotoStudioSort) async {
     guard selectedSort != sort else { return }
     selectedSort = sort
@@ -453,7 +468,10 @@ struct PhotoStudioView: View {
         Section("작품") {
           ForEach(model.posts) { post in
             NavigationLink {
-              PhotoPostDetailView(postID: post.id, service: detailService)
+              PhotoPostDetailView(postID: post.id, service: detailService) { change in
+                model.apply(change)
+                Task { await model.refresh() }
+              }
             } label: {
               PhotoStudioPostRow(post: post)
             }

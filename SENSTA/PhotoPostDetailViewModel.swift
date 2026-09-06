@@ -29,6 +29,10 @@ final class PhotoPostDetailViewModel {
     await load()
   }
 
+  func refresh() async {
+    await load()
+  }
+
   private func load() async {
     guard !requestInFlight else { return }
     let previousState = state

@@ -178,7 +178,10 @@ struct ContentView: View {
         }
       }
       .navigationDestination(item: $selectedPostID) { postID in
-        PhotoPostDetailView(postID: postID, service: detailService)
+        PhotoPostDetailView(postID: postID, service: detailService) { change in
+          model.apply(change)
+          Task { await model.refresh() }
+        }
       }
       .navigationDestination(isPresented: $showSearch) {
         PhotoSearchView(service: activeFeedService, detailService: detailService)

@@ -52,25 +52,26 @@ struct SENSTAApp: App {
     WindowGroup {
       ContentView(
         service: photoFeedService, detailService: photoPostDetailService,
-        pushNotifications: pushNotifications)
-        .accountSession(account)
-        .environment(\.accountSession, account)
-        .task { await account.restore() }
-        .task(id: account.sessionIdentity) {
-          await pushNotifications.synchronize(with: account)
-        }
-        .onOpenURL { _ = GoogleSignInClient.handle($0) }
-        #if DEBUG
-          .preferredColorScheme(
-            ProcessInfo.processInfo.arguments.contains("--ui-test-dark")
-              ? .dark : ProcessInfo.processInfo.arguments.contains("--ui-test-light") ? .light : nil
-          )
-          .transformEnvironment(\.dynamicTypeSize) { size in
-            if ProcessInfo.processInfo.arguments.contains("--ui-test-large-text") {
-              size = .accessibility3
-            }
+        pushNotifications: pushNotifications
+      )
+      .accountSession(account)
+      .environment(\.accountSession, account)
+      .task { await account.restore() }
+      .task(id: account.sessionIdentity) {
+        await pushNotifications.synchronize(with: account)
+      }
+      .onOpenURL { _ = GoogleSignInClient.handle($0) }
+      #if DEBUG
+        .preferredColorScheme(
+          ProcessInfo.processInfo.arguments.contains("--ui-test-dark")
+            ? .dark : ProcessInfo.processInfo.arguments.contains("--ui-test-light") ? .light : nil
+        )
+        .transformEnvironment(\.dynamicTypeSize) { size in
+          if ProcessInfo.processInfo.arguments.contains("--ui-test-large-text") {
+            size = .accessibility3
           }
-        #endif
+        }
+      #endif
     }
   }
 }
@@ -150,7 +151,8 @@ struct SENSTAApp: App {
         ], hasMore: page == 1)
     }
     func fetchPost(id: Int) async throws -> PhotoPostDetail {
-      let otherUserTest = ProcessInfo.processInfo.arguments.contains("--ui-test-messages")
+      let otherUserTest =
+        ProcessInfo.processInfo.arguments.contains("--ui-test-messages")
         || ProcessInfo.processInfo.arguments.contains("--ui-test-safety")
       let post = PhotoPost(
         id: id, title: "빛과 여백", content: "사진의 전체 구도를 감상하세요.",
@@ -193,6 +195,10 @@ extension ContentView {
     private var userBlocked = false
     private var acknowledgedAchievementKeys = Set<String>()
     private var directMessageID = 102
+    private var editedStudioTitle: String?
+    private var editedStudioContent: String?
+    private var editedStudioTags: [String] = []
+    private var deletedStudioPostIDs = Set<Int>()
     func data(for request: URLRequest) async throws -> Data {
       if request.url?.path.hasSuffix("/board/list") == true {
         guard request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true
@@ -339,8 +345,15 @@ extension ContentView {
         let totalCount: Int
         let hasNext: Bool
         if sort == "views" {
-          items = [studioItem(uid: 201, title: "가장 많이 본 비공개 사진", status: 2, hit: 81)]
-          totalCount = 1
+          items =
+            deletedStudioPostIDs.contains(201)
+            ? []
+            : [
+              studioItem(
+                uid: 201, title: editedStudioTitle ?? "가장 많이 본 비공개 사진", status: 2,
+                hit: 81)
+            ]
+          totalCount = items.count
           hasNext = false
         } else if page == 2 {
           items = [studioItem(uid: 103, title: "세 번째 작품", status: 0, hit: 9)]
@@ -397,6 +410,29 @@ extension ContentView {
           #"{"success":true,"code":0,"error":"","result":[{"uid":31,"name":"여름사진","count":12},{"uid":32,"name":"여름빛","count":7}]}"#
             .utf8)
       }
+      if request.httpMethod == "PATCH", request.url?.path.hasSuffix("/editor/modify") == true {
+        guard let body = String(data: request.httpBody ?? Data(), encoding: .utf8),
+          body.contains("name=\"boardUid\"\r\n\r\n2\r\n"),
+          body.contains("name=\"postUid\"\r\n\r\n201\r\n"),
+          body.contains("name=\"categoryUid\"\r\n\r\n1\r\n"),
+          body.contains("name=\"isSecret\"\r\n\r\ntrue\r\n"),
+          let title = multipartValue(named: "title", in: body),
+          let content = multipartValue(named: "content", in: body),
+          let tags = multipartValue(named: "tags", in: body)
+        else { throw NuboAPIError.invalidRequest }
+        editedStudioTitle = title
+        editedStudioContent = content
+        editedStudioTags = tags.split(separator: ",").map(String.init)
+        return Data(#"{"success":true,"code":0,"error":"","result":null}"#.utf8)
+      }
+      if request.httpMethod == "DELETE", request.url?.path.hasSuffix("/board/remove/post") == true {
+        let body = try JSONDecoder().decode([String: Int].self, from: request.httpBody!)
+        guard body["boardUid"] == 2, body["postUid"] == 201 else {
+          throw NuboAPIError.invalidRequest
+        }
+        deletedStudioPostIDs.insert(201)
+        return Data(#"{"success":true,"code":0,"error":"","result":null}"#.utf8)
+      }
       if request.httpMethod == "POST", request.url?.path.contains("/comment/") == true {
         if String(data: request.httpBody ?? Data(), encoding: .utf8)?.contains("reject") == true {
           return Data(#"{"success":false,"code":3,"result":null}"#.utf8)
@@ -439,18 +475,22 @@ extension ContentView {
       }
       let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
       let postID = Int(query?.first(where: { $0.name == "postUid" })?.value ?? "1") ?? 1
-      let studioTitle = postID == 201 ? "가장 많이 본 비공개 사진" : "빛과 여백"
+      let studioTitle =
+        postID == 201 ? editedStudioTitle ?? "가장 많이 본 비공개 사진" : "빛과 여백"
       let result: [String: Any] = [
         "config": ["uid": 2, "id": "photo", "name": "사진", "rowCount": 32],
         "post": [
-          "uid": postID, "title": studioTitle, "content": "",
+          "uid": postID, "title": studioTitle,
+          "content": postID == 201 ? editedStudioContent ?? "차분한 빛의 기록입니다." : "",
           "submitted": 1_788_600_000_000 as Int64, "modified": 0,
           "hit": 3, "status": postID == 201 ? 2 : 0,
           "category": ["uid": 1, "name": "사진"], "cover": "", "comment": 0,
           "like": liked ? 2 : 1, "liked": liked,
           "writer": ["uid": 1, "name": "사진가", "profile": "", "signature": ""],
         ],
-        "images": [], "files": [], "tags": [], "prevPostUid": 0, "nextPostUid": 0,
+        "images": [], "files": [],
+        "tags": editedStudioTags.enumerated().map { ["uid": $0.offset + 1, "name": $0.element] },
+        "prevPostUid": 0, "nextPostUid": 0,
         "writerPosts": [], "writerComments": [],
       ]
       return try JSONSerialization.data(withJSONObject: [
@@ -523,6 +563,14 @@ extension ContentView {
         "status": status, "imageCount": uid == 101 ? 3 : 1,
         "hit": hit, "like": 4, "comment": 2,
       ]
+    }
+
+    private func multipartValue(named name: String, in body: String) -> String? {
+      let marker = "name=\"\(name)\"\r\n\r\n"
+      guard let start = body.range(of: marker)?.upperBound,
+        let end = body[start...].range(of: "\r\n")?.lowerBound
+      else { return nil }
+      return String(body[start..<end])
     }
 
     private func boardListItem(uid: Int, writerID: Int) -> [String: Any] {

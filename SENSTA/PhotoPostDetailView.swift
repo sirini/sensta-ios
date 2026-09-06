@@ -2,18 +2,28 @@ import SwiftUI
 
 struct PhotoPostDetailView: View {
   @Environment(\.accountSession) private var account
+  @Environment(\.dismiss) private var dismiss
   @State private var model: PhotoPostDetailViewModel
   @State private var selectedImageID: PhotoPostImage.ID?
   @State private var showsPhotoViewer = false
   @State private var showsReport = false
+  @State private var showsEdit = false
+  @State private var showsDeleteConfirmation = false
+  @State private var isDeleting = false
+  @State private var deleteError: String?
   @State private var commentsScrollRequest = 0
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   private let detailService: any PhotoPostDetailServing
   private let commentsService: any PhotoCommentsServing
+  private let onChanged: @MainActor (PhotoPostChange) -> Void
 
-  init(postID: Int, service: any PhotoPostDetailServing) {
+  init(
+    postID: Int, service: any PhotoPostDetailServing,
+    onChanged: @escaping @MainActor (PhotoPostChange) -> Void = { _ in }
+  ) {
     detailService = service
     commentsService = service
+    self.onChanged = onChanged
     _model = State(initialValue: PhotoPostDetailViewModel(postID: postID, service: service))
   }
 
@@ -68,11 +78,32 @@ struct PhotoPostDetailView: View {
             .disabled(
               account?.userSafety.states[detail.post.writer.id]?.isReported == true
                 || account?.userSafety.states[detail.post.writer.id]?.isLoading == true
-                || account?.userSafety.states[detail.post.writer.id]?.isMutating == true)
+                || account?.userSafety.states[detail.post.writer.id]?.isMutating == true
+            )
             .accessibilityLabel(
               account?.userSafety.states[detail.post.writer.id]?.isReported == true
-                ? "신고 접수됨" : "사진 신고")
+                ? "신고 접수됨" : "사진 신고"
+            )
             .accessibilityIdentifier("photo-detail-report")
+          }
+          if canManage(detail) {
+            Menu {
+              Button("사진 정보 수정", systemImage: "pencil") { showsEdit = true }
+                .accessibilityIdentifier("photo-detail-edit")
+              Button("사진 삭제", systemImage: "trash", role: .destructive) {
+                showsDeleteConfirmation = true
+              }
+              .accessibilityIdentifier("photo-detail-delete")
+            } label: {
+              if isDeleting {
+                ProgressView()
+              } else {
+                Image(systemName: "ellipsis.circle")
+              }
+            }
+            .disabled(isDeleting)
+            .accessibilityLabel("내 사진 관리")
+            .accessibilityIdentifier("photo-detail-owner-menu")
           }
         }
       }
@@ -89,6 +120,38 @@ struct PhotoPostDetailView: View {
           targetUserID: detail.post.writer.id, targetName: detail.post.writer.name,
           context: .photo(postID: detail.post.id), account: account)
       }
+    }
+    .sheet(isPresented: $showsEdit) {
+      if let account, let detail = loadedDetail {
+        PhotoPostEditSheet(detail: detail, account: account) {
+          Task {
+            await model.refresh()
+            onChanged(.edited(detail.post.id))
+          }
+        }
+      }
+    }
+    .confirmationDialog(
+      "이 사진을 삭제할까요?", isPresented: $showsDeleteConfirmation,
+      titleVisibility: .visible
+    ) {
+      Button("사진 삭제", role: .destructive) {
+        guard let detail = loadedDetail else { return }
+        Task { await delete(detail) }
+      }
+      Button("취소", role: .cancel) {}
+    } message: {
+      Text("사진과 댓글, 좋아요 정보가 함께 삭제되며 되돌릴 수 없습니다.")
+    }
+    .alert(
+      "사진을 삭제하지 못했어요",
+      isPresented: Binding(
+        get: { deleteError != nil },
+        set: { if !$0 { deleteError = nil } })
+    ) {
+      Button("확인") { deleteError = nil }
+    } message: {
+      Text(deleteError ?? "잠시 뒤 다시 시도해 주세요.")
     }
     .task { await model.loadIfNeeded() }
     .task(id: safetyLoadID) {
@@ -109,6 +172,29 @@ struct PhotoPostDetailView: View {
   private func canReport(_ post: PhotoPost) -> Bool {
     guard let user = account?.user else { return false }
     return post.writer.id > 0 && post.writer.id != user.uid
+  }
+
+  private func canManage(_ detail: PhotoPostDetail) -> Bool {
+    guard let user = account?.user else { return false }
+    return detail.post.writer.id == user.uid && detail.boardID != nil
+      && detail.categoryID != nil && [0, 2].contains(detail.status)
+  }
+
+  @MainActor
+  private func delete(_ detail: PhotoPostDetail) async {
+    guard let account, !isDeleting else { return }
+    isDeleting = true
+    deleteError = nil
+    defer { isDeleting = false }
+    do {
+      try await detail.delete(using: account)
+      try Task.checkCancellation()
+      onChanged(.deleted(detail.post.id))
+      dismiss()
+    } catch is CancellationError {
+    } catch {
+      deleteError = "연결을 확인한 뒤 다시 시도해 주세요."
+    }
   }
 
   private func loadedContent(_ detail: PhotoPostDetail) -> some View {
