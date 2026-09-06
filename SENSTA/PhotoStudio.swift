@@ -457,6 +457,15 @@ struct PhotoStudioView: View {
             } label: {
               PhotoStudioPostRow(post: post)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+              Color(.secondarySystemGroupedBackground),
+              in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
             .accessibilityIdentifier("photo-studio-post-\(post.id)")
             .task { await model.loadMoreIfNeeded(currentPostID: post.id) }
           }
@@ -577,17 +586,16 @@ private struct PhotoStudioPostRow: View {
     Group {
       if dynamicTypeSize.isAccessibilitySize {
         VStack(alignment: .leading, spacing: 12) {
-          cover.frame(maxWidth: .infinity).aspectRatio(4 / 3, contentMode: .fit)
+          cover.frame(maxWidth: .infinity)
           details
         }
       } else {
         HStack(spacing: 12) {
-          cover.frame(width: 112, height: 88)
+          cover.frame(width: 96, height: 96)
           details
         }
       }
     }
-    .padding(.vertical, 4)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(post.title.nuboPlainText)
     .accessibilityValue(accessibilityValue)
@@ -595,7 +603,7 @@ private struct PhotoStudioPostRow: View {
 
   private var cover: some View {
     CachedAsyncPhotoImage(
-      url: post.coverURL, targetSize: CGSize(width: 320, height: 240)
+      url: post.coverURL, targetSize: CGSize(width: 384, height: 384)
     ) { phase in
       if case .success(let image) = phase {
         image.resizable().scaledToFill()
@@ -605,8 +613,13 @@ private struct PhotoStudioPostRow: View {
         }
       }
     }
+    .aspectRatio(1, contentMode: .fill)
     .clipped()
-    .clipShape(RoundedRectangle(cornerRadius: 8))
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 12, style: .continuous)
+        .stroke(Color.primary.opacity(0.06), lineWidth: 0.5)
+    }
     .overlay(alignment: .bottomTrailing) {
       if post.imageCount > 1 {
         Label("\(post.imageCount)", systemImage: "photo.stack")

@@ -301,6 +301,10 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertTrue(app.descendants(matching: .any)["photo-studio-summary"].exists)
     XCTAssertTrue(app.buttons["photo-studio-post-101"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.buttons["photo-studio-post-103"].waitForExistence(timeout: 5))
+    let listCapture = XCTAttachment(screenshot: app.screenshot())
+    listCapture.name = "My studio square preview cards"
+    listCapture.lifetime = .keepAlways
+    add(listCapture)
 
     let views = app.buttons["photo-studio-sort-views"]
     XCTAssertTrue(views.isHittable)
@@ -321,6 +325,37 @@ final class SENSTAUITests: XCTestCase {
     detailCapture.name = "Authenticated private studio detail"
     detailCapture.lifetime = .keepAlways
     add(detailCapture)
+  }
+
+  @MainActor
+  func testMyPhotoStudioSquareCardsAdaptToLargeText() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-large-text"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    let password = app.secureTextFields["account-password"]
+    password.tap()
+    password.typeText("test-password")
+    app.buttons["account-signin"].tap()
+    let studio = app.buttons["account-photo-studio"]
+    XCTAssertTrue(studio.waitForExistence(timeout: 5))
+    studio.tap()
+
+    XCTAssertTrue(app.navigationBars["내 작품"].waitForExistence(timeout: 5))
+    let firstWork = app.buttons["photo-studio-post-101"]
+    XCTAssertTrue(firstWork.waitForExistence(timeout: 5))
+    XCTAssertGreaterThanOrEqual(firstWork.frame.minX, app.frame.minX)
+    XCTAssertLessThanOrEqual(firstWork.frame.maxX, app.frame.maxX)
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "My studio square preview cards with large text"
+    capture.lifetime = .keepAlways
+    add(capture)
   }
 
   @MainActor
