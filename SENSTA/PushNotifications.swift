@@ -332,18 +332,24 @@ extension PushNotificationManager: MessagingDelegate {
 extension PushNotificationManager: UNUserNotificationCenterDelegate {
   nonisolated func userNotificationCenter(
     _ center: UNUserNotificationCenter,
-    willPresent notification: UNNotification
-  ) async -> UNNotificationPresentationOptions {
-    [.banner, .list, .badge, .sound]
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    // iOS 27 beta에서는 async delegate bridge가 cooperative executor에서 완료되며
+    // UIKit의 상태 복원 처리가 메인 스레드 assertion으로 종료될 수 있다.
+    completionHandler([.banner, .list, .badge, .sound])
   }
 
   nonisolated func userNotificationCenter(
     _ center: UNUserNotificationCenter,
-    didReceive response: UNNotificationResponse
-  ) async {
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
     let userInfo = response.notification.request.content.userInfo
-    guard let destination = RemoteNotificationDestination.make(from: userInfo) else { return }
-    await MainActor.run { self.destination = destination }
+    if let destination = RemoteNotificationDestination.make(from: userInfo) {
+      Task { @MainActor [weak self] in self?.destination = destination }
+    }
+    completionHandler()
   }
 }
 
