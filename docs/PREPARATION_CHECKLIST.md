@@ -27,13 +27,14 @@
 - [x] Apple Silicon Mac과 Apple Vision Pro 자동 배포 해제
 - [x] 최소 지원 iOS 버전 확정: iOS 17 이상
 - [x] 초기 iPhone 전용 방향 확정, iPad는 별도 QA 뒤 확대
-- [ ] Universal Link와 알림 deep link 범위 확정
+- [x] 알림 deep link 범위 확정: 사진 활동은 상세, 1:1 메시지는 해당 대화
+- [ ] 웹 Universal Link 범위 확정
 
 ## GOAPI와 NUBO
 
 - [x] 공용 Google server client audience와 mobile 인증·refresh 계약
 - [x] Sign in with Apple 서버 검증과 외부 계정 연결 정책
-- [ ] `ios` push platform 등록과 APNs/FCM payload
+- [x] `ios` push platform 등록과 APNs/FCM alert payload 구현 (`GOAPI b6b9b0f`, 운영 반영 대기)
 - [x] `sensta-ios` 게시글 출처와 플랫폼 공통 `sensta-app` 업적 정책
 - [x] HEIC/JPEG 방향 정규화, 썸네일, EXIF와 GPS 제거 계약
 - [ ] UGC 게시 전 필터와 신고 처리 운영 계약
@@ -46,7 +47,7 @@
 
 - [x] Firebase 프로젝트에 운영 iOS 앱 등록
 - [x] Firebase 프로젝트에 개발 iOS 앱 등록
-- [x] 각 앱의 `GoogleService-Info.plist`를 로컬에 안전하게 배치
+- [ ] 각 앱의 `GoogleService-Info.plist`를 구성별 로컬 경로에 안전하게 배치
 - [x] 운영·개발 Apple App ID에서 Push Notifications 활성화
 - [x] 운영·개발 Apple App ID에서 Associated Domains와 Sign in with Apple 활성화
 - [ ] APNs 인증 키 생성 및 Firebase Console에 업로드
@@ -64,7 +65,7 @@
 - [ ] 전용 지원 URL 준비: 현재 `https://sensta.me/support`는 없음
 - [ ] 신고·차단·운영자 조치·부적절 콘텐츠 필터의 심사 시나리오 작성
 - [ ] App Privacy 데이터 수집표 작성
-- [ ] Firebase·Google 등 third-party SDK privacy manifest 확인
+- [x] Firebase·Google 등 third-party SDK privacy manifest가 Release 앱 번들에 포함되는지 확인
 - [ ] 앱 내 계정 삭제와 Sign in with Apple token 폐기 검증
 - [ ] 연령 등급 질문, 콘텐츠 권리와 수출 규정 답변 준비
 - [x] 대한민국 비즈니스 규정 준수용 연락처 및 사업자등록번호 보유 여부 확인 완료

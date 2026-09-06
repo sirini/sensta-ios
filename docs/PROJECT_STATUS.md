@@ -538,3 +538,36 @@
   시간·읽음 상태가 함께 표시될 때도 프로필 이미지가 말풍선 전체 높이의 가운데에 놓인다.
 - 메시지 계약 단위 테스트 5개와 관련 UI 테스트 3개, 자동 서명 실기기 Debug 및 Release simulator
   빌드를 통과했다. 개선본을 iPhone 17에 설치했으며 기기 잠금 때문에 자동 실행만 생략했다.
+
+## iOS 원격 푸시 기반 (2026-09-06)
+
+- GOAPI `b6b9b0f`가 기존 Android device 계약을 유지하면서 `platform=ios` 등록을 허용하고, FCM multicast에
+  APNs alert push header·기본 sound를 함께 넣는다. 데이터베이스 migration과 환경 변수 변경은 없다.
+  `go test ./...`, `go vet ./...`와 공식 Ubuntu 22.04 build·Ubuntu 24.04 및 qemu64/max runtime smoke를
+  통과했다. 운영 교체용 `dist/nubo-runtime/bin/goapi`의 SHA-256은
+  `014801934b335f23d2acef3e7c21c3e05009a9cb9fb36d09aba5f7a7e2b23e01`이며 운영 반영은 남아 있다.
+- 앱은 Firebase Apple SDK 12.18.0의 `FirebaseCore`·`FirebaseMessaging`만 연결한다. 앱 시작 직후 권한을
+  묻지 않고 알림 화면의 `알림 켜기`에서 alert·badge·sound 권한을 요청한다. 허용된 계정만 FCM
+  installation ID를 인증된 `/push/device`에 등록하며, 갱신·재시도·로그아웃 해제와 계정 전환 격리를
+  처리한다.
+- foreground에서는 banner·목록·badge·sound를 표시하고, 알림을 누르면 사진 활동은 해당 상세로,
+  type 4는 보낸 사진가를 읽어 해당 1:1 대화로 이동한다. Debug·Release의 APNs entitlement를 각각
+  development·production으로 분리하고 구성별 `GoogleService-Info.plist`를 Git에 넣지 않은 채 빌드 시
+  복사한다. visible alert만 사용하므로 silent push용 Background Mode는 추가하지 않았다.
+- push request·response·payload routing 단위 테스트 3개와 로그아웃 전에 device를 해제하는 순서 테스트가
+  통과했다. 전체 단위 실행에서 신규 push 테스트와 기존 테스트는 통과했고 기존 Keychain simulator
+  환경 테스트 한 개만 묶음 실행에서 재현됐으며 단독 실행은 통과했다. Release simulator build, Debug
+  정적 분석과 자동 서명 iPhone Debug build가 통과했고 서명된 앱의 개발 APNs entitlement도 확인했다.
+- 실제 수신 시험 전 외부 준비가 남아 있다. Firebase Console에서 Debug·Release 앱의
+  `GoogleService-Info.plist`를 각각 내려받고, Apple Developer의 APNs `.p8` 키를 두 Firebase 앱의 Cloud
+  Messaging 설정에 올린다. GOAPI를 운영 반영한 뒤 iPhone에서 foreground·background·종료 상태와 사진·
+  1:1 메시지 deep link, 로그아웃·계정 전환을 검증한다.
+
+## 다음 작업 (현재)
+
+1. Firebase·APNs 외부 구성을 완료하고 새 GOAPI runtime을 운영 반영한 뒤 iPhone 원격 push 수신을 검증한다.
+2. 실제 iPhone에서 알림 읽음 처리와 JPEG·HEIC 다중 업로드를 마무리 검증한다.
+3. 신고와 차단을 작은 수직 기능 단위로 구현한다. 서버 계약 변경이 필요하면 웹·Android·iOS 영향을 함께
+   확인하고 제품 소유자에게 먼저 알린다.
+4. 앱 내 계정 삭제와 Sign in with Apple token 폐기, UGC 심사 시나리오와 App Store 제출 준비를 진행한다.
+5. 웹 Universal Link 범위는 원격 push 출시를 막지 않으므로 별도 작업으로 둔다.

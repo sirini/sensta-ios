@@ -8,16 +8,22 @@ struct ContentView: View {
   @State private var showUpload = false
   @State private var showAchievementProfile = false
   @State private var selectedPostID: Int?
+  @State private var selectedMessageUserID: Int?
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.scenePhase) private var scenePhase
   var account: AccountSession? = nil
   private let detailService: any PhotoPostDetailServing
   private let feedService: any PhotoFeedServing
+  private let pushNotifications: PushNotificationManager
 
-  init(service: any PhotoFeedServing, detailService: any PhotoPostDetailServing) {
+  init(
+    service: any PhotoFeedServing, detailService: any PhotoPostDetailServing,
+    pushNotifications: PushNotificationManager = .shared
+  ) {
     _model = State(initialValue: PhotoFeedViewModel(service: service))
     self.detailService = detailService
     self.feedService = service
+    self.pushNotifications = pushNotifications
   }
 
   var body: some View {
@@ -106,7 +112,7 @@ struct ContentView: View {
                 NavigationLink {
                   PhotoNotificationsView(
                     center: notificationCenter, account: account, detailService: detailService,
-                    feedService: feedService)
+                    feedService: feedService, pushNotifications: pushNotifications)
                 } label: {
                   PhotoNotificationBell(hasUnread: notificationCenter.hasUnread)
                 }
@@ -170,6 +176,13 @@ struct ContentView: View {
           )
         }
       }
+      .navigationDestination(item: $selectedMessageUserID) { userID in
+        if let account {
+          RemoteDirectMessageDestinationView(
+            userID: userID, account: account, feedService: feedService,
+            detailService: detailService)
+        }
+      }
     }
     .sheet(isPresented: $showAccount) {
       if let account {
@@ -203,14 +216,32 @@ struct ContentView: View {
       }
       await notificationCenter.load(using: account)
       await account.achievements.check(using: account)
+      openRemoteNotificationIfPossible()
+    }
+    .onChange(of: pushNotifications.destination, initial: true) { _, _ in
+      openRemoteNotificationIfPossible()
     }
     .onChange(of: scenePhase) { _, phase in
       guard phase == .active, let account, account.user != nil else { return }
       Task {
+        await pushNotifications.synchronize(with: account)
         await notificationCenter.load(using: account, force: true)
         await account.achievements.check(using: account)
       }
     }
+  }
+
+  private func openRemoteNotificationIfPossible() {
+    guard account?.user != nil, let destination = pushNotifications.destination else { return }
+    showAccount = false
+    showUpload = false
+    switch destination {
+    case .post(let postID):
+      selectedPostID = postID
+    case .directMessage(let userID):
+      selectedMessageUserID = userID
+    }
+    pushNotifications.clearDestination()
   }
 }
 

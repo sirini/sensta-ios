@@ -25,6 +25,15 @@ private final class MemoryTokenStore: AccountTokenStoring {
   }
 }
 
+@MainActor
+private final class LogoutCoordinatorSpy: AccountLogoutCoordinating {
+  private(set) var observedAuthenticatedSession = false
+
+  func prepareForLogout(using account: AccountSession) async {
+    observedAuthenticatedSession = account.user != nil
+  }
+}
+
 private actor AccountStub: AccountServing {
   enum Mode {
     case normal, expired, rejected, offline, paused, appleLinkRequired, appleAudienceMismatch
@@ -548,6 +557,18 @@ struct AccountSessionTests {
     await session.restore()
     await session.logout()
     #expect(store.value == nil)
+    #expect(session.user == nil)
+  }
+
+  @Test func logoutUnregistersPushBeforeClearingSession() async {
+    let session = AccountSession(service: AccountStub(), store: MemoryTokenStore(testTokens))
+    await session.restore()
+    let coordinator = LogoutCoordinatorSpy()
+    session.logoutCoordinator = coordinator
+
+    await session.logout()
+
+    #expect(coordinator.observedAuthenticatedSession)
     #expect(session.user == nil)
   }
 

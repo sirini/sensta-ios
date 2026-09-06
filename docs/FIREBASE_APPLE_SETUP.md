@@ -21,21 +21,30 @@ Associated Domains, Push Notifications와 Sign in with Apple capability가 활�
 준비 항목:
 
 1. bundle ID와 Firebase 앱을 정확히 일치시킨다.
-2. 각 환경의 `GoogleService-Info.plist`를 내려받는다.
-3. 파일은 로컬 Xcode configuration에 연결하되 Git에는 커밋하지 않는다.
-4. Analytics가 제품에 필요하지 않다면 Messaging·Installations 중심으로 최소 SDK만 추가한다.
+2. 각 환경의 `GoogleService-Info.plist`를 내려받아 다음 경로에 둔다.
+   - 개발·QA: `Config/Firebase/Debug/GoogleService-Info.plist`
+   - 운영: `Config/Firebase/Release/GoogleService-Info.plist`
+3. 두 파일은 빌드할 때 해당 구성의 앱 번들로 복사되며 Git에는 커밋하지 않는다. 현재 로컬에는 두 파일이
+   없으므로 Firebase Console에서 새로 내려받아야 한다.
+4. 앱은 Firebase Apple SDK 12.18.0의 `FirebaseCore`와 `FirebaseMessaging`만 직접 연결한다. Analytics는
+   추가하지 않는다.
 5. Firebase와 Google SDK의 privacy manifest 및 App Privacy 수집 항목을 확인한다.
 
 ## APNs와 Firebase Cloud Messaging
 
 Apple Developer 계정이 활성화되면 다음을 준비한다.
 
-1. 운영 App ID에서 Push Notifications capability를 활성화한다.
-2. APNs 인증 키를 생성한다. `.p8` 파일, Key ID와 관련 비밀값은 Git에 저장하지 않는다.
-3. Firebase Console의 iOS 앱 Cloud Messaging 설정에 APNs 키를 업로드한다.
-4. Xcode target에 Push Notifications와 필요한 Background Modes를 추가한다.
-5. 알림 권한은 첫 실행 즉시가 아니라 사용자가 가치를 이해할 수 있는 시점에 요청한다.
-6. 실제 iPhone에서 foreground, background, 종료 상태와 알림 deep link를 각각 검증한다.
+1. 운영·개발 App ID의 Push Notifications capability는 이미 활성화돼 있다.
+2. Apple Developer의 Keys에서 APNs 인증 키를 생성한다. `.p8` 파일은 한 번만 내려받을 수 있으므로 안전한
+   비밀 저장소에 보관하고 Key ID를 함께 기록한다. Team ID는 `WKPCU58CWL`이다.
+3. Firebase Console > 프로젝트 설정 > Cloud Messaging에서 `SENSTA iOS`와 `SENSTA iOS Debug` 각각의
+   Apple 앱 구성에 같은 APNs 인증 키, Key ID와 Team ID를 업로드한다.
+4. Xcode target의 Push Notifications capability는 이미 활성화돼 있다. 현재 payload는 사용자에게 보이는
+   alert push이므로 silent background fetch용 `remote-notification` Background Mode는 추가하지 않는다.
+5. 앱은 알림 화면에서 사용자가 `알림 켜기`를 선택할 때 권한을 요청하고, 허용된 경우에만 APNs와 FCM FID를
+   등록한다.
+6. GOAPI `b6b9b0f` 이상을 운영에 반영한 뒤 실제 iPhone에서 foreground, background, 종료 상태와 사진·
+   1:1 메시지 deep link를 각각 검증한다.
 
 시뮬레이터 테스트만으로 APNs 출시 준비가 완료되었다고 판단하지 않는다.
 

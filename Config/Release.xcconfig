@@ -2,5 +2,6 @@
 #include? "Release.local.xcconfig"
 
 PRODUCT_BUNDLE_IDENTIFIER = me.sensta.ios
+APS_ENVIRONMENT = production
 SWIFT_COMPILATION_MODE = wholemodule
 SWIFT_OPTIMIZATION_LEVEL = -O

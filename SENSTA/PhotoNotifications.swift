@@ -245,58 +245,65 @@ struct PhotoNotificationsView: View {
   let account: AccountSession
   let detailService: any PhotoPostDetailServing
   let feedService: (any PhotoFeedServing)?
+  let pushNotifications: PushNotificationManager
 
   init(
     center: PhotoNotificationCenter, account: AccountSession,
-    detailService: any PhotoPostDetailServing, feedService: (any PhotoFeedServing)? = nil
+    detailService: any PhotoPostDetailServing, feedService: (any PhotoFeedServing)? = nil,
+    pushNotifications: PushNotificationManager = .shared
   ) {
     self.center = center
     self.account = account
     self.detailService = detailService
     self.feedService = feedService
+    self.pushNotifications = pushNotifications
   }
 
   var body: some View {
-    Group {
-      if center.isLoading && center.notifications.isEmpty {
-        ProgressView("알림을 불러오는 중…")
-      } else if center.notifications.isEmpty {
-        ContentUnavailableView(
-          "확인할 알림이 없어요",
-          systemImage: "bell.slash",
-          description: Text("새로운 활동이 생기면 이곳에서 알려드릴게요."))
-      } else {
-        List(center.notifications) { notification in
-          if notification.type == 4 {
-            NavigationLink {
-              DirectMessageView(
-                partner: DirectMessagePartner(
-                  id: notification.senderID, name: notification.senderName,
-                  profileURL: notification.senderProfileURL),
-                account: account, feedService: feedService, detailService: detailService
-              )
-              .task { await center.markRead(notification, using: account) }
-            } label: {
-              notificationRow(notification)
-            }
-          } else if notification.postID <= 0 {
-            Button {
-              Task { await center.markRead(notification, using: account) }
-            } label: {
-              notificationRow(notification)
-            }
-            .buttonStyle(.plain)
-          } else {
-            NavigationLink {
-              PhotoPostDetailView(postID: notification.postID, service: detailService)
+    VStack(spacing: 0) {
+      pushPermissionCallout
+      Group {
+        if center.isLoading && center.notifications.isEmpty {
+          ProgressView("알림을 불러오는 중…")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if center.notifications.isEmpty {
+          ContentUnavailableView(
+            "확인할 알림이 없어요",
+            systemImage: "bell.slash",
+            description: Text("새로운 활동이 생기면 이곳에서 알려드릴게요."))
+        } else {
+          List(center.notifications) { notification in
+            if notification.type == 4 {
+              NavigationLink {
+                DirectMessageView(
+                  partner: DirectMessagePartner(
+                    id: notification.senderID, name: notification.senderName,
+                    profileURL: notification.senderProfileURL),
+                  account: account, feedService: feedService, detailService: detailService
+                )
                 .task { await center.markRead(notification, using: account) }
-            } label: {
-              notificationRow(notification)
+              } label: {
+                notificationRow(notification)
+              }
+            } else if notification.postID <= 0 {
+              Button {
+                Task { await center.markRead(notification, using: account) }
+              } label: {
+                notificationRow(notification)
+              }
+              .buttonStyle(.plain)
+            } else {
+              NavigationLink {
+                PhotoPostDetailView(postID: notification.postID, service: detailService)
+                  .task { await center.markRead(notification, using: account) }
+              } label: {
+                notificationRow(notification)
+              }
             }
           }
+          .listStyle(.plain)
+          .refreshable { await center.load(using: account, force: true) }
         }
-        .listStyle(.plain)
-        .refreshable { await center.load(using: account, force: true) }
       }
     }
     .navigationTitle("알림")
@@ -320,7 +327,61 @@ struct PhotoNotificationsView: View {
           .accessibilityIdentifier("notification-error")
       }
     }
-    .task { await center.load(using: account, force: true) }
+    .task {
+      await pushNotifications.synchronize(with: account)
+      await center.load(using: account, force: true)
+    }
+  }
+
+  @ViewBuilder
+  private var pushPermissionCallout: some View {
+    switch pushNotifications.authorizationState {
+    case .notDetermined:
+      permissionCallout(
+        message: "좋아요·댓글·1:1 메시지를 놓치지 않도록 푸시 알림을 받을 수 있어요.",
+        actionTitle: "알림 켜기"
+      ) {
+        Task { await pushNotifications.requestAuthorization() }
+      }
+    case .denied:
+      permissionCallout(
+        message: "푸시 알림이 꺼져 있어요. iPhone 설정에서 다시 켤 수 있어요.",
+        actionTitle: "설정 열기",
+        action: pushNotifications.openSystemSettings)
+    case .authorized where pushNotifications.registrationError != nil:
+      permissionCallout(
+        message: pushNotifications.registrationError ?? "푸시 알림을 연결하지 못했어요.",
+        actionTitle: "다시 시도"
+      ) {
+        Task { await pushNotifications.retryRegistration() }
+      }
+    case .unavailable, .unknown, .authorized:
+      EmptyView()
+    }
+  }
+
+  private func permissionCallout(
+    message: String, actionTitle: String, action: @escaping @MainActor () -> Void
+  ) -> some View {
+    HStack(alignment: .center, spacing: 12) {
+      Image(systemName: "bell.badge")
+        .font(.title3)
+        .foregroundStyle(Color.accentColor)
+        .accessibilityHidden(true)
+      Text(message)
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      Spacer(minLength: 4)
+      Button(actionTitle, action: action)
+        .buttonStyle(.borderedProminent)
+        .controlSize(.small)
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 12)
+    .background(Color(.secondarySystemBackground))
+    .accessibilityElement(children: .contain)
+    .accessibilityIdentifier("notification-push-permission")
   }
 
   private func notificationRow(_ notification: PhotoNotification) -> some View {

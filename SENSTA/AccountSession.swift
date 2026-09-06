@@ -443,6 +443,7 @@ final class AccountSession {
   let apiBaseURL: URL?
   let postLikes = PhotoPostLikes()
   let achievements = AchievementInbox()
+  @ObservationIgnored weak var logoutCoordinator: (any AccountLogoutCoordinating)?
   private var identity = UUID()
   var sessionIdentity: UUID { identity }
   private(set) var commentCounts: [Int: Int] = [:]
@@ -803,6 +804,7 @@ final class AccountSession {
     error = nil
     defer { isBusy = false }
     do {
+      await logoutCoordinator?.prepareForLogout(using: self)
       // 로컬 삭제가 실패하면 로그아웃 완료로 표시하지 않는다.
       try store.clear()
       identity = UUID()

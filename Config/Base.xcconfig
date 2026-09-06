@@ -11,3 +11,6 @@ API_BASE_URL = https:/$()/sensta.me/goapi/
 GOOGLE_IOS_CLIENT_ID =
 GOOGLE_SERVER_CLIENT_ID =
 GOOGLE_REVERSED_CLIENT_ID =
+
+// Firebase Console에서 내려받은 구성별 파일은 Git에 넣지 않고 빌드할 때 앱 번들로 복사한다.
+FIREBASE_CONFIG_FILE = $(SRCROOT)/Config/Firebase/$(CONFIGURATION)/GoogleService-Info.plist

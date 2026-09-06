@@ -3,7 +3,9 @@ import SwiftUI
 
 @main
 struct SENSTAApp: App {
+  @UIApplicationDelegateAdaptor(SENSTAAppDelegate.self) private var appDelegate
   @State private var account: AccountSession
+  @State private var pushNotifications = PushNotificationManager.shared
   private let photoFeedService: any PhotoFeedServing
   private let photoPostDetailService: any PhotoPostDetailServing
 
@@ -48,10 +50,15 @@ struct SENSTAApp: App {
 
   var body: some Scene {
     WindowGroup {
-      ContentView(service: photoFeedService, detailService: photoPostDetailService)
+      ContentView(
+        service: photoFeedService, detailService: photoPostDetailService,
+        pushNotifications: pushNotifications)
         .accountSession(account)
         .environment(\.accountSession, account)
         .task { await account.restore() }
+        .task(id: account.sessionIdentity) {
+          await pushNotifications.synchronize(with: account)
+        }
         .onOpenURL { _ = GoogleSignInClient.handle($0) }
         #if DEBUG
           .preferredColorScheme(
