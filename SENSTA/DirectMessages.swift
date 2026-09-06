@@ -353,6 +353,7 @@ final class DirectMessageModel {
   private var loadedIdentity: UUID?
   private var markedThroughID: Int?
   private var refreshInProgress = false
+  private var refreshRequested = false
   private var messageGeneration = 0
 
   var draftLength: Int { draft.unicodeScalars.count }
@@ -372,14 +373,17 @@ final class DirectMessageModel {
       loadedIdentity = nil
       loadedTargetID = nil
       markedThroughID = nil
+      refreshRequested = false
       return
     }
     let identity = account.sessionIdentity
     let currentMessageGeneration = messageGeneration
     if loadedTargetID != partner.id || loadedIdentity != identity { markedThroughID = nil }
-    guard force || loadedTargetID != partner.id || loadedIdentity != identity,
-      !refreshInProgress, !isSending
-    else {
+    guard force || loadedTargetID != partner.id || loadedIdentity != identity else {
+      return
+    }
+    if refreshInProgress {
+      if force { refreshRequested = true }
       return
     }
     refreshInProgress = true
@@ -390,6 +394,12 @@ final class DirectMessageModel {
     defer {
       refreshInProgress = false
       if !quietly { isLoading = false }
+      if refreshRequested {
+        refreshRequested = false
+        Task { @MainActor [weak self] in
+          await self?.load(partner: partner, using: account, force: true, quietly: true)
+        }
+      }
     }
     do {
       let request = try DirectMessageEndpoint.history(
@@ -541,11 +551,18 @@ private struct DirectMessageThreadRow: View {
   }
 }
 
+private struct DirectMessagePollingID: Equatable {
+  let identity: UUID
+  let partnerID: Int
+  let isActive: Bool
+}
+
 struct DirectMessageView: View {
   let partner: DirectMessagePartner
   let account: AccountSession
   let feedService: (any PhotoFeedServing)?
   let detailService: (any PhotoPostDetailServing)?
+  private let pushNotifications: PushNotificationManager
   @State private var model = DirectMessageModel()
   @State private var selectedHashtag: String?
   @Environment(\.scenePhase) private var scenePhase
@@ -561,12 +578,14 @@ struct DirectMessageView: View {
   init(
     partner: DirectMessagePartner, account: AccountSession,
     feedService: (any PhotoFeedServing)? = nil,
-    detailService: (any PhotoPostDetailServing)? = nil
+    detailService: (any PhotoPostDetailServing)? = nil,
+    pushNotifications: PushNotificationManager = .shared
   ) {
     self.partner = partner
     self.account = account
     self.feedService = feedService
     self.detailService = detailService
+    self.pushNotifications = pushNotifications
   }
 
   var body: some View {
@@ -693,17 +712,26 @@ struct DirectMessageView: View {
     .navigationDestination(item: $selectedHashtag) { hashtag in
       hashtagSearchDestination(hashtag)
     }
-    .task(id: account.sessionIdentity) {
-      await model.load(partner: partner, using: account)
+    .task(
+      id: DirectMessagePollingID(
+        identity: account.sessionIdentity, partnerID: partner.id,
+        isActive: scenePhase == .active)
+    ) {
+      guard scenePhase == .active else { return }
+      await model.load(partner: partner, using: account, force: true)
       while !Task.isCancelled {
         do { try await Task.sleep(for: .seconds(12)) } catch { return }
-        guard scenePhase == .active else { continue }
         await model.load(partner: partner, using: account, force: true, quietly: true)
       }
     }
-    .onChange(of: scenePhase) { _, phase in
-      guard phase == .active else { return }
-      Task { await model.load(partner: partner, using: account, force: true) }
+    .onChange(of: pushNotifications.latestEvent, initial: true) { _, event in
+      guard case .directMessage(let senderID) = event?.destination,
+        senderID == partner.id
+      else { return }
+      Task {
+        await model.load(
+          partner: partner, using: account, force: true, quietly: !model.messages.isEmpty)
+      }
     }
   }
 

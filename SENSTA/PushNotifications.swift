@@ -75,6 +75,11 @@ enum RemoteNotificationDestination: Hashable, Sendable {
   }
 }
 
+struct RemoteNotificationEvent: Equatable, Sendable {
+  let id = UUID()
+  let destination: RemoteNotificationDestination
+}
+
 @MainActor
 protocol AccountLogoutCoordinating: AnyObject {
   func prepareForLogout(using account: AccountSession) async
@@ -111,6 +116,7 @@ final class PushNotificationManager: NSObject, AccountLogoutCoordinating {
   private(set) var isConfigured = false
   private(set) var registrationError: String?
   private(set) var destination: RemoteNotificationDestination?
+  private(set) var latestEvent: RemoteNotificationEvent?
 
   @ObservationIgnored private weak var account: AccountSession?
   @ObservationIgnored private weak var application: UIApplication?
@@ -307,9 +313,16 @@ final class PushNotificationManager: NSObject, AccountLogoutCoordinating {
     serverRegistration = nil
   }
 
-  private func receive(userInfo: [AnyHashable: Any]) {
+  private func receive(userInfo: [AnyHashable: Any], opensDestination: Bool = true) {
     guard let destination = RemoteNotificationDestination.make(from: userInfo) else { return }
-    self.destination = destination
+    receive(destination: destination, opensDestination: opensDestination)
+  }
+
+  private func receive(
+    destination: RemoteNotificationDestination, opensDestination: Bool = true
+  ) {
+    latestEvent = RemoteNotificationEvent(destination: destination)
+    if opensDestination { self.destination = destination }
   }
 
   private func debugLog(_ message: String) {
@@ -337,6 +350,13 @@ extension PushNotificationManager: UNUserNotificationCenterDelegate {
   ) {
     // iOS 27 beta에서는 async delegate bridge가 cooperative executor에서 완료되며
     // UIKit의 상태 복원 처리가 메인 스레드 assertion으로 종료될 수 있다.
+    let destination = RemoteNotificationDestination.make(
+      from: notification.request.content.userInfo)
+    if let destination {
+      Task { @MainActor [weak self] in
+        self?.receive(destination: destination, opensDestination: false)
+      }
+    }
     completionHandler([.banner, .list, .badge, .sound])
   }
 
@@ -345,9 +365,10 @@ extension PushNotificationManager: UNUserNotificationCenterDelegate {
     didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
-    let userInfo = response.notification.request.content.userInfo
-    if let destination = RemoteNotificationDestination.make(from: userInfo) {
-      Task { @MainActor [weak self] in self?.destination = destination }
+    let destination = RemoteNotificationDestination.make(
+      from: response.notification.request.content.userInfo)
+    if let destination {
+      Task { @MainActor [weak self] in self?.receive(destination: destination) }
     }
     completionHandler()
   }
