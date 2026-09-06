@@ -359,6 +359,76 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testAchievementCelebrationAcknowledgesQueueAndOpensOwnProfile() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-achievements"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+
+    let celebration = app.staticTexts["achievement-name"]
+    XCTAssertTrue(celebration.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.staticTexts["SENSTA 앱 포토그래퍼"].exists)
+    XCTAssertTrue(app.staticTexts["확인할 새 업적이 2개 있어요"].exists)
+    XCTAssertGreaterThanOrEqual(app.buttons["achievement-confirm"].frame.minX, app.frame.minX)
+    XCTAssertLessThanOrEqual(app.buttons["achievement-confirm"].frame.maxX, app.frame.maxX)
+    let firstCapture = XCTAttachment(screenshot: app.screenshot())
+    firstCapture.name = "Achievement celebration queue"
+    firstCapture.lifetime = .keepAlways
+    add(firstCapture)
+
+    app.buttons["achievement-confirm"].tap()
+    XCTAssertTrue(app.staticTexts["첫 발자국"].waitForExistence(timeout: 5))
+    app.buttons["achievement-view-profile"].tap()
+    XCTAssertTrue(app.navigationBars["사진가"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["photographer-badge-sensta-app"].waitForExistence(timeout: 5))
+    XCTAssertFalse(celebration.exists)
+    let profileCapture = XCTAttachment(screenshot: app.screenshot())
+    profileCapture.name = "Own achievements after acknowledgement"
+    profileCapture.lifetime = .keepAlways
+    add(profileCapture)
+  }
+
+  @MainActor
+  func testAchievementCelebrationFitsAccessibilityText() throws {
+    let app = XCUIApplication()
+    app.launchArguments = [
+      "--ui-test-viewer", "--ui-test-achievements", "--ui-test-large-text",
+    ]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    app.secureTextFields["account-password"].tap()
+    app.secureTextFields["account-password"].typeText("test-password")
+    app.buttons["account-signin"].tap()
+
+    XCTAssertTrue(app.staticTexts["achievement-name"].waitForExistence(timeout: 5))
+    let confirm = app.buttons["achievement-confirm"]
+    if !confirm.isHittable { app.swipeUp() }
+    XCTAssertTrue(confirm.isHittable)
+    XCTAssertGreaterThanOrEqual(confirm.frame.minX, app.frame.minX)
+    XCTAssertLessThanOrEqual(confirm.frame.maxX, app.frame.maxX)
+    XCTAssertLessThanOrEqual(confirm.frame.maxY, app.frame.maxY)
+    let capture = XCTAttachment(screenshot: app.screenshot())
+    capture.name = "Achievement celebration with accessibility text"
+    capture.lifetime = .keepAlways
+    add(capture)
+  }
+
+  @MainActor
   func testEmailSignupVerifiesCodeAndReturnsToLogin() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]

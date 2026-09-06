@@ -6,6 +6,7 @@ struct ContentView: View {
   @State private var showAccount = false
   @State private var showSearch = false
   @State private var showUpload = false
+  @State private var showAchievementProfile = false
   @State private var selectedPostID: Int?
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.scenePhase) private var scenePhase
@@ -53,6 +54,7 @@ struct ContentView: View {
               await model.refresh()
               if let account, account.user != nil {
                 await notificationCenter.load(using: account, force: true)
+                await account.achievements.check(using: account)
               }
             },
             onLoadMore: { await model.loadMoreIfNeeded(currentPostID: $0) },
@@ -158,6 +160,15 @@ struct ContentView: View {
       .navigationDestination(isPresented: $showSearch) {
         PhotoSearchView(service: feedService, detailService: detailService)
       }
+      .navigationDestination(isPresented: $showAchievementProfile) {
+        if let account, let user = account.user {
+          PhotographerView(
+            writer: PhotoPostWriter(
+              id: user.uid, name: user.name, profileURL: account.profileURL, badgeKeys: []),
+            service: detailService
+          )
+        }
+      }
     }
     .sheet(isPresented: $showAccount) {
       if let account {
@@ -170,9 +181,15 @@ struct ContentView: View {
       if let account, account.user != nil {
         PhotoUploadView(account: account) {
           showUpload = false
-          Task { await model.refresh() }
+          Task {
+            await model.refresh()
+            await account.achievements.check(using: account)
+          }
         }
       }
+    }
+    .achievementCelebration(account: showAccount || showUpload ? nil : account) {
+      showAchievementProfile = true
     }
     .task {
       await model.loadIfNeeded()
@@ -180,13 +197,18 @@ struct ContentView: View {
     .task(id: account?.sessionIdentity) {
       guard let account, account.user != nil else {
         notificationCenter.reset()
+        account?.achievements.reset()
         return
       }
       await notificationCenter.load(using: account)
+      await account.achievements.check(using: account)
     }
     .onChange(of: scenePhase) { _, phase in
       guard phase == .active, let account, account.user != nil else { return }
-      Task { await notificationCenter.load(using: account, force: true) }
+      Task {
+        await notificationCenter.load(using: account, force: true)
+        await account.achievements.check(using: account)
+      }
     }
   }
 }

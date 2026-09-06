@@ -442,6 +442,7 @@ final class AccountSession {
   private let store: any AccountTokenStoring
   let apiBaseURL: URL?
   let postLikes = PhotoPostLikes()
+  let achievements = AchievementInbox()
   private var identity = UUID()
   var sessionIdentity: UUID { identity }
   private(set) var commentCounts: [Int: Int] = [:]
@@ -644,6 +645,7 @@ final class AccountSession {
     try store.save(response.1)
     identity = UUID()
     postLikes.reset()
+    achievements.reset()
     tokens = response.1
     user = response.0
     appleLinked = nil
@@ -679,6 +681,7 @@ final class AccountSession {
       try Task.checkCancellation()
       identity = UUID()
       postLikes.reset()
+      achievements.reset()
       tokens = saved
       user = loaded
       appleLinked = nil
@@ -783,6 +786,7 @@ final class AccountSession {
     user = nil
     appleLinked = nil
     postLikes.reset()
+    achievements.reset()
     do {
       try store.clear()
       needsRestoration = false
@@ -805,6 +809,7 @@ final class AccountSession {
       refreshTask?.cancel()
       refreshTask = nil
       postLikes.reset()
+      achievements.reset()
       let oldToken = tokens?.token
       tokens = nil
       user = nil

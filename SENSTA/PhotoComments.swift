@@ -433,6 +433,7 @@ struct PhotoCommentsSection: View {
                     id: comment.id, postID: postID, baseline: model.totalCount ?? initialCount)
                   model.appendConfirmed(comment)
                   await model.refresh(account: account)
+                  await account.achievements.check(using: account)
                 }
               }
             }.id("comment-composer")

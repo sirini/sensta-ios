@@ -10,6 +10,7 @@ struct AccountView: View {
   @State private var detent: PresentationDetent = .medium
   @State private var appleNonce: String?
   @State private var isPreparingApple = false
+  @State private var showAchievementProfile = false
   private let googleSignIn = GoogleSignInClient()
   @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -184,8 +185,21 @@ struct AccountView: View {
       .confirmationDialog("로그아웃할까요?", isPresented: $confirmLogout, titleVisibility: .visible) {
         Button("로그아웃", role: .destructive) { Task { await session.logout() } }
       }
+      .navigationDestination(isPresented: $showAchievementProfile) {
+        if let user = session.user {
+          PhotographerView(
+            writer: PhotoPostWriter(
+              id: user.uid, name: user.name, profileURL: session.profileURL, badgeKeys: []),
+            service: detailService
+          )
+        }
+      }
       .onDisappear { password = "" }
       .task(id: session.sessionIdentity) { await prepareAppleAuthorization() }
+    }
+    .achievementCelebration(account: session) {
+      detent = .large
+      showAchievementProfile = true
     }
     .presentationDetents(
       dynamicTypeSize.isAccessibilitySize ? [.large] : [.medium, .large], selection: $detent
@@ -199,6 +213,9 @@ struct AccountView: View {
     }
     .onChange(of: session.user?.uid) { _, _ in
       detent = dynamicTypeSize.isAccessibilitySize ? .large : .medium
+    }
+    .onChange(of: session.achievements.current?.key) { _, key in
+      if key != nil { detent = .large }
     }
     .onChange(of: dynamicTypeSize, initial: true) { _, size in
       if size.isAccessibilitySize { detent = .large }

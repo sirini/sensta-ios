@@ -509,7 +509,10 @@ struct PhotoStudioView: View {
     .fullScreenCover(isPresented: $showUpload) {
       PhotoUploadView(account: account) {
         showUpload = false
-        Task { await model.refresh() }
+        Task {
+          await model.refresh()
+          await account.achievements.check(using: account)
+        }
       }
     }
     .task(id: account.sessionIdentity) {

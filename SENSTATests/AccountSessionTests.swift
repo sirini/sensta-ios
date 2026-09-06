@@ -296,6 +296,121 @@ struct AccountContractTests {
   }
 }
 
+private actor AchievementAccountStub: AccountServing {
+  let rejectsAcknowledgement: Bool
+  let returnsDuplicate: Bool
+  private(set) var methods: [String] = []
+  private(set) var authorizationHeaders: [String] = []
+  private(set) var acknowledgedKeys: [String] = []
+
+  init(rejectsAcknowledgement: Bool = false, returnsDuplicate: Bool = false) {
+    self.rejectsAcknowledgement = rejectsAcknowledgement
+    self.returnsDuplicate = returnsDuplicate
+  }
+
+  func data(for request: URLRequest) async throws -> Data {
+    methods.append(request.httpMethod ?? "")
+    authorizationHeaders.append(request.value(forHTTPHeaderField: "Authorization") ?? "")
+    if request.httpMethod == "PATCH" {
+      let body = try JSONDecoder().decode([String: [String]].self, from: request.httpBody!)
+      acknowledgedKeys.append(contentsOf: body["keys"] ?? [])
+      if rejectsAcknowledgement {
+        return Data(#"{"success":false,"code":4,"error":"internal","result":null}"#.utf8)
+      }
+      return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+    }
+    let first =
+      #"{"key":"sensta-app","name":"SENSTA 앱 포토그래퍼","description":"앱으로 사진을 공유했습니다.","iconKey":"aperture","earnedAt":1788410731496}"#
+    let second =
+      returnsDuplicate
+      ? first
+      : #"{"key":"first-post","name":"첫 발자국","description":"첫 게시글을 작성했습니다.","iconKey":"notebook-pen","earnedAt":1788410731497}"#
+    return Data("{\"success\":true,\"code\":0,\"error\":\"\",\"result\":[\(first),\(second)]}".utf8)
+  }
+
+  func signin(email: String, password: String) async throws -> (AccountUser, AccountTokens) {
+    (testUser, testTokens)
+  }
+  func load(token: String) async throws -> AccountUser { testUser }
+  func refresh(_ refresh: String) async throws -> AccountTokens { rotatedTokens }
+  func logout(token: String) async throws {}
+}
+
+struct AchievementTests {
+  private let baseURL = URL(string: "https://example.com/goapi/")!
+
+  @Test func endpointUsesAuthenticatedJSONContractWithoutEmbeddingCredentials() throws {
+    let pending = try AccountEndpoint.pendingAchievements(baseURL: baseURL)
+    #expect(pending.url?.path == "/goapi/auth/user/achievements")
+    #expect(pending.httpMethod == "GET")
+    #expect(pending.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(pending.httpShouldHandleCookies == false)
+
+    let acknowledgement = try AccountEndpoint.acknowledgeAchievements(
+      baseURL: baseURL, keys: [" sensta-app "])
+    #expect(acknowledgement.httpMethod == "PATCH")
+    #expect(acknowledgement.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(acknowledgement.value(forHTTPHeaderField: "Content-Type") == "application/json")
+    #expect(
+      try JSONDecoder().decode([String: [String]].self, from: acknowledgement.httpBody!) == [
+        "keys": ["sensta-app"]
+      ])
+    #expect(throws: NuboAPIError.invalidRequest) {
+      try AccountEndpoint.acknowledgeAchievements(baseURL: baseURL, keys: [])
+    }
+    #expect(throws: NuboAPIError.invalidRequest) {
+      try AccountEndpoint.acknowledgeAchievements(baseURL: baseURL, keys: ["same", "same"])
+    }
+  }
+
+  @MainActor @Test func inboxChecksAndAcknowledgesOneBadgeAtATime() async {
+    let service = AchievementAccountStub()
+    let session = AccountSession(
+      service: service, store: MemoryTokenStore(), apiBaseURL: baseURL)
+    await session.signin(email: "photo@example.com", password: "secret")
+
+    await session.achievements.check(using: session)
+    #expect(session.achievements.badges.map(\.key) == ["sensta-app", "first-post"])
+    #expect(await session.achievements.acknowledgeCurrent(using: session))
+    #expect(session.achievements.current?.key == "first-post")
+    #expect(await service.methods == ["GET", "PATCH"])
+    #expect(await service.authorizationHeaders == ["Bearer access-one", "Bearer access-one"])
+    #expect(await service.acknowledgedKeys == ["sensta-app"])
+  }
+
+  @MainActor @Test func malformedDuplicateBadgesAreRejectedAndLogoutClearsQueue() async {
+    let malformedService = AchievementAccountStub(returnsDuplicate: true)
+    let malformedSession = AccountSession(
+      service: malformedService, store: MemoryTokenStore(), apiBaseURL: baseURL)
+    await malformedSession.signin(email: "photo@example.com", password: "secret")
+    await malformedSession.achievements.check(using: malformedSession)
+    #expect(malformedSession.achievements.badges.isEmpty)
+
+    let service = AchievementAccountStub()
+    let session = AccountSession(
+      service: service, store: MemoryTokenStore(), apiBaseURL: baseURL)
+    await session.signin(email: "photo@example.com", password: "secret")
+    await session.achievements.check(using: session)
+    #expect(!session.achievements.badges.isEmpty)
+    await session.logout()
+    #expect(session.achievements.badges.isEmpty)
+  }
+
+  @MainActor @Test func failedAcknowledgementPreservesBadgeUntilUserSnoozesIt() async {
+    let service = AchievementAccountStub(rejectsAcknowledgement: true)
+    let session = AccountSession(
+      service: service, store: MemoryTokenStore(), apiBaseURL: baseURL)
+    await session.signin(email: "photo@example.com", password: "secret")
+    await session.achievements.check(using: session)
+
+    #expect(await session.achievements.acknowledgeCurrent(using: session) == false)
+    #expect(session.achievements.current?.key == "sensta-app")
+    #expect(session.achievements.acknowledgementMessage != nil)
+    session.achievements.snoozeCurrent()
+    #expect(session.achievements.current?.key == "first-post")
+  }
+}
+
 @MainActor
 struct AccountSessionTests {
   @Test func signinPersistsPairBeforePublishingUser() async {

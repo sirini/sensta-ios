@@ -112,7 +112,11 @@ struct SENSTAApp: App {
     private var photographerAttempts = 0
     func fetchPhotographer(id: Int) async throws -> PhotographerProfile {
       photographerAttempts += 1
-      if photographerAttempts == 1 { throw NuboAPIError.networkUnavailable }
+      if photographerAttempts == 1
+        && !ProcessInfo.processInfo.arguments.contains("--ui-test-achievements")
+      {
+        throw NuboAPIError.networkUnavailable
+      }
       let post = try await fetchPost(id: 1).post
       return PhotographerProfile(
         writer: post.writer, signature: "빛과 여백, 일상 속 작은 순간을 기록합니다.", posts: [post],
@@ -171,6 +175,7 @@ extension ContentView {
     private var commentID = 100
     private var appleLinked = false
     private var notificationRead = false
+    private var acknowledgedAchievementKeys = Set<String>()
     func data(for request: URLRequest) async throws -> Data {
       if request.url?.path.hasSuffix("/auth/apple/status") == true {
         return try JSONSerialization.data(withJSONObject: [
@@ -188,6 +193,34 @@ extension ContentView {
         else { throw NuboAPIError.httpStatus(401) }
         appleLinked = true
         return Data(#"{"success":true,"code":0,"result":{"linked":true}}"#.utf8)
+      }
+      if request.url?.path.hasSuffix("/auth/user/achievements") == true {
+        guard request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true
+        else { throw NuboAPIError.httpStatus(401) }
+        if request.httpMethod == "PATCH" {
+          let body = try JSONDecoder().decode([String: [String]].self, from: request.httpBody!)
+          acknowledgedAchievementKeys.formUnion(body["keys"] ?? [])
+          return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
+        }
+        let enabled = ProcessInfo.processInfo.arguments.contains("--ui-test-achievements")
+        let badges: [[String: Any]] =
+          enabled
+          ? [
+            [
+              "key": "sensta-app", "name": "SENSTA 앱 포토그래퍼",
+              "description": "SENSTA 앱으로 사진을 공유한 사용자입니다.",
+              "iconKey": "aperture", "earnedAt": 1_788_410_731_496 as Int64,
+            ],
+            [
+              "key": "first-post", "name": "첫 발자국",
+              "description": "첫 게시글을 작성했습니다.",
+              "iconKey": "notebook-pen", "earnedAt": 1_788_410_731_497 as Int64,
+            ],
+          ].filter { !acknowledgedAchievementKeys.contains($0["key"] as! String) }
+          : []
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "error": "", "result": badges,
+        ])
       }
       if request.url?.path.hasSuffix("/board/my/studio") == true {
         guard
