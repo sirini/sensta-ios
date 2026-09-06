@@ -189,6 +189,48 @@ extension ContentView {
         appleLinked = true
         return Data(#"{"success":true,"code":0,"result":{"linked":true}}"#.utf8)
       }
+      if request.url?.path.hasSuffix("/board/my/studio") == true {
+        guard
+          request.value(forHTTPHeaderField: "Authorization")?.hasPrefix("Bearer ") == true
+        else {
+          throw NuboAPIError.httpStatus(401)
+        }
+        let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+        let page = Int(query?.first(where: { $0.name == "page" })?.value ?? "1") ?? 1
+        let sort = query?.first(where: { $0.name == "sort" })?.value ?? "recent"
+        let items: [[String: Any]]
+        let totalCount: Int
+        let hasNext: Bool
+        if sort == "views" {
+          items = [studioItem(uid: 201, title: "가장 많이 본 비공개 사진", status: 2, hit: 81)]
+          totalCount = 1
+          hasNext = false
+        } else if page == 2 {
+          items = [studioItem(uid: 103, title: "세 번째 작품", status: 0, hit: 9)]
+          totalCount = 21
+          hasNext = false
+        } else {
+          items = [
+            studioItem(uid: 101, title: "비밀의 빛", status: 2, hit: 41),
+            studioItem(uid: 102, title: "푸른 여백", status: 0, hit: 20),
+          ]
+          totalCount = 21
+          hasNext = true
+        }
+        return try JSONSerialization.data(withJSONObject: [
+          "success": true, "code": 0, "error": "",
+          "result": [
+            "summary": [
+              "postCount": totalCount, "photoCount": totalCount + 2, "viewCount": 110,
+              "likeCount": 12, "commentCount": 7,
+            ],
+            "posts": [
+              "page": page, "limit": 20, "totalCount": totalCount, "hasNext": hasNext,
+              "items": items,
+            ],
+          ],
+        ])
+      }
       if request.url?.path.hasSuffix("/home/noti/load") == true {
         return try JSONSerialization.data(withJSONObject: [
           "success": true, "code": 0, "error": "",
@@ -237,8 +279,10 @@ extension ContentView {
         return Data(#"{"success":true,"code":0,"result":null}"#.utf8)
       }
       if request.url?.path.hasSuffix("/comment/list") == true {
+        let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+        let postID = Int(query?.first(where: { $0.name == "postUid" })?.value ?? "1") ?? 1
         let comment: [String: Any] = [
-          "uid": 1, "replyUid": 1, "postUid": 1,
+          "uid": 1, "replyUid": 1, "postUid": postID,
           "writer": ["uid": 2, "name": "사진가", "profile": "", "signature": ""],
           "like": commentLiked ? 3 : 2, "liked": commentLiked,
           "submitted": 1_788_600_000_000 as Int64, "modified": 0, "status": 0,
@@ -249,11 +293,16 @@ extension ContentView {
           "result": ["boardUid": 2, "totalCommentCount": 1, "comments": [comment]],
         ])
       }
+      let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+      let postID = Int(query?.first(where: { $0.name == "postUid" })?.value ?? "1") ?? 1
+      let studioTitle = postID == 201 ? "가장 많이 본 비공개 사진" : "빛과 여백"
       let result: [String: Any] = [
         "config": ["uid": 2, "id": "photo", "name": "사진", "rowCount": 32],
         "post": [
-          "uid": 1, "title": "빛과 여백", "content": "", "submitted": 0, "modified": 0,
-          "hit": 3, "status": 0, "category": ["uid": 1, "name": "사진"], "cover": "", "comment": 0,
+          "uid": postID, "title": studioTitle, "content": "",
+          "submitted": 1_788_600_000_000 as Int64, "modified": 0,
+          "hit": 3, "status": postID == 201 ? 2 : 0,
+          "category": ["uid": 1, "name": "사진"], "cover": "", "comment": 0,
           "like": liked ? 2 : 1, "liked": liked,
           "writer": ["uid": 1, "name": "사진가", "profile": "", "signature": ""],
         ],
@@ -321,6 +370,16 @@ extension ContentView {
       throw NuboAPIError.httpStatus(401)
     }
     func logout(token: String) async throws {}
+
+    private func studioItem(uid: Int, title: String, status: Int, hit: Int) -> [String: Any] {
+      [
+        "uid": uid, "title": title, "cover": "",
+        "submitted": 1_788_600_000_000 as Int64,
+        "modified": 1_788_600_001_000 as Int64,
+        "status": status, "imageCount": uid == 101 ? 3 : 1,
+        "hit": hit, "like": 4, "comment": 2,
+      ]
+    }
   }
 
   @MainActor private final class AccountUITestStore: AccountTokenStoring {

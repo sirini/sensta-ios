@@ -278,6 +278,52 @@ final class SENSTAUITests: XCTestCase {
   }
 
   @MainActor
+  func testMyPhotoStudioPaginatesSortsAndOpensPrivateWork() throws {
+    let app = XCUIApplication()
+    app.launchArguments = ["--ui-test-viewer"]
+    app.launch()
+    let account = app.buttons["photo-feed-account"]
+    XCTAssertTrue(account.waitForExistence(timeout: 10))
+    account.tap()
+    let email = app.textFields["account-email"]
+    XCTAssertTrue(email.waitForExistence(timeout: 5))
+    email.tap()
+    email.typeText("photo@example.com")
+    let password = app.secureTextFields["account-password"]
+    password.tap()
+    password.typeText("test-password")
+    app.buttons["account-signin"].tap()
+
+    let studio = app.buttons["account-photo-studio"]
+    XCTAssertTrue(studio.waitForExistence(timeout: 5))
+    studio.tap()
+    XCTAssertTrue(app.navigationBars["내 작품"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.descendants(matching: .any)["photo-studio-summary"].exists)
+    XCTAssertTrue(app.buttons["photo-studio-post-101"].waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["photo-studio-post-103"].waitForExistence(timeout: 5))
+
+    let views = app.buttons["photo-studio-sort-views"]
+    XCTAssertTrue(views.isHittable)
+    views.tap()
+    let privateWork = app.buttons["photo-studio-post-201"]
+    XCTAssertTrue(privateWork.waitForExistence(timeout: 5))
+    XCTAssertTrue(privateWork.label.contains("가장 많이 본 비공개 사진"))
+    XCTAssertTrue((privateWork.value as? String)?.contains("비공개") == true)
+    let studioCapture = XCTAttachment(screenshot: app.screenshot())
+    studioCapture.name = "My studio summary and private work"
+    studioCapture.lifetime = .keepAlways
+    add(studioCapture)
+
+    privateWork.tap()
+    XCTAssertTrue(app.staticTexts["photo-detail-title"].waitForExistence(timeout: 5))
+    XCTAssertEqual(app.staticTexts["photo-detail-title"].label, "가장 많이 본 비공개 사진")
+    let detailCapture = XCTAttachment(screenshot: app.screenshot())
+    detailCapture.name = "Authenticated private studio detail"
+    detailCapture.lifetime = .keepAlways
+    add(detailCapture)
+  }
+
+  @MainActor
   func testEmailSignupVerifiesCodeAndReturnsToLogin() throws {
     let app = XCUIApplication()
     app.launchArguments = ["--ui-test-viewer"]

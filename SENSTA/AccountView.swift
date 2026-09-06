@@ -30,6 +30,13 @@ struct AccountView: View {
                 Text(user.id).font(.subheadline).foregroundStyle(.secondary)
               }
             }.padding(.vertical, 4)
+            NavigationLink {
+              PhotoStudioView(account: session, publicDetailService: detailService)
+                .onAppear { detent = .large }
+            } label: {
+              Label("내 작품 스튜디오", systemImage: "photo.stack")
+            }
+            .accessibilityIdentifier("account-photo-studio")
             NavigationLink("내 공개 프로필") {
               PhotographerView(
                 writer: PhotoPostWriter(
