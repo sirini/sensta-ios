@@ -726,7 +726,7 @@ struct DirectMessageView: View {
 
   private func messageBubble(_ message: DirectMessage, isLatestMine: Bool) -> some View {
     let mine = message.senderID == account.user?.uid
-    return HStack(alignment: .bottom, spacing: 8) {
+    return HStack(alignment: .center, spacing: 8) {
       if mine { Spacer(minLength: 44) }
       if !mine {
         AccountAvatar(
