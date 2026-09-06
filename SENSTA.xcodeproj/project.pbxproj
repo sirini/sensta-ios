@@ -57,6 +57,7 @@
 		I10000000000000000000002 /* PushNotificationsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = I20000000000000000000002 /* PushNotificationsTests.swift */; };
 		I10000000000000000000003 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = I80000000000000000000001 /* FirebaseCore */; };
 		I10000000000000000000004 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = I80000000000000000000002 /* FirebaseMessaging */; };
+		J10000000000000000000001 /* PhotoUploadEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = J20000000000000000000001 /* PhotoUploadEditor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -132,6 +133,7 @@
 		H20000000000000000000002 /* DirectMessagesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectMessagesTests.swift; sourceTree = "<group>"; };
 		I20000000000000000000001 /* PushNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotifications.swift; sourceTree = "<group>"; };
 		I20000000000000000000002 /* PushNotificationsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationsTests.swift; sourceTree = "<group>"; };
+		J20000000000000000000001 /* PhotoUploadEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoUploadEditor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -204,6 +206,7 @@
 				B20000000000000000000002 /* PhotoComments.swift */,
 				E20000000000000000000001 /* PhotoNotifications.swift */,
 				E20000000000000000000002 /* PhotoUpload.swift */,
+				J20000000000000000000001 /* PhotoUploadEditor.swift */,
 				A2000000000000000000001C /* PhotoImagePipeline.swift */,
 				A20000000000000000000007 /* Assets.xcassets */,
 				A2000000000000000000000E /* Info.plist */,
@@ -473,6 +476,7 @@
 				B10000000000000000000002 /* PhotoComments.swift in Sources */,
 				E10000000000000000000001 /* PhotoNotifications.swift in Sources */,
 				E10000000000000000000002 /* PhotoUpload.swift in Sources */,
+				J10000000000000000000001 /* PhotoUploadEditor.swift in Sources */,
 				A10000000000000000000014 /* PhotoImagePipeline.swift in Sources */,
 				A10000000000000000000001 /* SENSTAApp.swift in Sources */,
 			);

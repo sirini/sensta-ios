@@ -11,8 +11,35 @@ struct PreparedUploadPhoto: Identifiable, Equatable, Sendable {
   let fileURL: URL
   let previewData: Data
   let byteCount: Int
+  let sourceFileURL: URL
+  let sourcePreviewData: Data
+  let sourceByteCount: Int
+  let edits: PhotoUploadEdits
 
-  func removeFile() { try? FileManager.default.removeItem(at: fileURL) }
+  init(
+    id: UUID, fileURL: URL, previewData: Data, byteCount: Int,
+    sourceFileURL: URL? = nil, sourcePreviewData: Data? = nil, sourceByteCount: Int? = nil,
+    edits: PhotoUploadEdits = PhotoUploadEdits()
+  ) {
+    self.id = id
+    self.fileURL = fileURL
+    self.previewData = previewData
+    self.byteCount = byteCount
+    self.sourceFileURL = sourceFileURL ?? fileURL
+    self.sourcePreviewData = sourcePreviewData ?? previewData
+    self.sourceByteCount = sourceByteCount ?? byteCount
+    self.edits = edits
+  }
+
+  func removeRenderedFile() {
+    guard fileURL != sourceFileURL else { return }
+    try? FileManager.default.removeItem(at: fileURL)
+  }
+
+  func removeFile() {
+    removeRenderedFile()
+    try? FileManager.default.removeItem(at: sourceFileURL)
+  }
 }
 
 enum PhotoUploadPreparationError: Error {
@@ -418,6 +445,72 @@ final class PhotoUploadModel {
     photos.remove(at: index)
   }
 
+  func applyEdits(to photoID: UUID, edits: PhotoUploadEdits) async -> Bool {
+    guard let photo = photos.first(where: { $0.id == photoID }) else { return false }
+    let identity = UUID()
+    preparationIdentity = identity
+    isPreparing = true
+    error = nil
+    var rendered: PreparedUploadPhoto?
+    defer {
+      if preparationIdentity == identity { isPreparing = false }
+    }
+    do {
+      rendered = try await Task.detached(priority: .userInitiated) {
+        try PhotoUploadRenderer.render(photo, edits: edits)
+      }.value
+      try Task.checkCancellation()
+      guard preparationIdentity == identity,
+        let index = photos.firstIndex(where: { $0.id == photoID }), let rendered
+      else {
+        rendered?.removeRenderedFile()
+        return false
+      }
+      photos[index].removeRenderedFile()
+      photos[index] = rendered
+      if totalBytes > Self.maximumUploadBytes {
+        error = "사진 크기가 100MB를 넘어요. 사진 수를 줄여 주세요."
+      }
+      return true
+    } catch is CancellationError {
+      rendered?.removeRenderedFile()
+      return false
+    } catch {
+      rendered?.removeRenderedFile()
+      if preparationIdentity == identity {
+        self.error = "사진 편집 내용을 저장하지 못했어요. 다시 시도해 주세요."
+      }
+      return false
+    }
+  }
+
+  #if DEBUG
+    func installEditorFixtureIfNeeded() {
+      guard photos.isEmpty else { return }
+      let palettes: [(UIColor, UIColor)] = [
+        (UIColor(red: 0.78, green: 0.31, blue: 0.20, alpha: 1), .systemTeal),
+        (.systemIndigo, UIColor(red: 0.96, green: 0.74, blue: 0.25, alpha: 1)),
+      ]
+      photos = palettes.compactMap { leading, trailing in
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let image = UIGraphicsImageRenderer(
+          size: CGSize(width: 900, height: 600), format: format
+        ).image { context in
+          leading.setFill()
+          context.fill(CGRect(x: 0, y: 0, width: 540, height: 600))
+          trailing.setFill()
+          context.fill(CGRect(x: 540, y: 0, width: 360, height: 600))
+          UIColor.white.withAlphaComponent(0.8).setFill()
+          context.cgContext.fillEllipse(in: CGRect(x: 110, y: 120, width: 190, height: 190))
+        }
+        guard let data = image.jpegData(compressionQuality: 0.9) else { return nil }
+        return try? PhotoUploadPreparer.prepare(data: data)
+      }
+    }
+  #endif
+
   func upload(using account: AccountSession) async -> Bool {
     guard canUpload, let config, let baseURL = account.apiBaseURL, let uploadTags else {
       return false
@@ -526,6 +619,7 @@ struct PhotoUploadView: View {
   @State private var pickerItems: [PhotosPickerItem] = []
   @State private var preparationTask: Task<Void, Never>?
   @State private var tagSuggestionTask: Task<Void, Never>?
+  @State private var editingPhoto: PreparedUploadPhoto?
 
   var body: some View {
     NavigationStack {
@@ -568,7 +662,14 @@ struct PhotoUploadView: View {
       }
     }
     .interactiveDismissDisabled(model.isUploading)
-    .task { await model.loadConfig(using: account) }
+    .task {
+      await model.loadConfig(using: account)
+      #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-upload-editor") {
+          model.installEditorFixtureIfNeeded()
+        }
+      #endif
+    }
     .onChange(of: pickerItems) { _, items in
       preparationTask?.cancel()
       preparationTask = Task { await model.replaceSelection(items) }
@@ -578,6 +679,15 @@ struct PhotoUploadView: View {
       preparationTask?.cancel()
       tagSuggestionTask?.cancel()
       model.cleanUp()
+    }
+    .sheet(item: $editingPhoto) { photo in
+      PhotoUploadEditorView(
+        photo: photo,
+        position: (model.photos.firstIndex(where: { $0.id == photo.id }) ?? 0) + 1,
+        totalCount: model.photos.count
+      ) { edits in
+        await model.applyEdits(to: photo.id, edits: edits)
+      }
     }
   }
 
@@ -609,11 +719,34 @@ struct PhotoUploadView: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 94), spacing: 8)], spacing: 8) {
           ForEach(model.photos) { photo in
             ZStack(alignment: .topTrailing) {
-              if let image = UIImage(data: photo.previewData) {
-                Image(uiImage: image)
-                  .resizable().scaledToFill()
-                  .frame(height: 112).clipShape(RoundedRectangle(cornerRadius: 12))
+              Button {
+                editingPhoto = photo
+              } label: {
+                ZStack(alignment: .bottomLeading) {
+                  if let image = UIImage(data: photo.previewData) {
+                    Image(uiImage: image)
+                      .resizable().scaledToFill()
+                      .frame(maxWidth: .infinity)
+                      .frame(height: 112).clipShape(RoundedRectangle(cornerRadius: 12))
+                  }
+                  Label(
+                    photo.edits.needsRendering ? "편집됨" : "편집",
+                    systemImage: "slider.horizontal.3"
+                  )
+                  .font(.caption2).fontWeight(.semibold)
+                  .foregroundStyle(.white)
+                  .padding(.horizontal, 8).padding(.vertical, 5)
+                  .background(.black.opacity(0.58), in: Capsule())
+                  .padding(6)
+                }
               }
+              .buttonStyle(.plain)
+              .accessibilityLabel(
+                "사진 \((model.photos.firstIndex(where: { $0.id == photo.id }) ?? 0) + 1) 편집"
+              )
+              .accessibilityValue(photo.edits.needsRendering ? "편집됨" : "원본")
+              .accessibilityIdentifier(
+                "photo-upload-edit-\(model.photos.firstIndex(where: { $0.id == photo.id }) ?? 0)")
               Button {
                 model.removePhoto(id: photo.id)
               } label: {
@@ -633,7 +766,7 @@ struct PhotoUploadView: View {
         .font(.subheadline)
       }
       if model.isPreparing { ProgressView("사진을 안전하게 준비하는 중…") }
-      Text("사진은 긴 변 4096px로 정리하고, 촬영 좌표를 제거한 뒤 업로드합니다.")
+      Text("사진을 눌러 회전·좌우 반전·필터를 적용할 수 있어요. 촬영 좌표는 업로드 전에 제거합니다.")
         .font(.caption).foregroundStyle(.secondary)
     }
   }

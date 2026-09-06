@@ -936,7 +936,7 @@ final class SENSTAUITests: XCTestCase {
   @MainActor
   func testFeedControlsAdaptToProfileNotificationsAndUpload() throws {
     let app = XCUIApplication()
-    app.launchArguments = ["--ui-test-viewer"]
+    app.launchArguments = ["--ui-test-viewer", "--ui-test-upload-editor"]
     app.launch()
 
     let upload = app.buttons["photo-feed-upload"]
@@ -984,8 +984,26 @@ final class SENSTAUITests: XCTestCase {
 
     upload.tap()
     XCTAssertTrue(app.navigationBars["새 사진"].waitForExistence(timeout: 5))
-    XCTAssertTrue(app.buttons["photo-upload-picker"].exists)
+    let firstPhoto = app.buttons["photo-upload-edit-0"]
+    XCTAssertTrue(firstPhoto.waitForExistence(timeout: 5))
+    XCTAssertEqual(firstPhoto.value as? String, "원본")
     XCTAssertFalse(app.buttons["photo-upload-submit"].isEnabled)
+
+    firstPhoto.tap()
+    XCTAssertTrue(app.navigationBars["사진 편집"].waitForExistence(timeout: 5))
+    app.buttons["photo-editor-rotate"].tap()
+    app.buttons["photo-editor-mirror"].tap()
+    app.buttons["photo-editor-filter-warm"].tap()
+    app.sliders["photo-editor-intensity"].adjust(toNormalizedSliderPosition: 0.65)
+    let editorCapture = XCTAttachment(screenshot: app.screenshot())
+    editorCapture.name = "Native photo rotate mirror and filter editor"
+    editorCapture.lifetime = .keepAlways
+    add(editorCapture)
+    app.buttons["photo-editor-save"].tap()
+    XCTAssertTrue(app.navigationBars["새 사진"].waitForExistence(timeout: 10))
+    let edited = expectation(
+      for: NSPredicate(format: "value == %@", "편집됨"), evaluatedWith: firstPhoto)
+    wait(for: [edited], timeout: 5)
 
     let tagField = app.textFields["photo-upload-tags"]
     for _ in 0..<5 where !tagField.isHittable { app.swipeUp() }

@@ -1,3 +1,4 @@
+import CoreImage
 import Foundation
 import ImageIO
 import Testing
@@ -109,6 +110,61 @@ struct PhotoUploadAndNotificationTests {
   }
 
   @Test
+  func uploadEditStateKeepsAndroidCompatibleRotationMirrorAndFilterControls() {
+    var edits = PhotoUploadEdits()
+    edits.rotateClockwise()
+    #expect(edits.rotationDegrees == 90)
+    edits.toggleMirror()
+    edits.selectFilter(.warm)
+    edits.setFilterIntensity(2)
+    #expect(edits.isMirrored)
+    #expect(edits.filter == .warm)
+    #expect(edits.filterIntensity == 1)
+    #expect(edits.needsRendering)
+
+    edits.rotateClockwise()
+    edits.rotateClockwise()
+    edits.rotateClockwise()
+    #expect(edits.rotationDegrees == 0)
+    edits.setFilterIntensity(-1)
+    #expect(edits.filterIntensity == 0)
+
+    edits.reset()
+    #expect(edits == PhotoUploadEdits())
+    #expect(!edits.needsRendering)
+  }
+
+  @Test
+  func uploadRendererAppliesEditsAndKeepsPrivacySafeMetadata() throws {
+    let source = try makeImageData(type: UTType.jpeg, orientation: 1)
+    let prepared = try PhotoUploadPreparer.prepare(data: source)
+    var edits = PhotoUploadEdits()
+    edits.rotateClockwise()
+    edits.toggleMirror()
+    edits.selectFilter(.mono)
+    let rendered = try PhotoUploadRenderer.render(prepared, edits: edits)
+    defer { rendered.removeFile() }
+
+    let output = try #require(CGImageSourceCreateWithURL(rendered.fileURL as CFURL, nil))
+    let image = try #require(CGImageSourceCreateImageAtIndex(output, 0, nil))
+    let properties = try #require(
+      CGImageSourceCopyPropertiesAtIndex(output, 0, nil) as? [CFString: Any])
+    let exif = try #require(properties[kCGImagePropertyExifDictionary] as? [CFString: Any])
+    let average = try averageRGBA(of: rendered.fileURL)
+
+    #expect(image.width == 80)
+    #expect(image.height == 120)
+    #expect(rendered.fileURL != rendered.sourceFileURL)
+    #expect(rendered.edits == edits)
+    #expect(!rendered.previewData.isEmpty)
+    #expect(properties[kCGImagePropertyGPSDictionary] == nil)
+    #expect((properties[kCGImagePropertyOrientation] as? Int ?? 1) == 1)
+    #expect(exif[kCGImagePropertyExifDateTimeOriginal] as? String == "2026:09:06 01:23:45")
+    #expect(abs(Int(average[0]) - Int(average[1])) <= 2)
+    #expect(abs(Int(average[1]) - Int(average[2])) <= 2)
+  }
+
+  @Test
   func uploadRequestUsesAndroidMultipartContractAndIOSOrigin() throws {
     let photoURL = FileManager.default.temporaryDirectory
       .appending(path: "multipart-test-\(UUID().uuidString).jpg")
@@ -207,5 +263,18 @@ struct PhotoUploadAndNotificationTests {
     CGImageDestinationAddImage(destination, cgImage, properties as CFDictionary)
     guard CGImageDestinationFinalize(destination) else { return nil }
     return data as Data
+  }
+
+  private func averageRGBA(of fileURL: URL) throws -> [UInt8] {
+    let input = try #require(CIImage(contentsOf: fileURL))
+    let filter = try #require(CIFilter(name: "CIAreaAverage"))
+    filter.setValue(input, forKey: kCIInputImageKey)
+    filter.setValue(CIVector(cgRect: input.extent), forKey: kCIInputExtentKey)
+    let output = try #require(filter.outputImage)
+    var bytes = [UInt8](repeating: 0, count: 4)
+    CIContext().render(
+      output, toBitmap: &bytes, rowBytes: 4, bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
+      format: .RGBA8, colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+    return bytes
   }
 }
