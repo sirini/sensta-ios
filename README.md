@@ -56,6 +56,7 @@ open SENSTA.xcodeproj
 - [프로젝트 상태](docs/PROJECT_STATUS.md)
 - [개발 환경](docs/DEVELOPMENT_SETUP.md)
 - [사전 준비 체크리스트](docs/PREPARATION_CHECKLIST.md)
+- [최종 실기기 통합 QA](docs/FINAL_DEVICE_QA.md)
 - [GOAPI 사전 작업](docs/GOAPI_PREPARATION.md)
 - [Firebase와 Apple 서비스 준비](docs/FIREBASE_APPLE_SETUP.md)
 
