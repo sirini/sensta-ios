@@ -39,6 +39,8 @@
 	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
 	<key>GIDServerClientID</key>
 	<string>$(GOOGLE_SERVER_CLIENT_ID)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>FirebaseMessagingAutoInitEnabled</key>
 	<false/>
 	<key>FirebaseMessagingInstallationIdEnabled</key>

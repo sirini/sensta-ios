@@ -66,6 +66,7 @@
 		N10000000000000000000001 /* AccountDeletionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = N20000000000000000000001 /* AccountDeletionView.swift */; };
 		O10000000000000000000001 /* SenstaTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = O20000000000000000000001 /* SenstaTheme.swift */; };
 		O10000000000000000000002 /* SenstaThemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = O20000000000000000000002 /* SenstaThemeTests.swift */; };
+		P10000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = P20000000000000000000001 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -150,6 +151,7 @@
 		N20000000000000000000001 /* AccountDeletionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDeletionView.swift; sourceTree = "<group>"; };
 		O20000000000000000000001 /* SenstaTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenstaTheme.swift; sourceTree = "<group>"; };
 		O20000000000000000000002 /* SenstaThemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SenstaThemeTests.swift; sourceTree = "<group>"; };
+		P20000000000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -229,6 +231,7 @@
 				N20000000000000000000001 /* AccountDeletionView.swift */,
 				O20000000000000000000001 /* SenstaTheme.swift */,
 				A2000000000000000000001C /* PhotoImagePipeline.swift */,
+				P20000000000000000000001 /* PrivacyInfo.xcprivacy */,
 				A20000000000000000000007 /* Assets.xcassets */,
 				A2000000000000000000000E /* Info.plist */,
 				A20000000000000000000008 /* SENSTA.entitlements */,
@@ -425,6 +428,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000004 /* Assets.xcassets in Resources */,
+				P10000000000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

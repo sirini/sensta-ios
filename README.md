@@ -4,9 +4,9 @@
 [SENSTA Android](https://github.com/sirini/sensta)의 제품 경험과 NUBO API contract v1을 기준으로,
 Swift와 SwiftUI를 사용해 Apple 플랫폼에 맞는 앱을 새로 개발합니다.
 
-이 저장소는 현재 **핵심 기능 안정화와 출시 준비 단계**입니다. 공개 피드·탐색·상세, 계정과 참여 기능,
-사진 업로드, 작품 스튜디오, 1:1 대화와 원격 알림을 구현했으며 신고·차단·계정 삭제와 App Store 준비를
-작은 작업 단위로 마무리하고 있습니다.
+이 저장소는 현재 **App Store 제출 준비 단계**입니다. 공개 피드·탐색·상세, 계정과 참여 기능,
+사진 업로드, 작품 스튜디오, 1:1 대화와 원격 알림, 신고·차단·계정 삭제 구현과 최종 실기기 QA를 마쳤고
+정식 Xcode 아카이브·스토어 메타데이터·TestFlight를 준비하고 있습니다.
 
 ## 목표
 
@@ -28,12 +28,12 @@ SENSTA iOS는 별도 데이터베이스를 두지 않습니다. Android와 웹�
 같은 사용자, 작품, 댓글, 대화, 업적과 신고 상태를 공유합니다. Firebase는 APNs를 통한 알림 전달에만
 사용합니다.
 
-## 현재 개발 환경
+## 현재 개발·제출 환경
 
 - Mac: macOS 27 beta
-- 기준 IDE: `/Applications/Xcode-beta.app`
-- 확인된 도구: Xcode 27.0 (`27A5252f`), Swift 6.4
-- 확인된 SDK와 시뮬레이터: iOS 27.0
+- 개발 IDE: `/Applications/Xcode-beta.app`의 Xcode 27.0 (`27A5252f`)
+- 제출 IDE: `/Applications/Xcode.app`의 정식 Xcode 26.6 (`17F113`)
+- 확인된 시뮬레이터: iOS 27.0(개발), iOS 26.5(제출 검증)
 - 실제 iPhone: 준비됨
 - Apple Developer Program: 활성, Team `WKPCU58CWL`, 2027-09-04 만료
 - App Store Connect: `SENSTA` Apple ID `6808687447`, 대한민국 무료 배포 준비 중
@@ -51,12 +51,20 @@ open SENSTA.xcodeproj
 시스템 전체 `xcode-select`를 바꾸지 않고 명령별 `DEVELOPER_DIR`를 사용합니다. Beta가 갱신되어도
 `/Applications/Xcode-beta.app` 경로가 유지되면 같은 명령을 사용할 수 있습니다.
 
+TestFlight·App Store용 정식 환경은 별도 스크립트로 선택합니다.
+
+```bash
+source ./scripts/xcode-release-env.sh
+./scripts/check-release-environment.sh
+```
+
 ## 문서
 
 - [프로젝트 상태](docs/PROJECT_STATUS.md)
 - [개발 환경](docs/DEVELOPMENT_SETUP.md)
 - [사전 준비 체크리스트](docs/PREPARATION_CHECKLIST.md)
 - [최종 실기기 통합 QA](docs/FINAL_DEVICE_QA.md)
+- [App Store 제출 가이드](docs/APP_STORE_SUBMISSION.md)
 - [GOAPI 사전 작업](docs/GOAPI_PREPARATION.md)
 - [Firebase와 Apple 서비스 준비](docs/FIREBASE_APPLE_SETUP.md)
 

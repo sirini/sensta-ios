@@ -620,10 +620,11 @@
 
 ## 다음 작업 (현재)
 
-1. 위 작업을 모두 모아 실제 iPhone에서 자르기 조합, 알림 읽음, JPEG·HEIC 다중 업로드와 UGC·계정·테마를
-   한 번의 최종 통합 QA로 확인한다. Apple 연결 계정 삭제는 복구 가능한 전용 테스트 계정을 사용한다.
-2. 통합 QA가 통과하면 전용 지원 URL, App Privacy 수집표와 TestFlight·App Store 제출 자료를 준비한다.
-   웹 Universal Link는 원격 push 출시를 막지 않으므로 별도 작업으로 둔다.
+1. 제품 소유자가 최종 실기기 통합 QA에서 주요 사용자 여정과 웜톤 라이트·다크 테마를 확인했고 크게
+   문제 없다고 승인했다. 파괴적인 Apple 연결 계정 삭제만 복구 가능한 전용 테스트 계정으로 별도 확인한다.
+2. App Store 제출 단계로 전환한다. NUBO 지원 페이지 운영 배포, 정식 Xcode 26.6 Release 아카이브와
+   privacy 검증, 6.9형 스크린샷, 심사용 계정, TestFlight 내부 테스트 순으로 완료한다. 웹 Universal Link는
+   원격 push 출시를 막지 않으므로 별도 작업으로 둔다.
 
 ## 신고·차단 (2026-09-06)
 
@@ -697,3 +698,22 @@
   독립 실행에서 통과했다. 인증 feed wrapper가 테스트 fixture의 페이지 정보를 잃던 문제도 실제 계약과
   같게 고쳐 페이지 실패·재시도 흐름을 다시 통과시켰다. Release simulator build와 Debug 정적 분석도
   통과했으며, 최종 실기기 통합 QA만 남아 있다.
+
+## App Store 제출 준비 (2026-09-06)
+
+- 제품 소유자가 최종 실기기 통합 QA에서 주요 기능에 큰 문제가 없고 Android·웹과 맞춘 웜톤 색감도
+  만족스럽다고 확인했다. 제출 준비로 전환하며 Apple 연결 계정의 실제 삭제·승인 폐기만 전용 테스트
+  계정으로 별도 검증한다.
+- Apple의 현재 제출 기준을 확인해 정식 Xcode 26.6(`17F113`)과 iOS 26.5 simulator runtime을 설치했다.
+  beta Xcode와 분리된 release 환경 선택·사전 검사 스크립트를 추가했다.
+- 앱 Privacy Manifest에 추적 없음, app-only `UserDefaults` 사유 `CA92.1`과 앱이 수집하는 계정·사진·
+  이용자 콘텐츠·식별자·상호 작용 정보를 선언했다. 면제 암호화만 사용하므로
+  `ITSAppUsesNonExemptEncryption=false`도 명시했다.
+- `docs/APP_STORE_SUBMISSION.md`에 메타데이터 초안, App Privacy 수집표, UGC·연령 등급·콘텐츠 권리,
+  수출 규정, 스크린샷 구성, 심사용 계정과 검토 메모, 실제 App Store Connect 입력 순서를 정리했다.
+- 정식 Xcode 26.6과 iOS 26.5 iPhone 17 Pro Max에서 Release build와 전체 단위 테스트 147개, 대표 공개·
+  업로드·탐색·상세·스튜디오·1:1 대화 UI 테스트 6개를 통과했다. `SENSTA 1.0 (1)` 아카이브를 만든 뒤
+  App Store용 IPA 내보내기에 성공했고 Apple Distribution 서명, production APNs, Sign in with Apple,
+  Associated Domains, `get-task-allow=false`, App Store provisioning profile을 확인했다.
+- 실제 공개 운영 사진으로 피드·탐색·상세와 AI 설명·사진가 프로필·전체 화면 감상 6.9형 스크린샷 5장을
+  만들었다. 모두 1320×2868, alpha 없는 PNG이며 `build/AppStoreScreenshots/6.9-inch/`에 보관한다.

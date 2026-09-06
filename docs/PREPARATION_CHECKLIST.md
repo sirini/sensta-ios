@@ -11,6 +11,7 @@
 - [x] Xcode에 Apple Account와 Team `WKPCU58CWL` 연결
 - [x] 개발용 iPhone 준비
 - [x] Xcode 27 beta와 iOS 27 simulator 설치
+- [x] 제출용 정식 Xcode 26.6와 iOS 26.5 simulator 설치
 - [x] Xcode 라이선스 동의와 초기 구성 완료
 - [x] iPhone을 Xcode에 연결하고 개발자 모드·자동 서명·설치·실행 확인
 
@@ -63,15 +64,16 @@
 - [x] 공개 개인정보처리방침: `https://sensta.me/privacy`
 - [x] 공개 이용약관: `https://sensta.me/terms`
 - [x] 공개 계정 삭제 안내: `https://sensta.me/delete-account`
-- [ ] 전용 지원 URL 준비: 현재 `https://sensta.me/support`는 없음
-- [ ] 신고·차단·운영자 조치·부적절 콘텐츠 필터의 심사 시나리오 작성
-- [ ] App Privacy 데이터 수집표 작성
+- [ ] 전용 지원 URL 운영 배포: NUBO `/support` 구현·검증 완료, `https://sensta.me/support` 배포 필요
+- [x] 신고·차단·운영자 조치·부적절 콘텐츠 필터의 심사 시나리오 작성
+- [x] App Privacy 데이터 수집표 작성
 - [x] Firebase·Google 등 third-party SDK privacy manifest가 Release 앱 번들에 포함되는지 확인
 - [ ] 앱 내 계정 삭제와 Sign in with Apple token 폐기 검증
-- [ ] 연령 등급 질문, 콘텐츠 권리와 수출 규정 답변 준비
+- [x] 앱 Privacy Manifest와 UserDefaults 필수 사유 `CA92.1` 선언
+- [x] 연령 등급 질문, 콘텐츠 권리와 수출 규정 답변 준비
 - [x] 대한민국 비즈니스 규정 준수용 연락처 및 사업자등록번호 보유 여부 확인 완료
-- [ ] App Review용 테스트 계정과 검토 메모 준비
-- [ ] 1024px App Store 아이콘과 기기별 스크린샷 준비
+- [ ] App Review용 테스트 계정 생성: 검토 메모 초안은 작성 완료
+- [x] 1024px App Store 아이콘과 실데이터 6.9형 iPhone 스크린샷 5장 준비
 - [ ] TestFlight 내부 테스트 후 실제 사용자 여정 회귀 테스트
 
 ## 첫 개발 세션
