@@ -34,7 +34,7 @@
 
 - [x] 공용 Google server client audience와 mobile 인증·refresh 계약
 - [x] Sign in with Apple 서버 검증과 외부 계정 연결 정책
-- [x] `ios` push platform 등록과 APNs/FCM alert payload 구현 (`GOAPI b6b9b0f`, 운영 반영 대기)
+- [x] `ios` push platform 등록과 APNs/FCM alert payload 구현 및 운영 반영 (`GOAPI b6b9b0f`, `1ccf15a`)
 - [x] `sensta-ios` 게시글 출처와 플랫폼 공통 `sensta-app` 업적 정책
 - [x] HEIC/JPEG 방향 정규화, 썸네일, EXIF와 GPS 제거 계약
 - [ ] UGC 게시 전 필터와 신고 처리 운영 계약
@@ -47,13 +47,13 @@
 
 - [x] Firebase 프로젝트에 운영 iOS 앱 등록
 - [x] Firebase 프로젝트에 개발 iOS 앱 등록
-- [ ] 각 앱의 `GoogleService-Info.plist`를 구성별 로컬 경로에 안전하게 배치
+- [x] 각 앱의 `GoogleService-Info.plist`를 구성별 로컬 경로에 안전하게 배치
 - [x] 운영·개발 Apple App ID에서 Push Notifications 활성화
 - [x] 운영·개발 Apple App ID에서 Associated Domains와 Sign in with Apple 활성화
-- [ ] Sandbox·Production APNs 인증 키 생성 및 각 Firebase iOS 앱 환경에 업로드
+- [x] Sandbox·Production APNs 인증 키 생성 및 각 Firebase iOS 앱 환경에 업로드
 - [x] Google OAuth iOS client ID 생성
 - [x] Sign in with Apple server configuration과 GOAPI 검증 준비
-- [ ] 실제 iPhone에서 foreground/background/종료 상태 알림 검증
+- [x] 실제 iPhone에서 foreground/background/종료 상태 알림과 사진·1:1 대화 deep link 검증
 
 세부 내용은 [Firebase와 Apple 서비스 준비](FIREBASE_APPLE_SETUP.md)를 따른다.
 

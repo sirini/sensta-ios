@@ -349,6 +349,11 @@ extension ContentView {
           #"{"success":true,"code":0,"error":"","result":{"config":{"uid":2,"useCategory":false},"categories":[{"uid":5,"name":"lounge"}]}}"#
             .utf8)
       }
+      if request.url?.path.hasSuffix("/editor/suggestion/tag") == true {
+        return Data(
+          #"{"success":true,"code":0,"error":"","result":[{"uid":31,"name":"여름사진","count":12},{"uid":32,"name":"여름빛","count":7}]}"#
+            .utf8)
+      }
       if request.httpMethod == "POST", request.url?.path.contains("/comment/") == true {
         if String(data: request.httpBody ?? Data(), encoding: .utf8)?.contains("reject") == true {
           return Data(#"{"success":false,"code":3,"result":null}"#.utf8)

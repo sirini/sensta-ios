@@ -50,6 +50,64 @@ struct PhotoUploadAndNotificationTests {
     #expect(config.categories.map(\.uid) == [8, 9])
   }
 
+  @Test @MainActor
+  func uploadTagsBecomeRemovableChipsWithCommaSpaceAndReturnInput() throws {
+    let defaults = try #require(UserDefaults(suiteName: "photo-upload-tags-\(UUID().uuidString)"))
+    let model = PhotoUploadModel(defaults: defaults)
+
+    model.updateTagDraft("풍경,DAILY #여름사진 ")
+    #expect(model.tags == ["풍경", "daily", "여름사진"])
+    #expect(model.tagDraft.isEmpty)
+
+    model.removeTag("daily")
+    #expect(model.tags == ["풍경", "여름사진"])
+
+    model.updateTagDraft("밤사진")
+    #expect(model.commitTagDraft())
+    #expect(model.tags == ["풍경", "여름사진", "밤사진"])
+
+    model.updateTagDraft("풍경 ")
+    #expect(model.tags == ["풍경", "여름사진", "밤사진"])
+    #expect(model.tagFeedback == "이미 추가한 태그예요.")
+  }
+
+  @Test @MainActor
+  func uploadTagValidationKeepsRejectedDraftAvailableForCorrection() throws {
+    let defaults = try #require(
+      UserDefaults(suiteName: "photo-upload-invalid-tag-\(UUID().uuidString)"))
+    let model = PhotoUploadModel(defaults: defaults)
+
+    model.updateTagDraft("빛 ")
+    #expect(model.tags.isEmpty)
+    #expect(model.tagDraft == "빛")
+    #expect(model.tagFeedback == "태그는 2자 이상 입력해 주세요.")
+
+    model.updateTagDraft("bad-tag")
+    #expect(!model.commitTagDraft())
+    #expect(model.tagDraft == "bad-tag")
+    #expect(model.tagFeedback?.contains("한글·영문") == true)
+  }
+
+  @Test
+  func uploadTagSuggestionContractEncodesQueryAndUsageCount() throws {
+    let baseURL = try #require(URL(string: "https://sensta.me/goapi/"))
+    let request = try PhotoUploadEndpoint.tagSuggestions(
+      baseURL: baseURL, query: "여름 사진", limit: 5)
+    let query = URLComponents(url: try #require(request.url), resolvingAgainstBaseURL: false)?
+      .queryItems
+    #expect(request.url?.path == "/goapi/editor/suggestion/tag")
+    #expect(query?.first(where: { $0.name == "tag" })?.value == "여름 사진")
+    #expect(query?.first(where: { $0.name == "limit" })?.value == "5")
+    #expect(request.httpMethod == "GET")
+
+    let data = Data(
+      #"{"success":true,"error":"","code":0,"result":[{"uid":31,"name":"여름사진","count":12}]}"#
+        .utf8)
+    let suggestions = try JSONDecoder()
+      .decode(AccountEnvelope<[PhotoUploadTagSuggestion]>.self, from: data).checked()
+    #expect(suggestions == [PhotoUploadTagSuggestion(uid: 31, name: "여름사진", count: 12)])
+  }
+
   @Test
   func uploadRequestUsesAndroidMultipartContractAndIOSOrigin() throws {
     let photoURL = FileManager.default.temporaryDirectory

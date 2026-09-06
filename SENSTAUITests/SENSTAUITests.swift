@@ -986,8 +986,28 @@ final class SENSTAUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["새 사진"].waitForExistence(timeout: 5))
     XCTAssertTrue(app.buttons["photo-upload-picker"].exists)
     XCTAssertFalse(app.buttons["photo-upload-submit"].isEnabled)
+
+    let tagField = app.textFields["photo-upload-tags"]
+    for _ in 0..<5 where !tagField.isHittable { app.swipeUp() }
+    XCTAssertTrue(tagField.isHittable)
+    tagField.tap()
+    tagField.typeText("풍경,빛결 ")
+    let landscapeTag = app.buttons["photo-upload-tag-풍경"]
+    XCTAssertTrue(landscapeTag.waitForExistence(timeout: 5))
+    XCTAssertTrue(app.buttons["photo-upload-tag-빛결"].exists)
+
+    tagField.typeText("여름")
+    let suggestion = app.buttons["photo-upload-tag-suggestion-31"]
+    XCTAssertTrue(suggestion.waitForExistence(timeout: 5))
+    for _ in 0..<3 where !suggestion.isHittable { app.swipeUp() }
+    XCTAssertTrue(suggestion.isHittable)
+    suggestion.tap()
+    XCTAssertTrue(app.buttons["photo-upload-tag-여름사진"].waitForExistence(timeout: 5))
+
+    landscapeTag.tap()
+    XCTAssertFalse(landscapeTag.exists)
     let capture = XCTAttachment(screenshot: app.screenshot())
-    capture.name = "Native photo upload entry"
+    capture.name = "Native photo upload tag chips and suggestions"
     capture.lifetime = .keepAlways
     add(capture)
   }

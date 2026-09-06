@@ -105,6 +105,13 @@ struct PhotoUploadBoardConfigDTO: Decodable, Sendable {
   let useCategory: Bool
 }
 
+struct PhotoUploadTagSuggestion: Decodable, Identifiable, Equatable, Sendable {
+  let uid: Int
+  let name: String
+  let count: Int
+  var id: Int { uid }
+}
+
 enum PhotoUploadEndpoint {
   static func config(baseURL: URL) throws -> URLRequest {
     guard
@@ -133,6 +140,23 @@ enum PhotoUploadEndpoint {
     if let appVersion, !appVersion.isEmpty {
       request.setValue(appVersion, forHTTPHeaderField: "X-Nubo-App-Version")
     }
+    request.setValue("application/json", forHTTPHeaderField: "Accept")
+    return request
+  }
+
+  static func tagSuggestions(baseURL: URL, query: String, limit: Int = 10) throws -> URLRequest {
+    guard limit > 0,
+      var components = URLComponents(
+        url: baseURL.appending(path: "editor/suggestion/tag"), resolvingAgainstBaseURL: false)
+    else { throw NuboAPIError.invalidRequest }
+    components.queryItems = [
+      URLQueryItem(name: "tag", value: query),
+      URLQueryItem(name: "limit", value: String(limit)),
+    ]
+    guard let url = components.url else { throw NuboAPIError.invalidRequest }
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    request.timeoutInterval = 20
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     return request
   }
@@ -210,12 +234,16 @@ struct MultipartBodyFile: Sendable {
 final class PhotoUploadModel {
   static let maximumPhotoCount = 9
   static let maximumUploadBytes = 100 * 1_024 * 1_024
+  static let maximumTagLength = 30
   static let policyVersion = "2026-08-21"
   static let policyPreferenceKey = "sensta.community-policy.accepted-version"
 
   var title = ""
   var content = ""
-  var tags = ""
+  private(set) var tagDraft = ""
+  private(set) var tags: [String] = []
+  private(set) var tagSuggestions: [PhotoUploadTagSuggestion] = []
+  private(set) var tagFeedback: String?
   var selectedCategoryID = 0
   private(set) var photos: [PreparedUploadPhoto] = []
   private(set) var config: PhotoUploadEditorConfig?
@@ -238,7 +266,7 @@ final class PhotoUploadModel {
       && totalBytes <= Self.maximumUploadBytes
       && title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2
       && content.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2
-      && isPolicyAccepted && normalizedTags != nil
+      && isPolicyAccepted && uploadTags != nil
   }
 
   var sizeDescription: String {
@@ -251,6 +279,80 @@ final class PhotoUploadModel {
       defaults.set(Self.policyVersion, forKey: Self.policyPreferenceKey)
     } else {
       defaults.removeObject(forKey: Self.policyPreferenceKey)
+    }
+  }
+
+  func updateTagDraft(_ value: String) {
+    let value = value.lowercased()
+    guard value.contains(where: Self.isTagSeparator) else {
+      tagDraft = value
+      tagFeedback = nil
+      if suggestionQuery == nil { tagSuggestions = [] }
+      return
+    }
+
+    var fragment = ""
+    var rejectedFragment: String?
+    for character in value {
+      if Self.isTagSeparator(character) {
+        guard !fragment.isEmpty else { continue }
+        switch appendTag(fragment) {
+        case .added, .duplicate:
+          break
+        case .rejected:
+          rejectedFragment = rejectedFragment ?? fragment
+        }
+        fragment = ""
+      } else {
+        fragment.append(character)
+      }
+    }
+    tagDraft = fragment.isEmpty ? rejectedFragment ?? "" : fragment
+    tagSuggestions = []
+  }
+
+  @discardableResult
+  func commitTagDraft() -> Bool {
+    guard !tagDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return true }
+    switch appendTag(tagDraft) {
+    case .added, .duplicate:
+      tagDraft = ""
+      tagSuggestions = []
+      return true
+    case .rejected:
+      return false
+    }
+  }
+
+  func selectTagSuggestion(_ suggestion: PhotoUploadTagSuggestion) {
+    _ = appendTag(suggestion.name)
+    tagDraft = ""
+    tagSuggestions = []
+  }
+
+  func removeTag(_ tag: String) {
+    tags.removeAll { $0 == tag }
+    tagFeedback = nil
+  }
+
+  func loadTagSuggestions(using account: AccountSession) async {
+    guard let query = suggestionQuery, let baseURL = account.apiBaseURL else {
+      tagSuggestions = []
+      return
+    }
+    do {
+      let request = try PhotoUploadEndpoint.tagSuggestions(baseURL: baseURL, query: query)
+      let data = try await account.sendAuthenticated(request)
+      let values = try JSONDecoder()
+        .decode(AccountEnvelope<[PhotoUploadTagSuggestion]>.self, from: data).checked()
+      try Task.checkCancellation()
+      guard query == suggestionQuery else { return }
+      tagSuggestions = values.filter { value in
+        !tags.contains(value.name.lowercased()) && Self.normalizedTag(value.name) != nil
+      }
+    } catch is CancellationError {
+    } catch {
+      if query == suggestionQuery { tagSuggestions = [] }
     }
   }
 
@@ -317,9 +419,9 @@ final class PhotoUploadModel {
   }
 
   func upload(using account: AccountSession) async -> Bool {
-    guard canUpload, let config, let baseURL = account.apiBaseURL,
-      let normalizedTags
-    else { return false }
+    guard canUpload, let config, let baseURL = account.apiBaseURL, let uploadTags else {
+      return false
+    }
     isUploading = true
     error = nil
     defer { isUploading = false }
@@ -328,7 +430,7 @@ final class PhotoUploadModel {
         boardID: config.boardID, categoryID: selectedCategoryID,
         title: title.trimmingCharacters(in: .whitespacesAndNewlines),
         content: content.trimmingCharacters(in: .whitespacesAndNewlines),
-        tags: normalizedTags, photos: photos)
+        tags: uploadTags, photos: photos)
       defer { body.removeFile() }
       let request = PhotoUploadEndpoint.write(
         baseURL: baseURL, body: body,
@@ -352,20 +454,67 @@ final class PhotoUploadModel {
     isPreparing = false
     for photo in photos { photo.removeFile() }
     photos = []
+    tagDraft = ""
+    tags = []
+    tagSuggestions = []
+    tagFeedback = nil
   }
 
-  private var normalizedTags: [String]? {
-    let values = tags.split(separator: ",", omittingEmptySubsequences: true)
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
-    let unique = values.reduce(into: [String]()) { result, tag in
-      if !result.contains(tag) { result.append(tag) }
+  private enum TagAdditionResult {
+    case added
+    case duplicate
+    case rejected
+  }
+
+  private func appendTag(_ value: String) -> TagAdditionResult {
+    guard let tag = Self.normalizedTag(value) else {
+      let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+      if trimmed.removingLeadingHashtags().count < 2 {
+        tagFeedback = "태그는 2자 이상 입력해 주세요."
+      } else if trimmed.removingLeadingHashtags().count > Self.maximumTagLength {
+        tagFeedback = "태그는 30자까지 입력할 수 있어요."
+      } else {
+        tagFeedback = "태그에는 한글·영문·숫자·밑줄·마침표만 사용할 수 있어요."
+      }
+      return .rejected
     }
-    guard
-      unique.allSatisfy({
-        $0.range(of: #"^[a-z0-9가-힣_.]+$"#, options: .regularExpression) != nil
-      })
+    guard !tags.contains(tag) else {
+      tagFeedback = "이미 추가한 태그예요."
+      return .duplicate
+    }
+    tags.append(tag)
+    tagFeedback = nil
+    return .added
+  }
+
+  private var uploadTags: [String]? {
+    let pending = tagDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !pending.isEmpty else { return tags }
+    guard let pending = Self.normalizedTag(pending) else { return nil }
+    return tags.contains(pending) ? tags : tags + [pending]
+  }
+
+  private var suggestionQuery: String? {
+    Self.normalizedTag(tagDraft)
+  }
+
+  private static func normalizedTag(_ value: String) -> String? {
+    let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
+      .removingLeadingHashtags().lowercased()
+    guard (2...maximumTagLength).contains(value.count),
+      value.range(of: #"^[a-z0-9가-힣_.]+$"#, options: .regularExpression) != nil
     else { return nil }
-    return unique
+    return value
+  }
+
+  private static func isTagSeparator(_ character: Character) -> Bool {
+    character == "," || character.isWhitespace
+  }
+}
+
+extension String {
+  fileprivate func removingLeadingHashtags() -> String {
+    String(drop(while: { $0 == "#" }))
   }
 }
 
@@ -376,6 +525,7 @@ struct PhotoUploadView: View {
   @State private var model = PhotoUploadModel()
   @State private var pickerItems: [PhotosPickerItem] = []
   @State private var preparationTask: Task<Void, Never>?
+  @State private var tagSuggestionTask: Task<Void, Never>?
 
   var body: some View {
     NavigationStack {
@@ -423,8 +573,10 @@ struct PhotoUploadView: View {
       preparationTask?.cancel()
       preparationTask = Task { await model.replaceSelection(items) }
     }
+    .onChange(of: model.tagDraft) { _, _ in scheduleTagSuggestions() }
     .onDisappear {
       preparationTask?.cancel()
+      tagSuggestionTask?.cancel()
       model.cleanUp()
     }
   }
@@ -498,11 +650,7 @@ struct PhotoUploadView: View {
         .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
         .accessibilityLabel("사진 설명")
         .accessibilityIdentifier("photo-upload-content")
-      TextField("태그 (쉼표로 구분)", text: $model.tags)
-        .textInputAutocapitalization(.never)
-        .autocorrectionDisabled()
-        .textFieldStyle(.roundedBorder)
-        .accessibilityIdentifier("photo-upload-tags")
+      tagSection
       if let config = model.config, config.usesCategories {
         Picker("카테고리", selection: $model.selectedCategoryID) {
           ForEach(config.categories) { Text($0.name).tag($0.uid) }
@@ -510,6 +658,109 @@ struct PhotoUploadView: View {
       }
       Text("제목과 설명은 각각 2자 이상 입력해 주세요.")
         .font(.caption).foregroundStyle(.secondary)
+    }
+  }
+
+  private var tagSection: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text("태그").font(.subheadline).fontWeight(.medium)
+      VStack(alignment: .leading, spacing: 8) {
+        if !model.tags.isEmpty {
+          ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+              ForEach(model.tags, id: \.self) { tag in
+                Button {
+                  model.removeTag(tag)
+                } label: {
+                  HStack(spacing: 5) {
+                    Text("#\(tag)")
+                    Image(systemName: "xmark")
+                      .font(.caption2).fontWeight(.bold)
+                  }
+                  .font(.subheadline)
+                  .padding(.horizontal, 10)
+                  .frame(minHeight: 32)
+                  .background(.tint.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(tag) 태그 삭제")
+                .accessibilityIdentifier("photo-upload-tag-\(tag)")
+              }
+            }
+          }
+        }
+        HStack(spacing: 8) {
+          Image(systemName: "number").foregroundStyle(.secondary)
+          TextField(
+            "태그 입력",
+            text: Binding(
+              get: { model.tagDraft },
+              set: { model.updateTagDraft($0) })
+          )
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          .submitLabel(.done)
+          .onSubmit { model.commitTagDraft() }
+          .accessibilityIdentifier("photo-upload-tags")
+          if !model.tagDraft.isEmpty {
+            Button {
+              model.commitTagDraft()
+            } label: {
+              Image(systemName: "plus.circle.fill").font(.title3)
+            }
+            .accessibilityLabel("태그 추가")
+            .accessibilityIdentifier("photo-upload-tag-add")
+          }
+        }
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .background(
+        RoundedRectangle(cornerRadius: 12)
+          .fill(Color(.secondarySystemBackground))
+      )
+      .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 0.5))
+
+      if !model.tagSuggestions.isEmpty {
+        VStack(spacing: 0) {
+          ForEach(Array(model.tagSuggestions.enumerated()), id: \.element.id) { index, suggestion in
+            Button {
+              tagSuggestionTask?.cancel()
+              model.selectTagSuggestion(suggestion)
+            } label: {
+              HStack {
+                Text("#\(suggestion.name)").foregroundStyle(.primary)
+                Spacer()
+                Text("\(suggestion.count)회").foregroundStyle(.secondary)
+              }
+              .font(.subheadline)
+              .frame(maxWidth: .infinity, minHeight: 44)
+              .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .accessibilityLabel("\(suggestion.name), \(suggestion.count)회 사용, 태그로 추가")
+            .accessibilityIdentifier("photo-upload-tag-suggestion-\(suggestion.uid)")
+            if index < model.tagSuggestions.count - 1 { Divider() }
+          }
+        }
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.separator), lineWidth: 0.5))
+      }
+
+      Text(model.tagFeedback ?? "콤마·스페이스·Return으로 추가하고, 태그를 누르면 삭제할 수 있어요.")
+        .font(.caption)
+        .foregroundStyle(model.tagFeedback == nil ? Color.secondary : Color.red)
+        .accessibilityIdentifier(
+          model.tagFeedback == nil ? "photo-upload-tag-help" : "photo-upload-tag-error")
+    }
+  }
+
+  private func scheduleTagSuggestions() {
+    tagSuggestionTask?.cancel()
+    tagSuggestionTask = Task {
+      do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+      await model.loadTagSuggestions(using: account)
     }
   }
 
