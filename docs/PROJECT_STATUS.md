@@ -622,9 +622,7 @@
 
 1. 위 작업을 모두 모아 실제 iPhone에서 자르기 조합, 알림 읽음, JPEG·HEIC 다중 업로드와 UGC·계정·테마를
    한 번의 최종 통합 QA로 확인한다. Apple 연결 계정 삭제는 복구 가능한 전용 테스트 계정을 사용한다.
-2. Apple 연결 계정 삭제 QA 전에 GOAPI `24bcc4d` runtime을 운영에 반영하고 Team ID·Key ID·Sign in with
-   Apple `.p8` private key를 설정한다.
-3. 통합 QA가 통과하면 전용 지원 URL, App Privacy 수집표와 TestFlight·App Store 제출 자료를 준비한다.
+2. 통합 QA가 통과하면 전용 지원 URL, App Privacy 수집표와 TestFlight·App Store 제출 자료를 준비한다.
    웹 Universal Link는 원격 push 출시를 막지 않으므로 별도 작업으로 둔다.
 
 ## 신고·차단 (2026-09-06)
@@ -676,6 +674,11 @@
   테스트로 검증했다. 전체 단위 146개, 이메일 계정 삭제 자동 UI 흐름, Release simulator build와 Debug
   정적 분석을 통과했다. 실기기 삭제는 복구할 수 없으므로 최종 통합 QA에서 전용 테스트 계정으로 한 번만
   확인한다.
+- 운영 `/var/www/sensta.me/bin/goapi`와 실행 프로세스가 `24bcc4d`의 검증된 SHA-256과 일치함을 확인하고,
+  Apple Team ID·Key ID와 저장소 밖 `/etc/nubo/apple`의 권한 `600` `.p8` 경로를 운영 `.env`에 설정했다.
+  기존 `.env`와 runtime은 `/var/backups/sensta-goapi-20260906-213548-apple-delete`에 보존했다. tmux의
+  GOAPI를 재시작한 뒤 내부·외부 health와 DB readiness, version, 개인정보·약관·탈퇴 웹 페이지가 모두
+  HTTP 200이며 두 Apple 탈퇴 endpoint가 미인증 요청에 HTTP 401을 반환하는 것을 확인했다.
 
 ## 공통 웜톤 라이트·다크 테마 (2026-09-06)
 

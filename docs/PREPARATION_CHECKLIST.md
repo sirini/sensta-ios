@@ -37,6 +37,7 @@
 - [x] `ios` push platform 등록과 APNs/FCM alert payload 구현 및 운영 반영 (`GOAPI b6b9b0f`, `1ccf15a`)
 - [x] `sensta-ios` 게시글 출처와 플랫폼 공통 `sensta-app` 업적 정책
 - [x] HEIC/JPEG 방향 정규화, 썸네일, EXIF와 GPS 제거 계약
+- [x] Apple 계정 삭제용 GOAPI `24bcc4d`와 Team ID·Key ID·Sign in with Apple `.p8` 운영 설정
 - [ ] UGC 게시 전 필터와 신고 처리 운영 계약
 - [ ] iOS가 사용하는 endpoint별 request/response fixture
 - [ ] GOAPI 보안 회귀 테스트와 NUBO API contract 문서 갱신
