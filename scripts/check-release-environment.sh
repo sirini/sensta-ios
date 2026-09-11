@@ -9,11 +9,22 @@ source "$sensta_ios_script_dir/xcode-release-env.sh" >/dev/null
 sensta_ios_xcode_line="$(xcodebuild -version | sed -n '1p')"
 sensta_ios_xcode_major="${sensta_ios_xcode_line#Xcode }"
 sensta_ios_xcode_major="${sensta_ios_xcode_major%%.*}"
-sensta_ios_sdks="$(xcodebuild -showsdks)"
-sensta_ios_runtimes="$(xcrun simctl list runtimes)"
+sensta_ios_xcode_build="$(xcodebuild -version | sed -n 's/^Build version //p')"
 
 echo "Xcode app: $SENSTA_IOS_RELEASE_XCODE_APP"
 echo "Xcode: $sensta_ios_xcode_line"
+echo "Xcode build: $sensta_ios_xcode_build"
+echo "macOS: $(sw_vers -productVersion) ($(sw_vers -buildVersion))"
+
+# 버전 숫자만 검사하면 beta나 이전에 실패한 Xcode로 다시 제출할 수 있다.
+# 제출 도구를 바꿀 때는 Apple 릴리스 노트를 재확인하고 이 기준도 함께 갱신한다.
+if [[ "$sensta_ios_xcode_build" != "27A266a" ]]; then
+  echo "오류: 현재 검증된 제출 기준은 Xcode 27 RC (27A266a)입니다." >&2
+  exit 1
+fi
+
+sensta_ios_sdks="$(xcodebuild -showsdks)"
+sensta_ios_runtimes="$(xcrun simctl list runtimes)"
 
 if [[ ! "$sensta_ios_xcode_major" =~ ^[0-9]+$ ]] || (( sensta_ios_xcode_major < 26 )); then
   echo "오류: 2026-04-28 이후 제출에는 Xcode 26 이상이 필요합니다." >&2

@@ -2,14 +2,18 @@
 
 ## 현재 목표
 
-- 2026-09-11 재제출 점검: 기존 `1.0 (1)`은 `ITMS-90111`로 실패했고 App Store Connect에서
-  `잘못된 바이너리` 상태를 확인했다. Apple은 9월 9일부터 Xcode 27 RC(`27A266a`) 제출을 허용한다.
-  현재 Mac은 macOS beta 8(`26A5425a`), Xcode 26.6과 Xcode 27 beta 6이며 RC 설치가 필요하다.
-  macOS RC(`26A5428`) 다운로드를 시작했고 제품 소유자가 업데이트·재시작을 직접 진행하기로 했다.
-  Xcode RC는 공식 다운로드 페이지에서 요청했으나 로컬 파일·설치 완료를 확인하지 못했다.
-  재시작 후 RC 설치 확인 → 빌드 번호 2 → 전체 단위·핵심 UI와 Debug/Release 검증 → 아카이브·업로드
-  → 기존 제출의 빌드 교체·재제출 순서로 진행한다. 이번 재제출 요청은 이미 승인됐으며 수동 출시를 유지한다.
-- 아래 9월 6일의 `심사 대기 중` 기록은 당시 제출 직후 상태이며 현재 상태는 위 재제출 점검을 따른다.
+- 2026-09-11 RC 재제출 준비: 기존 `1.0 (1)`은 `ITMS-90111`로 실패했고 새 `1.0 (2)`를 준비했다.
+  제품 소유자가 macOS `27.0 (26A428)`로 업데이트했으며 공식 Xcode 27 RC(`27A266a`)를
+  `/Applications/Xcode-27-RC.app`에 설치했다. 개발·제출 스크립트는 RC를 선택하고 제출 검사는
+  이전 Xcode 선택을 차단한다. 시스템 전체 Xcode 선택과 기존 설치본은 유지한다.
+- iOS 26.5에서 RC로 빌드한 전체 단위 147개와 핵심 UI 7개가 통과했다. Release simulator build,
+  `build/SENSTA-1.0-2.xcarchive`와 App Store IPA export·Apple Distribution 서명 검증을 통과했다.
+  아카이브는 iOS 27 SDK `24A430`, macOS `26A428`을 기록하며 개인정보 manifest 20개는 기존과 같다.
+  iOS 27 RC simulator `24A434`의 iPhone 18 Pro Max에서도 단위 147개와 피드·확대 감상·Apple/Google
+  로그인 UI 4개가 통과했고 화면 캡처를 확인했다. 전체 UI 검증은 26.5의 7개와 27 RC의 4개다.
+- App Store Connect에서 자동 출시로 되어 있던 값을 기존 결정대로 수동 출시로 저장하고 재조회했다.
+  로컬 검증을 완료했으며 새 바이너리의 업로드·재제출을 진행한다. 운영 health·support·privacy·terms·
+  delete-account URL은 모두 HTTP 200이다. 아래 9월 6일의 심사 대기 기록은 당시 상태다.
 
 - SENSTA Android의 제품 동작과 GOAPI API contract v1을 기준으로 iPhone용 네이티브 SwiftUI 앱을
   개발한다.

@@ -7,7 +7,7 @@
 
 - App Store Connect 앱: `SENSTA`, Apple ID `6808687447`, SKU `sensta-ios`
 - bundle ID: `me.sensta.ios`
-- 버전: `1.0`, 빌드: `1`
+- 버전: `1.0`, 재제출 빌드: `2` (기존 실패 빌드: `1`)
 - 지원 범위: iOS 17 이상, iPhone 전용
 - 가격·지역: 무료, 대한민국
 - 카테고리: 사진 및 비디오 / 소셜 네트워킹
@@ -19,14 +19,25 @@
 
 지원 URL은 NUBO의 `/support` 페이지로 운영 배포했고 외부 HTTP 200과 실제 이메일 링크를 확인했다.
 
-`SENSTA 1.0 (1)`은 2026년 9월 6일 정식 Xcode 26.6으로 App Store Connect 업로드에 성공했으며 현재
+`SENSTA 1.0 (1)`은 2026년 9월 6일 정식 Xcode 26.6으로 App Store Connect 업로드에 성공했다.
 Apple의 초기 빌드 처리와 제출 전 검증을 통과해 App Review에 제출됐지만 이후
 `ITMS-90111: Unsupported SDK or Xcode version`으로 실패했다. 9월 11일 App Store Connect에서
 `잘못된 바이너리`와 기존 제출의 `해결되지 않은 문제` 상태를 다시 확인했다. 승인 후에는 수동 출시한다.
 기존 제출 ID는 `143cfbf7-a31d-4ccd-9d10-e5db7d2f1761`이다.
 
-다음 제출은 버전 `1.0`, 빌드 `2`로 준비한다. 아직 빌드 번호 변경·새 아카이브·업로드·재제출은 하지
-않았다. 기존 스크린샷·메타데이터·심사 정보는 유지하고 새 바이너리를 연결한다.
+다음 제출은 버전 `1.0`, 빌드 `2`로 준비한다. Debug·Release의 빌드 번호를 `2`로 올렸다.
+기존 스크린샷·메타데이터·심사 정보는 유지하고 새 바이너리를 연결한다. 9월 11일 재확인 중 자동 출시로
+설정된 것을 발견해 기존 결정대로 수동 출시로 저장하고 새로고침 후 유지됨을 확인했다.
+
+## 빌드 2 검증 결과 (2026-09-11)
+
+- Xcode 27 RC로 iOS 26.5 단위 147개·핵심 UI 7개, iOS 27 RC(`24A434`) 단위 147개·UI 4개 통과.
+- Debug test build, Release simulator build, Release archive와 App Store export 통과.
+- 최종 아카이브: `build/SENSTA-1.0-2.xcarchive`, 로컬 IPA: `build/AppStoreExport-2/SENSTA.ipa`.
+- 아카이브 metadata: `DTXcodeBuild=27A266a`, `DTSDKBuild=24A430`, `BuildMachineOSBuild=26A428`.
+- Apple Distribution 서명, production APNs, Apple 로그인·Associated Domains, `get-task-allow=false` 검증.
+- 앱과 SDK의 Privacy Manifest 20개는 빌드 1과 동일하며 면제 암호화 선언도 유지한다.
+- 로컬 export IPA SHA-256: `9dafaeec018e970d2214b6a503a7eb1743211292e805378da4a9402d93e1ae67`.
 
 ## Apple의 현재 기술 기준
 
@@ -35,12 +46,13 @@ Apple의 초기 빌드 처리와 제출 전 검증을 통과해 App Review에 �
   공식 Xcode 27 RC 빌드는 `27A266a`다.
 - 실패한 빌드 1은 Xcode 26.6(`17F113`), iOS 26.5 SDK(`23F81a`), macOS 27 beta 8
   (`26A5425a`) 조합이었다. Xcode 26.6의 공식 지원 호스트는 macOS 26.x까지이므로 이 조합은 피한다.
-- 현재 Mac에는 Xcode 26.6과 Xcode 27 beta 6(`27A5252f`)만 확인됐다. 재제출 전에 macOS 27 RC와
-  Xcode 27 RC로 준비하고 실제 버전·SDK·아카이브의 빌드 정보를 확인한다. 시스템 업데이트에 표시된
-  macOS RC 빌드는 `26A5428`이며 제품 소유자가 업데이트·재시작을 직접 수행하기로 했다.
-- `scripts/xcode-release-env.sh`의 기본값은 아직 Xcode 26.6 경로다. RC 설치 후
-  `SENSTA_IOS_RELEASE_XCODE_APP`에 실제 RC 앱 경로를 지정한다. 기존 검사 스크립트의 성공만으로
-  App Store 허용 여부가 검증되지는 않으므로 아래 공식 릴리스 노트와 정확한 Xcode 빌드를 대조한다.
+- 제품 소유자의 업데이트·재시작 후 실제 호스트는 macOS `27.0 (26A428)`로 확인됐다. 업데이트 전
+  표시된 `26A5428` 대신 실제 설치 결과를 기준으로 한다.
+- 공식 XIP에서 Xcode 27 RC를 `/Applications/Xcode-27-RC.app`에 설치했고 `27A266a`와 iOS 27 SDK,
+  Apple 코드 서명을 확인했다. 기존 Xcode 26.6·27 beta 6은 별도로 유지한다.
+- `scripts/xcode-release-env.sh`는 RC를 기본으로 선택하며 시스템 Xcode 선택은 변경하지 않는다.
+  사전 검사는 정확한 `27A266a`를 요구한다. 새 제출 도구로 변경할 때는 Apple 릴리스 노트를 검증하고
+  스크립트의 기준도 갱신한다.
 - 앱은 추적하지 않으며 운영체제의 표준 HTTPS 등 면제 암호화만 사용하므로
   `ITSAppUsesNonExemptEncryption`을 `false`로 선언한다.
 - 앱의 `UserDefaults` 사용은 Privacy Manifest에 app-only 사유 `CA92.1`로 선언한다.
@@ -59,8 +71,7 @@ Apple의 초기 빌드 처리와 제출 전 검증을 통과해 App Review에 �
 
 ## 제출 빌드 만들기
 
-아래는 빌드 1을 만들 때 사용한 기존 명령이다. 재제출 때는 RC 앱 경로를 명시하고, 설치된 simulator
-destination과 아카이브 이름·빌드 번호를 `1.0 (2)`에 맞춰 변경한다. 시스템 전체 Xcode 선택은 바꾸지 않는다.
+RC 환경에서 아래 명령을 실행한다. Simulator destination은 설치된 runtime과 기기 목록에 맞춘다.
 
 ```bash
 source ./scripts/xcode-release-env.sh
@@ -78,22 +89,22 @@ xcodebuild \
   -scheme SENSTA \
   -configuration Release \
   -destination 'generic/platform=iOS' \
-  -archivePath build/SENSTA-1.0-1.xcarchive \
+  -archivePath build/SENSTA-1.0-2.xcarchive \
   -allowProvisioningUpdates \
   archive
 
 xcodebuild \
   -exportArchive \
-  -archivePath build/SENSTA-1.0-1.xcarchive \
-  -exportPath build/AppStoreExport \
+  -archivePath build/SENSTA-1.0-2.xcarchive \
+  -exportPath build/AppStoreExport-2 \
   -exportOptionsPlist Config/ExportOptions-AppStore.plist \
   -allowProvisioningUpdates
 ```
 
 마지막 명령은 서버로 업로드하지 않고 App Store 배포 서명과 IPA 생성을 로컬에서 검증한다. 아카이브 뒤
-Xcode의 Window > Organizer에서 `SENSTA 1.0 (1)`을 선택해 Validate App을 먼저 실행하고, 오류가 없을 때
+Xcode의 Window > Organizer에서 `SENSTA 1.0 (2)`를 선택해 Validate App을 먼저 실행하고, 오류가 없을 때
 Distribute App > App Store Connect > Upload로 전송한다. 같은 버전에서 다시 업로드해야 하면
-`CURRENT_PROJECT_VERSION`을 2 이상으로 올린다.
+`CURRENT_PROJECT_VERSION`을 아직 사용하지 않은 번호로 올린다.
 
 ## App Store 표시 정보 초안
 

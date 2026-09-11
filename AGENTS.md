@@ -48,8 +48,8 @@ The iOS app should feel native to Apple platforms while preserving the product b
 
 ## Toolchain and validation
 
-- During the macOS 27 beta period, use `/Applications/Xcode-beta.app` through `scripts/xcode-env.sh` instead
-  of changing the machine-wide developer directory implicitly.
+- Use `/Applications/Xcode-27-RC.app` (Xcode 27 RC `27A266a`) through `scripts/xcode-env.sh` or
+  `scripts/xcode-release-env.sh` instead of changing the machine-wide developer directory implicitly.
 - Revalidate the accepted stable Xcode and SDK requirement before TestFlight or App Store submission; a beta
   toolchain is not a permanent release baseline.
 - Run `scripts/check-environment.sh` before project work. Once the Xcode project exists, run relevant unit/UI
