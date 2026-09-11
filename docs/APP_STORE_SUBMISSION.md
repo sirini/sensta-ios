@@ -1,6 +1,6 @@
 # SENSTA App Store 제출 가이드
 
-기준일은 2026년 9월 6일이다. Apple 요구 사항은 바뀔 수 있으므로 실제 제출 직전에 연결된 공식 문서를
+기준일은 2026년 9월 11일이다. Apple 요구 사항은 바뀔 수 있으므로 실제 제출 직전에 연결된 공식 문서를
 다시 확인한다.
 
 ## 현재 제출 대상
@@ -20,14 +20,27 @@
 지원 URL은 NUBO의 `/support` 페이지로 운영 배포했고 외부 HTTP 200과 실제 이메일 링크를 확인했다.
 
 `SENSTA 1.0 (1)`은 2026년 9월 6일 정식 Xcode 26.6으로 App Store Connect 업로드에 성공했으며 현재
-Apple의 빌드 처리와 제출 전 검증을 통과해 App Review에 제출됐다. 상태는 `심사 대기 중`이며 승인을
-받아도 자동 공개되지 않는 수동 출시 방식이다. 같은 빌드 번호를 다시 업로드할 수 없으므로 후속 바이너리
-수정이 필요하면 빌드 번호를 올린다.
+Apple의 초기 빌드 처리와 제출 전 검증을 통과해 App Review에 제출됐지만 이후
+`ITMS-90111: Unsupported SDK or Xcode version`으로 실패했다. 9월 11일 App Store Connect에서
+`잘못된 바이너리`와 기존 제출의 `해결되지 않은 문제` 상태를 다시 확인했다. 승인 후에는 수동 출시한다.
+기존 제출 ID는 `143cfbf7-a31d-4ccd-9d10-e5db7d2f1761`이다.
+
+다음 제출은 버전 `1.0`, 빌드 `2`로 준비한다. 아직 빌드 번호 변경·새 아카이브·업로드·재제출은 하지
+않았다. 기존 스크린샷·메타데이터·심사 정보는 유지하고 새 바이너리를 연결한다.
 
 ## Apple의 현재 기술 기준
 
 - 2026년 4월 28일부터 App Store Connect 업로드는 Xcode 26 이상과 iOS 26 SDK 이상으로 빌드해야 한다.
-- 이 저장소의 제출 기준은 beta가 아닌 `/Applications/Xcode.app`의 Xcode 26.6(`17F113`)이다.
+- Apple은 2026-09-09부터 Xcode 27 RC와 iOS 27 RC SDK의 App Store 제출을 허용한다.
+  공식 Xcode 27 RC 빌드는 `27A266a`다.
+- 실패한 빌드 1은 Xcode 26.6(`17F113`), iOS 26.5 SDK(`23F81a`), macOS 27 beta 8
+  (`26A5425a`) 조합이었다. Xcode 26.6의 공식 지원 호스트는 macOS 26.x까지이므로 이 조합은 피한다.
+- 현재 Mac에는 Xcode 26.6과 Xcode 27 beta 6(`27A5252f`)만 확인됐다. 재제출 전에 macOS 27 RC와
+  Xcode 27 RC로 준비하고 실제 버전·SDK·아카이브의 빌드 정보를 확인한다. 시스템 업데이트에 표시된
+  macOS RC 빌드는 `26A5428`이며 제품 소유자가 업데이트·재시작을 직접 수행하기로 했다.
+- `scripts/xcode-release-env.sh`의 기본값은 아직 Xcode 26.6 경로다. RC 설치 후
+  `SENSTA_IOS_RELEASE_XCODE_APP`에 실제 RC 앱 경로를 지정한다. 기존 검사 스크립트의 성공만으로
+  App Store 허용 여부가 검증되지는 않으므로 아래 공식 릴리스 노트와 정확한 Xcode 빌드를 대조한다.
 - 앱은 추적하지 않으며 운영체제의 표준 HTTPS 등 면제 암호화만 사용하므로
   `ITSAppUsesNonExemptEncryption`을 `false`로 선언한다.
 - 앱의 `UserDefaults` 사용은 Privacy Manifest에 app-only 사유 `CA92.1`로 선언한다.
@@ -35,6 +48,9 @@ Apple의 빌드 처리와 제출 전 검증을 통과해 App Review에 제출됐
 
 공식 문서:
 
+- [App Store Connect release notes](https://developer.apple.com/help/app-store-connect/release-notes/)
+- [Xcode 27 RC](https://developer.apple.com/news/releases/?id=09092026h)
+- [Xcode system requirements](https://developer.apple.com/xcode/system-requirements/)
 - [Upcoming Requirements](https://developer.apple.com/news/upcoming-requirements/)
 - [App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/)
 - [Required reason API](https://developer.apple.com/documentation/bundleresources/describing-use-of-required-reason-api)
@@ -43,7 +59,8 @@ Apple의 빌드 처리와 제출 전 검증을 통과해 App Review에 제출됐
 
 ## 제출 빌드 만들기
 
-시스템 전체 Xcode 선택을 바꾸지 않고 정식 Xcode를 현재 셸에서만 사용한다.
+아래는 빌드 1을 만들 때 사용한 기존 명령이다. 재제출 때는 RC 앱 경로를 명시하고, 설치된 simulator
+destination과 아카이브 이름·빌드 번호를 `1.0 (2)`에 맞춰 변경한다. 시스템 전체 Xcode 선택은 바꾸지 않는다.
 
 ```bash
 source ./scripts/xcode-release-env.sh
