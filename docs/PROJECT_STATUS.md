@@ -11,10 +11,11 @@
   아카이브는 iOS 27 SDK `24A430`, macOS `26A428`을 기록하며 개인정보 manifest 20개는 기존과 같다.
   iOS 27 RC simulator `24A434`의 iPhone 18 Pro Max에서도 단위 147개와 피드·확대 감상·Apple/Google
   로그인 UI 4개가 통과했고 화면 캡처를 확인했다. 전체 UI 검증은 26.5의 7개와 27 RC의 4개다.
-- App Store Connect에서 자동 출시로 되어 있던 값을 기존 결정대로 수동 출시로 저장하고 재조회했다.
+- 재제출 당시의 수동 출시 설정은 2026-09-11 제품 소유자의 후속 요청에 따라 승인 후 자동 출시로
+  변경했다. 아래의 과거 수동 출시 기록보다 이 최신 결정을 우선한다.
   빌드 2 업로드·Apple 처리·기존 빌드 교체·재제출을 완료했고 2026-09-11 23:04 KST 접수 뒤
   `심사 대기 중`을 확인했다. 제출 ID는 `143cfbf7-a31d-4ccd-9d10-e5db7d2f1761`, 빌드 ID는
-  `fc145e89-b43f-4ebb-a6a9-2cdc228d67ad`다. 다음 작업은 Apple 심사 결과 대응과 승인 후 수동 출시다.
+  `fc145e89-b43f-4ebb-a6a9-2cdc228d67ad`다. 다음 작업은 Apple 심사 결과 대응과 승인 후 자동 출시 결과 확인이다.
   운영 health·support·privacy·terms·delete-account URL은 모두 HTTP 200이다.
 
 - SENSTA Android의 제품 동작과 GOAPI API contract v1을 기준으로 iPhone용 네이티브 SwiftUI 앱을
