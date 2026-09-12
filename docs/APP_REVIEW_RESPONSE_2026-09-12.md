@@ -10,12 +10,14 @@
   Review Notes에 기존 삭제 계정 안내와 함께 3,697자로 저장했다. 영상은 준비 중이라고 명시했다.
 - 기존 App Store Connect의 기본 심사 계정과 삭제 테스트 계정 안내는 유지한다. 실제 자격 증명은
   이 문서나 Git에 복사하지 않는다.
-- 제품 소유자가 실제 iPhone 영상을 촬영했으나 계정 삭제가 실패했다. GOAPI `ed55c9b`에서 MySQL
-  오류 1093을 수정했고 운영 반영·실기기 삭제 재확인이 남았다. 제출 영상 파일 자체의 검토는 대기 중이다.
+- 첫 영상의 계정 삭제 실패는 GOAPI `ed55c9b`의 MySQL 오류 1093 수정으로 해결했다. 운영 바이너리
+  해시가 수정판과 일치하며 새 영상 13:46의 삭제 완료 화면과 23:11:12 KST 서버 요청을 대조했다.
+- 새 영상(14:57.5, 약 1.68 GB)을 검토해 실행·가입·로그인·업로드·신고·차단·메시지·계정 삭제를 확인했다.
+  제출용 용량 조정, 개인정보 노출 구간 검토와 최종 첨부·회신·재제출이 남았다.
 - 영상 검토 뒤 Reply와 Review Notes 양쪽에 동일한 자료를 제공한다. 촬영하지 않은 기능이나
   확인하지 않은 OS/기기에서 성공했다고 기재하지 않는다.
 - 서버 수정이므로 iOS 제출 빌드 `1.0 (2)`는 유지한다. 운영 교체 파일·해시와 검증 근거는 sibling NUBO의
-  `docs/ACCOUNT_DELETION_MYSQL.md`를 따른다. 삭제 성공 확인 뒤 최종 영상과 답변을 준비한다.
+  `docs/ACCOUNT_DELETION_MYSQL.md`를 따른다. 삭제 성공을 확인했으며 최종 영상과 답변을 준비한다.
 
 ## 촬영 순서
 
@@ -49,6 +51,39 @@
 연결 계정도 시연한다면 Apple 재인증·승인 폐기까지 확인하되 개인 Apple 계정 정보를 노출하지 않는다.
 이메일 가입/로그인/삭제, UGC 신고/차단은 필수 범위다. 유료 기능은 없으므로 결제 시연은 해당하지 않는다.
 
+## 재촬영 영상 검토 결과
+
+원본 `ScreenRecording_09-12-2026 22-57-27_1.MP4`는 897.501667초, 1,677,263,702 bytes,
+1206×2622 HEVC다. 원본은 수정하지 않았다. 전체 시간대에서 2초 간격 449개 프레임의 문자를 확인하고,
+10초 간격 개요와 가입·신고·차단·삭제 구간의 2초 간격 화면을 시각 검토했다. 연속 재생으로 모든 프레임을
+검사한 것은 아니며 짧은 일시적 이상이나 모든 개인정보의 부재를 보증하지 않는다. 음성 설명은 없다.
+
+| 원본 시간 | 확인 결과 |
+| --- | --- |
+| 00:00–01:20 | iPhone 홈에서 앱 실행, 공개 피드·사진 상세·검색 |
+| 01:24–02:40 | 이메일 가입·인증 후 로그인, 계정 화면 |
+| 02:50–03:12 | 좋아요·댓글 등록 |
+| 04:04–06:40 | 사진 선택·편집·태그 입력·업로드, 업적과 게시된 사진 상세 |
+| 07:46–08:02 | 사진 신고 후 신고 접수됨 표시 |
+| 08:10–08:20 | 사용자 차단 후 프로필과 사진 콘텐츠 숨김 |
+| 08:34–12:04 | 실제 메시지 송수신, 알림 목록과 SENSTA 푸시 배너 |
+| 13:32–13:50 | DELETE 입력·최종 확인, 13:46 삭제 완료, 로그인 화면 복귀 |
+
+필수 흐름의 완료가 확인되어 전체 재촬영을 요구할 이유는 발견하지 못했다. 스튜디오 내부, 차단 해제,
+Apple/Google 로그인, 삭제 후 앱 재실행은 이 영상에서 검증했다고 기재하지 않는다. 기기/OS의 정확한
+버전은 영상 자체에 표시되지 않아 별도 확인 자료와 구분한다.
+
+제출본 준비 사항:
+
+- 가입 이메일과 사용한 인증 코드(약 02:26), 개인 사진 보관함 썸네일(04:04–04:14), 메시지와 상대
+  프로필(08:34–12:04)이 보인다. 개인정보를 노출해도 되는지 검토하고 필요한 영역만 가린다.
+  실제 이메일·인증 코드·대화 내용이나 캡처는 Git에 기록하지 않는다.
+- 용량을 줄일 경우 별도 MP4 사본을 만들고 작은 글자와 삭제 완료 화면의 가독성을 확인한다.
+  14:58은 Apple이 제시한 제한 위반으로 확인된 길이가 아니다. 필요하면 대기 구간을 줄일 수 있으나
+  편집본의 시각은 바뀌므로 아래 타임스탬프도 최종본에 맞춰 갱신한다.
+- 제출 시 원본 기준으로 가입/로그인 01:24, 업로드 04:04, 신고 07:46, 차단 08:10, 메시지 08:34,
+  계정 삭제 13:32(완료 13:46)를 심사관에게 안내할 수 있다.
+
 ## 영문 답변 초안
 
 아래 대괄호는 영상 검토 후 실제 값으로 바꾼다. 완성 전에는 전송하지 않는다. 계정 비밀번호는 기존
@@ -62,7 +97,8 @@ Thank you for your Guideline 2.1 message. Here is the information for SENSTA 1.0
 1. Physical-device demonstration
 [VIDEO ATTACHMENT NAME OR ACCESSIBLE URL]
 Device: [IPHONE MODEL], iOS [VERSION/BUILD], SENSTA 1.0 (2).
-[VERIFIED CONTENTS/TIMESTAMPS]
+Original recording timestamps: 00:00 launch/public browsing; 01:24 email signup and login; 04:04 photo editing/upload; 07:46 report submission; 08:10 blocking/content hidden; 08:34 messaging/notifications; 13:32 account deletion (success at 13:46).
+[UPDATE TIMESTAMPS IF THE FINAL ATTACHMENT IS TRIMMED]
 
 2. Purpose and audience
 SENSTA is a free photo community for photography enthusiasts, hobbyists and photographers. It helps people discover photographs, publish their own work and discuss photography through immersive viewing, editing/upload, search, profiles, comments and messages. It is a public community, not an employee-only app.
