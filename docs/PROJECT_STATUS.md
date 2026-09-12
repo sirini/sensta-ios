@@ -7,12 +7,15 @@
   지적하지 않았다. `1.0 (2)`와 제출 ID `143cfbf7-a31d-4ccd-9d10-e5db7d2f1761`을 유지한다.
 - App Store Connect Review Notes에 2–6번 설명과 영상 준비 중 상태를 3,697자로 저장하고 기존
   기본/삭제 심사 계정 안내와 자동 출시를 유지했다. 실제 회신·영상 첨부·재제출은 아직 하지 않았다.
-- 제품 소유자가 실제 영상을 직접 촬영하기로 했다. 촬영 순서와 영문 답변은
-  `docs/APP_REVIEW_RESPONSE_2026-09-12.md`에 준비했다. 영상에서 가입·로그인·삭제·신고·차단의
-  완료와 실제 기기/OS/빌드를 확인한 뒤 회신과 Notes 양쪽을 완성하고 같은 빌드로 재심사한다.
-- 빌드 2는 Xcode 27 RC `27A266a`로 생성했고 iOS 26.5 단위 147개·UI 7개, iOS 27 RC 단위 147개·
-  UI 4개, Debug/Release build·archive·export·배포 서명 검증을 통과했다. 이번 대응은 문서와 심사
-  메타데이터만 변경하며 앱/서버 코드 변경이나 신규 빌드는 없다.
+- 제품 소유자가 제출 빌드 2로 실기기 영상을 촬영했으나 계정 삭제가 실패했다. 22:39 KST 운영 로그와
+  읽기 전용 EXPLAIN, 실제 MySQL 8.0.46 회귀 테스트에서 공통 GOAPI의 댓글 삭제 SQL 오류 1093을
+  재현했다. GOAPI `ed55c9b`로 수정하고 전체 test·vet와 공식 Ubuntu runtime 검증을 통과했다.
+  운영 바이너리 교체·재시작 및 실기기 삭제 재확인이 남았으며 iOS 코드·제출 빌드 2는 유지한다.
+  배포 파일과 근거는 sibling NUBO `docs/ACCOUNT_DELETION_MYSQL.md`에 기록했다.
+- 촬영 순서와 영문 답변은 `docs/APP_REVIEW_RESPONSE_2026-09-12.md`를 따른다. 삭제 성공 확인 뒤
+  기존 영상의 사용 가능 구간과 추가 촬영 범위를 정하고, 실제 기기/OS/빌드와 함께 회신·Notes를 완성한다.
+  영상 첨부·회신·재제출은 아직 하지 않았다.
+- 빌드 2의 기존 Xcode 27 RC 단위/UI·Debug/Release·archive·배포 서명 검증 결과는 유지한다.
 
 - SENSTA Android의 제품 동작과 GOAPI API contract v1을 기준으로 iPhone용 네이티브 SwiftUI 앱을
   개발한다.
