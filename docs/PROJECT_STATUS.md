@@ -2,21 +2,17 @@
 
 ## 현재 목표
 
-- 2026-09-11 RC 재제출 준비: 기존 `1.0 (1)`은 `ITMS-90111`로 실패했고 새 `1.0 (2)`를 준비했다.
-  제품 소유자가 macOS `27.0 (26A428)`로 업데이트했으며 공식 Xcode 27 RC(`27A266a`)를
-  `/Applications/Xcode-27-RC.app`에 설치했다. 개발·제출 스크립트는 RC를 선택하고 제출 검사는
-  이전 Xcode 선택을 차단한다. 시스템 전체 Xcode 선택과 기존 설치본은 유지한다.
-- iOS 26.5에서 RC로 빌드한 전체 단위 147개와 핵심 UI 7개가 통과했다. Release simulator build,
-  `build/SENSTA-1.0-2.xcarchive`와 App Store IPA export·Apple Distribution 서명 검증을 통과했다.
-  아카이브는 iOS 27 SDK `24A430`, macOS `26A428`을 기록하며 개인정보 manifest 20개는 기존과 같다.
-  iOS 27 RC simulator `24A434`의 iPhone 18 Pro Max에서도 단위 147개와 피드·확대 감상·Apple/Google
-  로그인 UI 4개가 통과했고 화면 캡처를 확인했다. 전체 UI 검증은 26.5의 7개와 27 RC의 4개다.
-- 재제출 당시의 수동 출시 설정은 2026-09-11 제품 소유자의 후속 요청에 따라 승인 후 자동 출시로
-  변경했다. 아래의 과거 수동 출시 기록보다 이 최신 결정을 우선한다.
-  빌드 2 업로드·Apple 처리·기존 빌드 교체·재제출을 완료했고 2026-09-11 23:04 KST 접수 뒤
-  `심사 대기 중`을 확인했다. 제출 ID는 `143cfbf7-a31d-4ccd-9d10-e5db7d2f1761`, 빌드 ID는
-  `fc145e89-b43f-4ebb-a6a9-2cdc228d67ad`다. 다음 작업은 Apple 심사 결과 대응과 승인 후 자동 출시 결과 확인이다.
-  운영 health·support·privacy·terms·delete-account URL은 모두 HTTP 200이다.
+- 2026-09-12 Apple Guideline 2.1 추가 정보 요청: 심사 이력이 적은 계정에 대해 실제 iPhone의 최신 OS
+  시연 영상과 앱 목적·이용 방법·외부 서비스·지역 차이·콘텐츠 권리 설명을 요구했다. 구체적 결함은
+  지적하지 않았다. `1.0 (2)`와 제출 ID `143cfbf7-a31d-4ccd-9d10-e5db7d2f1761`을 유지한다.
+- App Store Connect Review Notes에 2–6번 설명과 영상 준비 중 상태를 3,697자로 저장하고 기존
+  기본/삭제 심사 계정 안내와 자동 출시를 유지했다. 실제 회신·영상 첨부·재제출은 아직 하지 않았다.
+- 제품 소유자가 실제 영상을 직접 촬영하기로 했다. 촬영 순서와 영문 답변은
+  `docs/APP_REVIEW_RESPONSE_2026-09-12.md`에 준비했다. 영상에서 가입·로그인·삭제·신고·차단의
+  완료와 실제 기기/OS/빌드를 확인한 뒤 회신과 Notes 양쪽을 완성하고 같은 빌드로 재심사한다.
+- 빌드 2는 Xcode 27 RC `27A266a`로 생성했고 iOS 26.5 단위 147개·UI 7개, iOS 27 RC 단위 147개·
+  UI 4개, Debug/Release build·archive·export·배포 서명 검증을 통과했다. 이번 대응은 문서와 심사
+  메타데이터만 변경하며 앱/서버 코드 변경이나 신규 빌드는 없다.
 
 - SENSTA Android의 제품 동작과 GOAPI API contract v1을 기준으로 iPhone용 네이티브 SwiftUI 앱을
   개발한다.
