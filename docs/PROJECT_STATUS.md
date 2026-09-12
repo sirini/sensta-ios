@@ -5,15 +5,17 @@
 - 2026-09-12 Apple Guideline 2.1 추가 정보 요청: 심사 이력이 적은 계정에 대해 실제 iPhone의 최신 OS
   시연 영상과 앱 목적·이용 방법·외부 서비스·지역 차이·콘텐츠 권리 설명을 요구했다. 구체적 결함은
   지적하지 않았다. `1.0 (2)`와 제출 ID `143cfbf7-a31d-4ccd-9d10-e5db7d2f1761`을 유지한다.
-- App Store Connect Review Notes에 2–6번 설명과 영상 준비 중 상태를 3,697자로 저장하고 기존
-  기본/삭제 심사 계정 안내와 자동 출시를 유지했다. 실제 회신·영상 첨부·재제출은 아직 하지 않았다.
+- 2026-09-12 23:30 KST App Review에 3,643자 답변과 193 MB 시연 영상을 전송하고 Review Notes에
+  동일 항목과 기존 삭제 계정 안내를 3,856자로 저장했다. 23:31 KST 동일 빌드를 재제출해
+  **심사 대기 중**을 확인했다. 기본/삭제 심사 계정 및 승인 후 자동 출시를 유지하며 Apple 결과를 기다린다.
 - 첫 촬영의 계정 삭제 실패는 공통 GOAPI의 MySQL 댓글 삭제 SQL 오류 1093이었다. GOAPI `ed55c9b`로
   수정하고 전체 test·vet와 공식 Ubuntu runtime 검증을 통과했다. 새 촬영 검토에서 운영 파일 해시가
   수정판과 일치하고 23:11:12 KST 삭제 요청 및 영상 13:46의 삭제 완료를 확인했다. iOS 빌드 2는 유지한다.
   배포 파일과 근거는 sibling NUBO `docs/ACCOUNT_DELETION_MYSQL.md`에 기록했다.
 - 새 14:57.5 영상의 실행·가입·로그인·업로드·신고·차단·메시지·삭제 완료를 확인했다. 검토 범위와
-  타임스탬프는 `docs/APP_REVIEW_RESPONSE_2026-09-12.md`에 기록했다. 약 1.68 GB 원본의 제출용
-  용량 조정과 개인정보 노출 구간 검토, 기기/OS 표기·Reply·Notes 최종 반영 및 첨부·재제출이 남았다.
+  타임스탬프와 실제 전송한 답변은 `docs/APP_REVIEW_RESPONSE_2026-09-12.md`에 기록했다. 원래 해상도와
+  길이를 유지한 H.264 압축본을 전체 디코딩·화면 검증 후 첨부했다. 실기기 iPhone 17/iOS 27.0 (24A435)와
+  설치된 제출 앱 `me.sensta.ios` 1.0 (2)도 다시 확인했다.
 - 빌드 2의 기존 Xcode 27 RC 단위/UI·Debug/Release·archive·배포 서명 검증 결과는 유지한다.
 
 - SENSTA Android의 제품 동작과 GOAPI API contract v1을 기준으로 iPhone용 네이티브 SwiftUI 앱을
